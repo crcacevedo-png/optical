@@ -1,0 +1,152 @@
+{
+  "theme_and_archetype": {
+    "domain": "Healthcare SaaS / Retail Management",
+    "theme": "Light Theme",
+    "archetype": "Archetype 1 (Organic & Earthy / Crisp Health)",
+    "description": "A clean, trustworthy, and modern dashboard tailored for optical clinics. It balances the clinical precision required for optometry with the premium retail feel of selling eyeglasses. Uses bone white backgrounds, deep pine green as the primary trust color, and warm ochre accents.",
+    "emotional_tone": "Trustworthy, Clear, Grounded, Professional"
+  },
+  "typography": {
+    "heading_font": "Outfit",
+    "body_font": "Manrope",
+    "rules": {
+      "h1": "text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900",
+      "h2": "text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900",
+      "h3": "text-xl font-medium tracking-tight text-slate-800",
+      "h4": "text-lg font-medium text-slate-800",
+      "body": "text-sm sm:text-base leading-relaxed text-slate-600 font-normal",
+      "labels": "text-xs font-semibold tracking-[0.05em] uppercase text-slate-500",
+      "metrics": "text-3xl font-bold tracking-tighter text-pine-900"
+    },
+    "installation": "import '@fontsource/outfit'; import '@fontsource/manrope';"
+  },
+  "color_palette": {
+    "background": {
+      "default": "#FAFAFA",
+      "paper": "#FFFFFF",
+      "sidebar": "#F4F4F5",
+      "muted": "#F1F5F9"
+    },
+    "primary": {
+      "DEFAULT": "#0F4C3A",
+      "hover": "#0A3326",
+      "light": "#ECFDF5",
+      "text": "#FFFFFF"
+    },
+    "secondary": {
+      "DEFAULT": "#D97706",
+      "hover": "#B45309",
+      "text": "#FFFFFF"
+    },
+    "text": {
+      "primary": "#0F172A",
+      "secondary": "#475569",
+      "muted": "#94A3B8"
+    },
+    "border": "#E2E8F0",
+    "states": {
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "info": "#3B82F6"
+    }
+  },
+  "spacing_and_layout": {
+    "strategy": "The 'Control Room' Grid (For Dashboards / Analytics). Use generous padding within cards to ensure data doesn't feel cramped.",
+    "container_padding": "p-6 md:p-8",
+    "card_padding": "p-6",
+    "gap_standard": "gap-6",
+    "border_radius": {
+      "card": "rounded-xl",
+      "button": "rounded-lg",
+      "input": "rounded-lg",
+      "badge": "rounded-full"
+    },
+    "shadows": {
+      "card": "shadow-[0_2px_10px_-3px_rgba(6,81,237,0.05)]",
+      "dropdown": "shadow-lg shadow-slate-200/50",
+      "floating": "shadow-xl shadow-slate-200/60"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-primary text-white hover:bg-primary-hover transition-colors duration-200 font-medium h-11 px-6 rounded-lg",
+      "secondary": "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors duration-200 font-medium h-11 px-6 rounded-lg",
+      "ghost": "text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors rounded-lg h-10 px-4"
+    },
+    "cards": {
+      "default": "bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden",
+      "interactive": "bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+    },
+    "inputs": {
+      "default": "h-11 rounded-lg border-slate-200 bg-white text-slate-900 focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-slate-400"
+    },
+    "tables": {
+      "header": "bg-slate-50/50 text-slate-500 font-semibold text-xs uppercase tracking-wider",
+      "row": "border-b border-slate-100 hover:bg-slate-50/50 transition-colors"
+    },
+    "sidebar": {
+      "container": "bg-white border-r border-slate-200 w-64 flex-shrink-0 flex flex-col h-screen",
+      "item": "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+      "item_active": "bg-primary/10 text-primary",
+      "item_inactive": "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+    }
+  },
+  "icons_and_assets": {
+    "icon_library": "lucide-react",
+    "installation_command": "yarn add lucide-react",
+    "image_urls": {
+      "login_background": {
+        "url": "https://images.pexels.com/photos/2078266/pexels-photo-2078266.jpeg",
+        "description": "Soft green gradient abstract background for the login page right-side panel.",
+        "category": "background"
+      },
+      "patient_avatar": {
+        "url": "https://images.unsplash.com/photo-1750390200208-d17fa7bfaf45",
+        "description": "Stylish woman wearing glasses, useful for demonstrating a detailed patient profile or testimonial.",
+        "category": "portrait"
+      },
+      "inventory_glasses": {
+        "url": "https://images.pexels.com/photos/7357970/pexels-photo-7357970.jpeg",
+        "description": "Vibrant collection of eyeglasses on white background, to be used in the inventory demo table or product catalog.",
+        "category": "product"
+      },
+      "clinic_room": {
+        "url": "https://images.pexels.com/photos/5965843/pexels-photo-5965843.jpeg",
+        "description": "Ophthalmology clinic examination room for branch (Sucursal) imagery or onboarding.",
+        "category": "environment"
+      }
+    }
+  },
+  "data_and_localization": {
+    "language": "es",
+    "currency": "GTQ",
+    "currency_format": "Q 1,200.00",
+    "demo_data_rules": "Use realistic Guatemalan names (e.g., 'Óptica Visión Clara', 'Juan Pérez', 'Ciudad de Guatemala'). Ensure all financial metrics display the 'Q' symbol.",
+    "testing": "All interactive elements must include a data-testid attribute in kebab-case (e.g., data-testid='login-submit-button')."
+  },
+  "key_page_structures": {
+    "login": {
+      "layout": "50/50 Split Screen. Left side: Centered login form, minimal logo, Welcome text. Right side: Full cover image (`login_background`) with a glassmorphism testimonial card overlaid."
+    },
+    "dashboard": {
+      "layout": "Sidebar on the left. Top Header with User/Branch Context. Main content uses the 'Control Room' grid: Top row 4 stat cards (Ingresos, Citas, Recetas, Pacientes). Middle row: Wide Chart (Ingresos/Egresos) + Narrow List (Próximas Citas)."
+    },
+    "patients": {
+      "layout": "Two-pane layout. Left 30%: Searchable patient list. Right 70%: Patient details including clinical history, active prescriptions (Recetas de Anteojos / Médicas)."
+    },
+    "prescriptions_form": {
+      "layout": "Complex bento layout. Separate sections clearly: Ojo Derecho (OD), Ojo Izquierdo (OI) with inputs for Esfera, Cilindro, Eje, Adición, D.P. Use distinct background cards for each eye to prevent data entry errors."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Strictly adhere to the color palette. Do NOT use default Tailwind blue for buttons or active states. Use the defined Primary color (#0F4C3A).",
+    "Implement the 'Control Room' grid strategy for dashboards. Do not center text arbitrarily. Left-align data for readability.",
+    "Use Shadcn UI components extensively (Cards, Inputs, Tables, Dialogs) but override their default styles to match the border-radius and colors defined here.",
+    "For the multi-tenant aspect, ensure there is a clear UI indicator (e.g., in the header) showing which 'Sucursal' or 'Empresa' is currently active.",
+    "Ensure all currency values are formatted in GTQ (Quetzales).",
+    "Incorporate the provided image URLs to make the UI look alive and populated during the demo.",
+    "Use 'Outfit' for all headings and 'Manrope' for all body text. Setup these fonts globally in index.css.",
+    "Ensure all interactive components have proper data-testid attributes for testing."
+  ]
+}
