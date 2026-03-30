@@ -37,14 +37,12 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-md">
           {/* Logo */}
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-pine-900 rounded-xl flex items-center justify-center">
-              <Glasses className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="font-heading text-2xl font-semibold text-slate-900">OptiSaaS</h1>
-              <p className="text-sm text-slate-500">Sistema de Gestión para Ópticas</p>
-            </div>
+          <div className="flex items-center justify-center mb-8">
+            <img 
+              src="https://customer-assets.emergentagent.com/job_eyecare-erp/artifacts/80lobcqc_logo%20cortexia%20optical%20transparente.png" 
+              alt="Cortexia Optical" 
+              className="h-20 object-contain"
+            />
           </div>
 
           <Card className="border-0 shadow-none">

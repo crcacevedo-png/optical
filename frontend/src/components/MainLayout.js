@@ -65,14 +65,12 @@ export default function MainLayout() {
       <aside className="hidden lg:flex w-64 flex-shrink-0 flex-col bg-white border-r border-slate-200 h-screen sticky top-0">
         {/* Logo */}
         <div className="p-5 border-b border-slate-100">
-          <Link to="/dashboard" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-pine-900 rounded-xl flex items-center justify-center">
-              <Glasses className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="font-heading text-lg font-semibold text-slate-900">OptiSaaS</h1>
-              <p className="text-xs text-slate-500">Gestión de Ópticas</p>
-            </div>
+          <Link to="/dashboard" className="flex items-center justify-center">
+            <img 
+              src="https://customer-assets.emergentagent.com/job_eyecare-erp/artifacts/80lobcqc_logo%20cortexia%20optical%20transparente.png" 
+              alt="Cortexia Optical" 
+              className="h-14 object-contain"
+            />
           </Link>
         </div>
 
@@ -118,10 +116,11 @@ export default function MainLayout() {
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200">
         <div className="flex items-center justify-between p-4">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="w-9 h-9 bg-pine-900 rounded-lg flex items-center justify-center">
-              <Glasses className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-heading font-semibold text-slate-900">OptiSaaS</span>
+            <img 
+              src="https://customer-assets.emergentagent.com/job_eyecare-erp/artifacts/80lobcqc_logo%20cortexia%20optical%20transparente.png" 
+              alt="Cortexia Optical" 
+              className="h-9 object-contain"
+            />
           </Link>
           <Button
             variant="ghost"
