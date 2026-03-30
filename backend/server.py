@@ -179,6 +179,25 @@ class MedicalPrescriptionCreate(BaseModel):
     medications: List[dict]
     instructions: Optional[str] = None
 
+class ContactLensPrescriptionCreate(BaseModel):
+    patient_id: str
+    od_power: Optional[float] = None
+    od_bc: Optional[float] = None
+    od_dia: Optional[float] = None
+    od_cylinder: Optional[float] = None
+    od_axis: Optional[int] = None
+    od_addition: Optional[float] = None
+    oi_power: Optional[float] = None
+    oi_bc: Optional[float] = None
+    oi_dia: Optional[float] = None
+    oi_cylinder: Optional[float] = None
+    oi_axis: Optional[int] = None
+    oi_addition: Optional[float] = None
+    brand: Optional[str] = None
+    lens_type: Optional[str] = None
+    replacement: Optional[str] = None
+    observations: Optional[str] = None
+
 class ProductCreate(BaseModel):
     name: str
     sku: str
@@ -879,6 +898,138 @@ async def get_medical_prescription_pdf(rx_id: str, user: dict = Depends(get_curr
     buffer.seek(0)
     
     return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=receta_medica_{rx_id}.pdf"})
+
+# ==================== CONTACT LENS PRESCRIPTIONS ====================
+@prescriptions_router.get("/contact")
+async def list_contact_lens_prescriptions(user: dict = Depends(get_current_user), patient_id: Optional[str] = None):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    query = {"company_id": ObjectId(user["company_id"])}
+    if patient_id:
+        query["patient_id"] = ObjectId(patient_id)
+    prescriptions = await db.contact_lens_prescriptions.find(query).sort("created_at", -1).to_list(100)
+    for rx in prescriptions:
+        rx["_id"] = str(rx["_id"])
+        rx["patient_id"] = str(rx["patient_id"])
+        rx["company_id"] = str(rx["company_id"])
+        patient = await db.patients.find_one({"_id": ObjectId(rx["patient_id"])}, {"first_name": 1, "last_name": 1})
+        if patient:
+            rx["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
+    return prescriptions
+
+@prescriptions_router.post("/contact")
+async def create_contact_lens_prescription(data: ContactLensPrescriptionCreate, user: dict = Depends(get_current_user)):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    rx_doc = {
+        "company_id": ObjectId(user["company_id"]),
+        "patient_id": ObjectId(data.patient_id),
+        "od_power": data.od_power,
+        "od_bc": data.od_bc,
+        "od_dia": data.od_dia,
+        "od_cylinder": data.od_cylinder,
+        "od_axis": data.od_axis,
+        "od_addition": data.od_addition,
+        "oi_power": data.oi_power,
+        "oi_bc": data.oi_bc,
+        "oi_dia": data.oi_dia,
+        "oi_cylinder": data.oi_cylinder,
+        "oi_axis": data.oi_axis,
+        "oi_addition": data.oi_addition,
+        "brand": data.brand,
+        "lens_type": data.lens_type,
+        "replacement": data.replacement,
+        "observations": data.observations,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": ObjectId(user["_id"])
+    }
+    result = await db.contact_lens_prescriptions.insert_one(rx_doc)
+    return {"_id": str(result.inserted_id), "message": "Receta de lentes de contacto creada"}
+
+@prescriptions_router.get("/contact/{rx_id}/pdf")
+async def get_contact_lens_prescription_pdf(rx_id: str, user: dict = Depends(get_current_user)):
+    rx = await db.contact_lens_prescriptions.find_one({"_id": ObjectId(rx_id)})
+    if not rx or str(rx["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Receta no encontrada")
+    
+    patient = await db.patients.find_one({"_id": rx["patient_id"]})
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
+    
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    
+    # Header
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(1*inch, height - 1*inch, company["name"] if company else "Óptica")
+    c.setFont("Helvetica", 10)
+    c.drawString(1*inch, height - 1.3*inch, company.get("address", "") if company else "")
+    c.drawString(1*inch, height - 1.5*inch, f"Tel: {company.get('phone', '')}" if company else "")
+    
+    # Title
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(width/2, height - 2*inch, "RECETA DE LENTES DE CONTACTO")
+    
+    # Patient info
+    c.setFont("Helvetica", 11)
+    c.drawString(1*inch, height - 2.5*inch, f"Paciente: {patient['first_name']} {patient['last_name']}" if patient else "")
+    c.drawString(1*inch, height - 2.7*inch, f"Fecha: {rx['created_at'][:10]}")
+    
+    # Prescription table
+    y = height - 3.2*inch
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(1.5*inch, y, "OJO")
+    c.drawString(2.3*inch, y, "PODER")
+    c.drawString(3.1*inch, y, "B.C.")
+    c.drawString(3.9*inch, y, "DIA")
+    c.drawString(4.7*inch, y, "CIL")
+    c.drawString(5.5*inch, y, "EJE")
+    c.drawString(6.3*inch, y, "ADD")
+    
+    y -= 0.3*inch
+    c.setFont("Helvetica", 10)
+    c.drawString(1.5*inch, y, "OD")
+    c.drawString(2.3*inch, y, str(rx.get("od_power", "-") or "-"))
+    c.drawString(3.1*inch, y, str(rx.get("od_bc", "-") or "-"))
+    c.drawString(3.9*inch, y, str(rx.get("od_dia", "-") or "-"))
+    c.drawString(4.7*inch, y, str(rx.get("od_cylinder", "-") or "-"))
+    c.drawString(5.5*inch, y, str(rx.get("od_axis", "-") or "-"))
+    c.drawString(6.3*inch, y, str(rx.get("od_addition", "-") or "-"))
+    
+    y -= 0.3*inch
+    c.drawString(1.5*inch, y, "OI")
+    c.drawString(2.3*inch, y, str(rx.get("oi_power", "-") or "-"))
+    c.drawString(3.1*inch, y, str(rx.get("oi_bc", "-") or "-"))
+    c.drawString(3.9*inch, y, str(rx.get("oi_dia", "-") or "-"))
+    c.drawString(4.7*inch, y, str(rx.get("oi_cylinder", "-") or "-"))
+    c.drawString(5.5*inch, y, str(rx.get("oi_axis", "-") or "-"))
+    c.drawString(6.3*inch, y, str(rx.get("oi_addition", "-") or "-"))
+    
+    # Product info
+    y -= 0.6*inch
+    if rx.get("brand"):
+        c.drawString(1*inch, y, f"Marca: {rx['brand']}")
+        y -= 0.25*inch
+    if rx.get("lens_type"):
+        c.drawString(1*inch, y, f"Tipo: {rx['lens_type']}")
+        y -= 0.25*inch
+    if rx.get("replacement"):
+        c.drawString(1*inch, y, f"Reemplazo: {rx['replacement']}")
+        y -= 0.25*inch
+    
+    # Observations
+    if rx.get("observations"):
+        y -= 0.3*inch
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(1*inch, y, "Observaciones:")
+        c.setFont("Helvetica", 10)
+        c.drawString(1*inch, y - 0.2*inch, rx["observations"][:150])
+    
+    c.save()
+    buffer.seek(0)
+    
+    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=receta_contacto_{rx_id}.pdf"})
 
 # ==================== INVENTORY ROUTES ====================
 @inventory_router.get("/products")
