@@ -13,14 +13,14 @@ import os
 import logging
 import bcrypt
 import jwt
-import secrets
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
 import io
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
+from reportlab.lib import colors
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -29,13 +29,12 @@ db = client[os.environ['DB_NAME']]
 
 # JWT Config
 JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 def get_jwt_secret() -> str:
     return os.environ["JWT_SECRET"]
 
-# Password hashing
 def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
@@ -44,13 +43,9 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
-# JWT Token Management
 def create_access_token(user_id: str, email: str, role: str, company_id: str = None) -> str:
     payload = {
-        "sub": user_id,
-        "email": email,
-        "role": role,
-        "company_id": company_id,
+        "sub": user_id, "email": email, "role": role, "company_id": company_id,
         "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
         "type": "access"
     }
@@ -64,7 +59,16 @@ def create_refresh_token(user_id: str) -> str:
     }
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
-# Auth helper
+def calculate_age(birth_date_str: str) -> int:
+    if not birth_date_str:
+        return None
+    try:
+        birth = datetime.strptime(birth_date_str[:10], "%Y-%m-%d").date()
+        today = date.today()
+        return today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
+    except:
+        return None
+
 async def get_current_user(request: Request) -> dict:
     token = request.cookies.get("access_token")
     if not token:
@@ -92,7 +96,7 @@ async def get_current_user(request: Request) -> dict:
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token inválido")
 
-# Pydantic Models
+# ==================== PYDANTIC MODELS ====================
 class UserRegister(BaseModel):
     email: EmailStr
     password: str
@@ -135,30 +139,57 @@ class PatientCreate(BaseModel):
     birth_date: Optional[str] = None
     gender: Optional[str] = None
     phone: str
+    whatsapp: Optional[str] = None
     email: Optional[EmailStr] = None
     address: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = "Guatemala"
     emergency_contact: Optional[str] = None
     emergency_phone: Optional[str] = None
     notes: Optional[str] = None
+    branch_id: Optional[str] = None
+
+class PatientUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    dpi: Optional[str] = None
+    birth_date: Optional[str] = None
+    gender: Optional[str] = None
+    phone: Optional[str] = None
+    whatsapp: Optional[str] = None
+    email: Optional[EmailStr] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    emergency_contact: Optional[str] = None
+    emergency_phone: Optional[str] = None
+    notes: Optional[str] = None
+    branch_id: Optional[str] = None
 
 class AppointmentCreate(BaseModel):
     patient_id: str
     branch_id: Optional[str] = None
     professional_id: Optional[str] = None
+    professional_name: Optional[str] = None
     date: str
     time: str
     duration: int = 30
     type: str
+    status: Optional[str] = "pendiente"
     notes: Optional[str] = None
 
 class AppointmentUpdate(BaseModel):
     status: Optional[str] = None
     date: Optional[str] = None
     time: Optional[str] = None
+    duration: Optional[int] = None
+    type: Optional[str] = None
+    professional_name: Optional[str] = None
     notes: Optional[str] = None
 
 class EyeglassPrescriptionCreate(BaseModel):
     patient_id: str
+    professional_name: Optional[str] = None
     od_sphere: Optional[float] = None
     od_cylinder: Optional[float] = None
     od_axis: Optional[int] = None
@@ -175,12 +206,14 @@ class EyeglassPrescriptionCreate(BaseModel):
 
 class MedicalPrescriptionCreate(BaseModel):
     patient_id: str
+    professional_name: Optional[str] = None
     diagnosis: Optional[str] = None
     medications: List[dict]
     instructions: Optional[str] = None
 
 class ContactLensPrescriptionCreate(BaseModel):
     patient_id: str
+    professional_name: Optional[str] = None
     od_power: Optional[float] = None
     od_bc: Optional[float] = None
     od_dia: Optional[float] = None
@@ -207,13 +240,25 @@ class ProductCreate(BaseModel):
     cost_price: float
     sale_price: float
     min_stock: int = 5
+    branch_id: Optional[str] = None
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    sku: Optional[str] = None
+    category: Optional[str] = None
+    brand: Optional[str] = None
+    description: Optional[str] = None
+    cost_price: Optional[float] = None
+    sale_price: Optional[float] = None
+    min_stock: Optional[int] = None
 
 class InventoryMovement(BaseModel):
     product_id: str
     branch_id: str
-    type: str
+    type: str  # 'entrada', 'salida'
     quantity: int
     notes: Optional[str] = None
+    reference: Optional[str] = None
 
 class SaleCreate(BaseModel):
     patient_id: Optional[str] = None
@@ -227,7 +272,7 @@ class SaleCreate(BaseModel):
     notes: Optional[str] = None
 
 class FinanceEntryCreate(BaseModel):
-    type: str
+    type: str  # 'ingreso', 'egreso'
     category: str
     amount: float
     description: str
@@ -241,10 +286,9 @@ class UserCreate(BaseModel):
     role: str
     branch_id: Optional[str] = None
 
-# Create the main app
-app = FastAPI(title="Ópticas SaaS API")
+# ==================== APP SETUP ====================
+app = FastAPI(title="Cortexia Optical API")
 
-# Create routers
 api_router = APIRouter(prefix="/api")
 auth_router = APIRouter(prefix="/auth", tags=["Autenticación"])
 companies_router = APIRouter(prefix="/companies", tags=["Empresas"])
@@ -267,13 +311,8 @@ async def register(data: UserRegister, response: Response):
         raise HTTPException(status_code=400, detail="El email ya está registrado")
     
     user_doc = {
-        "email": email,
-        "password_hash": hash_password(data.password),
-        "name": data.name,
-        "role": "user",
-        "company_id": None,
-        "branch_id": None,
-        "is_active": True,
+        "email": email, "password_hash": hash_password(data.password), "name": data.name,
+        "role": "user", "company_id": None, "branch_id": None, "is_active": True,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     result = await db.users.insert_one(user_doc)
@@ -291,7 +330,6 @@ async def register(data: UserRegister, response: Response):
 async def login(data: UserLogin, response: Response, request: Request):
     email = data.email.lower()
     
-    # Check brute force
     ip = request.client.host if request.client else "unknown"
     identifier = f"{ip}:{email}"
     attempt = await db.login_attempts.find_one({"identifier": identifier})
@@ -314,7 +352,6 @@ async def login(data: UserLogin, response: Response, request: Request):
     if not user.get("is_active", True):
         raise HTTPException(status_code=403, detail="Cuenta desactivada")
     
-    # Clear attempts on success
     await db.login_attempts.delete_one({"identifier": identifier})
     
     user_id = str(user["_id"])
@@ -326,12 +363,8 @@ async def login(data: UserLogin, response: Response, request: Request):
     response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
     
     return {
-        "_id": user_id,
-        "email": user["email"],
-        "name": user["name"],
-        "role": user["role"],
-        "company_id": company_id,
-        "branch_id": str(user["branch_id"]) if user.get("branch_id") else None
+        "_id": user_id, "email": user["email"], "name": user["name"], "role": user["role"],
+        "company_id": company_id, "branch_id": str(user["branch_id"]) if user.get("branch_id") else None
     }
 
 async def increment_login_attempts(identifier: str):
@@ -378,7 +411,7 @@ async def refresh_token(request: Request, response: Response):
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token inválido")
 
-# ==================== COMPANIES ROUTES (SuperAdmin) ====================
+# ==================== COMPANIES ROUTES ====================
 @companies_router.get("")
 async def list_companies(user: dict = Depends(get_current_user)):
     if user["role"] != "superadmin":
@@ -394,28 +427,17 @@ async def create_company(data: CompanyCreate, user: dict = Depends(get_current_u
         raise HTTPException(status_code=403, detail="Acceso denegado")
     
     company_doc = {
-        "name": data.name,
-        "legal_name": data.legal_name,
-        "tax_id": data.tax_id,
-        "address": data.address,
-        "phone": data.phone,
-        "email": data.email.lower(),
-        "is_active": True,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "name": data.name, "legal_name": data.legal_name, "tax_id": data.tax_id,
+        "address": data.address, "phone": data.phone, "email": data.email.lower(),
+        "is_active": True, "created_at": datetime.now(timezone.utc).isoformat()
     }
     result = await db.companies.insert_one(company_doc)
     company_id = result.inserted_id
     
-    # Create admin user for this company
     admin_doc = {
-        "email": data.admin_email.lower(),
-        "password_hash": hash_password(data.admin_password),
-        "name": data.admin_name,
-        "role": "admin",
-        "company_id": company_id,
-        "branch_id": None,
-        "is_active": True,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "email": data.admin_email.lower(), "password_hash": hash_password(data.admin_password),
+        "name": data.admin_name, "role": "admin", "company_id": company_id, "branch_id": None,
+        "is_active": True, "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.users.insert_one(admin_doc)
     
@@ -468,13 +490,9 @@ async def create_branch(data: BranchCreate, user: dict = Depends(get_current_use
         raise HTTPException(status_code=400, detail="No tiene empresa asignada")
     
     branch_doc = {
-        "company_id": ObjectId(user["company_id"]),
-        "name": data.name,
-        "address": data.address,
-        "phone": data.phone,
-        "email": data.email.lower() if data.email else None,
-        "is_active": True,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "company_id": ObjectId(user["company_id"]), "name": data.name, "address": data.address,
+        "phone": data.phone, "email": data.email.lower() if data.email else None,
+        "is_active": True, "created_at": datetime.now(timezone.utc).isoformat()
     }
     result = await db.branches.insert_one(branch_doc)
     return {"_id": str(result.inserted_id), "name": data.name}
@@ -518,15 +536,18 @@ async def list_patients(
             {"first_name": {"$regex": search, "$options": "i"}},
             {"last_name": {"$regex": search, "$options": "i"}},
             {"phone": {"$regex": search, "$options": "i"}},
+            {"whatsapp": {"$regex": search, "$options": "i"}},
             {"dpi": {"$regex": search, "$options": "i"}}
         ]
     
-    patients = await db.patients.find(query, {"_id": 1, "first_name": 1, "last_name": 1, "phone": 1, "email": 1, "created_at": 1}).skip(skip).limit(limit).to_list(limit)
+    total = await db.patients.count_documents(query)
+    patients = await db.patients.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
     for p in patients:
         p["_id"] = str(p["_id"])
+        p["age"] = calculate_age(p.get("birth_date"))
     
-    total = await db.patients.count_documents(query)
-    return {"patients": patients, "total": total}
+    return {"patients": patients, "total": total, "limit": limit, "skip": skip}
 
 @patients_router.post("")
 async def create_patient(data: PatientCreate, user: dict = Depends(get_current_user)):
@@ -535,19 +556,13 @@ async def create_patient(data: PatientCreate, user: dict = Depends(get_current_u
     
     patient_doc = {
         "company_id": ObjectId(user["company_id"]),
-        "branch_id": ObjectId(user["branch_id"]) if user.get("branch_id") else None,
-        "first_name": data.first_name,
-        "last_name": data.last_name,
-        "dpi": data.dpi,
-        "birth_date": data.birth_date,
-        "gender": data.gender,
-        "phone": data.phone,
-        "email": data.email.lower() if data.email else None,
-        "address": data.address,
-        "emergency_contact": data.emergency_contact,
-        "emergency_phone": data.emergency_phone,
-        "notes": data.notes,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "branch_id": ObjectId(data.branch_id) if data.branch_id else (ObjectId(user["branch_id"]) if user.get("branch_id") else None),
+        "first_name": data.first_name, "last_name": data.last_name, "dpi": data.dpi,
+        "birth_date": data.birth_date, "gender": data.gender, "phone": data.phone,
+        "whatsapp": data.whatsapp or data.phone, "email": data.email.lower() if data.email else None,
+        "address": data.address, "city": data.city, "country": data.country,
+        "emergency_contact": data.emergency_contact, "emergency_phone": data.emergency_phone,
+        "notes": data.notes, "created_at": datetime.now(timezone.utc).isoformat(),
         "created_by": ObjectId(user["_id"])
     }
     result = await db.patients.insert_one(patient_doc)
@@ -563,36 +578,42 @@ async def get_patient(patient_id: str, user: dict = Depends(get_current_user)):
     
     patient["_id"] = str(patient["_id"])
     patient["company_id"] = str(patient["company_id"])
+    patient["age"] = calculate_age(patient.get("birth_date"))
     if patient.get("branch_id"):
         patient["branch_id"] = str(patient["branch_id"])
     if patient.get("created_by"):
         patient["created_by"] = str(patient["created_by"])
     
-    # Get prescriptions
-    eyeglass_rx = await db.eyeglass_prescriptions.find({"patient_id": ObjectId(patient_id)}).sort("created_at", -1).to_list(10)
+    # Historial completo
+    eyeglass_rx = await db.eyeglass_prescriptions.find({"patient_id": ObjectId(patient_id)}).sort("created_at", -1).to_list(20)
     for rx in eyeglass_rx:
         rx["_id"] = str(rx["_id"])
         rx["patient_id"] = str(rx["patient_id"])
         rx["company_id"] = str(rx["company_id"])
     patient["eyeglass_prescriptions"] = eyeglass_rx
     
-    medical_rx = await db.medical_prescriptions.find({"patient_id": ObjectId(patient_id)}).sort("created_at", -1).to_list(10)
+    contact_rx = await db.contact_lens_prescriptions.find({"patient_id": ObjectId(patient_id)}).sort("created_at", -1).to_list(20)
+    for rx in contact_rx:
+        rx["_id"] = str(rx["_id"])
+        rx["patient_id"] = str(rx["patient_id"])
+        rx["company_id"] = str(rx["company_id"])
+    patient["contact_prescriptions"] = contact_rx
+    
+    medical_rx = await db.medical_prescriptions.find({"patient_id": ObjectId(patient_id)}).sort("created_at", -1).to_list(20)
     for rx in medical_rx:
         rx["_id"] = str(rx["_id"])
         rx["patient_id"] = str(rx["patient_id"])
         rx["company_id"] = str(rx["company_id"])
     patient["medical_prescriptions"] = medical_rx
     
-    # Get appointments
-    appointments = await db.appointments.find({"patient_id": ObjectId(patient_id)}).sort("date", -1).to_list(20)
+    appointments = await db.appointments.find({"patient_id": ObjectId(patient_id)}).sort("date", -1).to_list(30)
     for apt in appointments:
         apt["_id"] = str(apt["_id"])
         apt["patient_id"] = str(apt["patient_id"])
         apt["company_id"] = str(apt["company_id"])
     patient["appointments"] = appointments
     
-    # Get sales
-    sales = await db.sales.find({"patient_id": ObjectId(patient_id)}).sort("created_at", -1).to_list(20)
+    sales = await db.sales.find({"patient_id": ObjectId(patient_id)}).sort("created_at", -1).to_list(30)
     for s in sales:
         s["_id"] = str(s["_id"])
         if s.get("patient_id"):
@@ -603,28 +624,52 @@ async def get_patient(patient_id: str, user: dict = Depends(get_current_user)):
     return patient
 
 @patients_router.put("/{patient_id}")
-async def update_patient(patient_id: str, data: PatientCreate, user: dict = Depends(get_current_user)):
+async def update_patient(patient_id: str, data: PatientUpdate, user: dict = Depends(get_current_user)):
     patient = await db.patients.find_one({"_id": ObjectId(patient_id)})
     if not patient or str(patient["company_id"]) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
-    update_data = data.model_dump(exclude_unset=True)
+    
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    if "email" in update_data and update_data["email"]:
+        update_data["email"] = update_data["email"].lower()
+    if "branch_id" in update_data and update_data["branch_id"]:
+        update_data["branch_id"] = ObjectId(update_data["branch_id"])
+    
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.patients.update_one({"_id": ObjectId(patient_id)}, {"$set": update_data})
     return {"message": "Paciente actualizado"}
+
+@patients_router.delete("/{patient_id}")
+async def delete_patient(patient_id: str, user: dict = Depends(get_current_user)):
+    if user["role"] not in ["admin"]:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar pacientes")
+    patient = await db.patients.find_one({"_id": ObjectId(patient_id)})
+    if not patient or str(patient["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    await db.patients.update_one({"_id": ObjectId(patient_id)}, {"$set": {"is_deleted": True}})
+    return {"message": "Paciente eliminado"}
 
 # ==================== APPOINTMENTS ROUTES ====================
 @appointments_router.get("")
 async def list_appointments(
     user: dict = Depends(get_current_user),
     date: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     status: Optional[str] = None,
-    branch_id: Optional[str] = None
+    branch_id: Optional[str] = None,
+    view: Optional[str] = "day"
 ):
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="SuperAdmin no puede ver citas")
     
     query = {"company_id": ObjectId(user["company_id"])}
+    
     if date:
         query["date"] = date
+    elif date_from and date_to:
+        query["date"] = {"$gte": date_from, "$lte": date_to}
+    
     if status:
         query["status"] = status
     if branch_id:
@@ -632,17 +677,17 @@ async def list_appointments(
     elif user.get("branch_id"):
         query["branch_id"] = ObjectId(user["branch_id"])
     
-    appointments = await db.appointments.find(query).sort([("date", 1), ("time", 1)]).to_list(200)
+    appointments = await db.appointments.find(query).sort([("date", 1), ("time", 1)]).to_list(500)
     for apt in appointments:
         apt["_id"] = str(apt["_id"])
         apt["patient_id"] = str(apt["patient_id"])
         apt["company_id"] = str(apt["company_id"])
         if apt.get("branch_id"):
             apt["branch_id"] = str(apt["branch_id"])
-        # Get patient name
-        patient = await db.patients.find_one({"_id": ObjectId(apt["patient_id"])}, {"first_name": 1, "last_name": 1})
+        patient = await db.patients.find_one({"_id": ObjectId(apt["patient_id"])}, {"first_name": 1, "last_name": 1, "phone": 1})
         if patient:
             apt["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
+            apt["patient_phone"] = patient.get("phone", "")
     
     return appointments
 
@@ -656,17 +701,29 @@ async def create_appointment(data: AppointmentCreate, user: dict = Depends(get_c
         "branch_id": ObjectId(data.branch_id) if data.branch_id else (ObjectId(user["branch_id"]) if user.get("branch_id") else None),
         "patient_id": ObjectId(data.patient_id),
         "professional_id": ObjectId(data.professional_id) if data.professional_id else None,
-        "date": data.date,
-        "time": data.time,
-        "duration": data.duration,
-        "type": data.type,
-        "status": "scheduled",
-        "notes": data.notes,
+        "professional_name": data.professional_name,
+        "date": data.date, "time": data.time, "duration": data.duration, "type": data.type,
+        "status": data.status or "pendiente", "notes": data.notes,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "created_by": ObjectId(user["_id"])
     }
     result = await db.appointments.insert_one(apt_doc)
     return {"_id": str(result.inserted_id), "message": "Cita creada"}
+
+@appointments_router.get("/{appointment_id}")
+async def get_appointment(appointment_id: str, user: dict = Depends(get_current_user)):
+    apt = await db.appointments.find_one({"_id": ObjectId(appointment_id)})
+    if not apt or str(apt["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+    apt["_id"] = str(apt["_id"])
+    apt["patient_id"] = str(apt["patient_id"])
+    apt["company_id"] = str(apt["company_id"])
+    if apt.get("branch_id"):
+        apt["branch_id"] = str(apt["branch_id"])
+    patient = await db.patients.find_one({"_id": ObjectId(apt["patient_id"])}, {"first_name": 1, "last_name": 1})
+    if patient:
+        apt["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
+    return apt
 
 @appointments_router.put("/{appointment_id}")
 async def update_appointment(appointment_id: str, data: AppointmentUpdate, user: dict = Depends(get_current_user)):
@@ -674,6 +731,7 @@ async def update_appointment(appointment_id: str, data: AppointmentUpdate, user:
     if not apt or str(apt["company_id"]) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Cita no encontrada")
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.appointments.update_one({"_id": ObjectId(appointment_id)}, {"$set": update_data})
     return {"message": "Cita actualizada"}
 
@@ -682,10 +740,10 @@ async def cancel_appointment(appointment_id: str, user: dict = Depends(get_curre
     apt = await db.appointments.find_one({"_id": ObjectId(appointment_id)})
     if not apt or str(apt["company_id"]) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Cita no encontrada")
-    await db.appointments.update_one({"_id": ObjectId(appointment_id)}, {"$set": {"status": "cancelled"}})
+    await db.appointments.update_one({"_id": ObjectId(appointment_id)}, {"$set": {"status": "cancelada"}})
     return {"message": "Cita cancelada"}
 
-# ==================== PRESCRIPTIONS ROUTES ====================
+# ==================== PRESCRIPTIONS - EYEGLASS ====================
 @prescriptions_router.get("/eyeglass")
 async def list_eyeglass_prescriptions(user: dict = Depends(get_current_user), patient_id: Optional[str] = None):
     if user["role"] == "superadmin":
@@ -709,23 +767,14 @@ async def create_eyeglass_prescription(data: EyeglassPrescriptionCreate, user: d
         raise HTTPException(status_code=403, detail="Acceso denegado")
     
     rx_doc = {
-        "company_id": ObjectId(user["company_id"]),
-        "patient_id": ObjectId(data.patient_id),
-        "od_sphere": data.od_sphere,
-        "od_cylinder": data.od_cylinder,
-        "od_axis": data.od_axis,
-        "od_addition": data.od_addition,
-        "od_dp": data.od_dp,
-        "oi_sphere": data.oi_sphere,
-        "oi_cylinder": data.oi_cylinder,
-        "oi_axis": data.oi_axis,
-        "oi_addition": data.oi_addition,
-        "oi_dp": data.oi_dp,
-        "observations": data.observations,
-        "lens_type": data.lens_type,
-        "frame_type": data.frame_type,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "created_by": ObjectId(user["_id"])
+        "company_id": ObjectId(user["company_id"]), "patient_id": ObjectId(data.patient_id),
+        "professional_name": data.professional_name or user["name"],
+        "od_sphere": data.od_sphere, "od_cylinder": data.od_cylinder, "od_axis": data.od_axis,
+        "od_addition": data.od_addition, "od_dp": data.od_dp,
+        "oi_sphere": data.oi_sphere, "oi_cylinder": data.oi_cylinder, "oi_axis": data.oi_axis,
+        "oi_addition": data.oi_addition, "oi_dp": data.oi_dp,
+        "observations": data.observations, "lens_type": data.lens_type, "frame_type": data.frame_type,
+        "created_at": datetime.now(timezone.utc).isoformat(), "created_by": ObjectId(user["_id"])
     }
     result = await db.eyeglass_prescriptions.insert_one(rx_doc)
     return {"_id": str(result.inserted_id), "message": "Receta creada"}
@@ -743,163 +792,90 @@ async def get_eyeglass_prescription_pdf(rx_id: str, user: dict = Depends(get_cur
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
     
-    # Header
-    c.setFont("Helvetica-Bold", 18)
-    c.drawString(1*inch, height - 1*inch, company["name"] if company else "Óptica")
+    # Header con logo placeholder
+    c.setFillColor(colors.HexColor("#0F4C3A"))
+    c.rect(0, height - 1.2*inch, width, 1.2*inch, fill=True, stroke=False)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 22)
+    c.drawString(1*inch, height - 0.8*inch, company["name"] if company else "Cortexia Optical")
     c.setFont("Helvetica", 10)
-    c.drawString(1*inch, height - 1.3*inch, company.get("address", "") if company else "")
-    c.drawString(1*inch, height - 1.5*inch, f"Tel: {company.get('phone', '')}" if company else "")
+    c.drawString(1*inch, height - 1*inch, company.get("address", "") if company else "")
+    c.drawString(5*inch, height - 0.8*inch, f"Tel: {company.get('phone', '')}" if company else "")
     
-    # Title
-    c.setFont("Helvetica-Bold", 14)
-    c.drawCentredString(width/2, height - 2*inch, "RECETA DE ANTEOJOS")
+    # Título
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(width/2, height - 1.7*inch, "RECETA DE ANTEOJOS")
     
-    # Patient info
+    # Info paciente
     c.setFont("Helvetica", 11)
-    c.drawString(1*inch, height - 2.5*inch, f"Paciente: {patient['first_name']} {patient['last_name']}" if patient else "")
-    c.drawString(1*inch, height - 2.7*inch, f"Fecha: {rx['created_at'][:10]}")
+    y = height - 2.2*inch
+    c.drawString(1*inch, y, f"Paciente: {patient['first_name']} {patient['last_name']}" if patient else "")
+    c.drawString(4.5*inch, y, f"Fecha: {rx['created_at'][:10]}")
+    y -= 0.25*inch
+    if patient and patient.get("birth_date"):
+        age = calculate_age(patient["birth_date"])
+        c.drawString(1*inch, y, f"Edad: {age} años" if age else "")
+    c.drawString(4.5*inch, y, f"Profesional: {rx.get('professional_name', '')}")
     
-    # Prescription table
-    y = height - 3.2*inch
+    # Tabla de receta
+    y -= 0.5*inch
+    c.setFillColor(colors.HexColor("#F1F5F9"))
+    c.rect(0.8*inch, y - 0.8*inch, 6.4*inch, 1*inch, fill=True, stroke=False)
+    c.setFillColor(colors.black)
+    
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(1.5*inch, y, "OJO")
-    c.drawString(2.5*inch, y, "ESFERA")
-    c.drawString(3.5*inch, y, "CILINDRO")
-    c.drawString(4.5*inch, y, "EJE")
-    c.drawString(5.5*inch, y, "ADICIÓN")
-    c.drawString(6.5*inch, y, "D.P.")
+    headers = ["", "ESFERA", "CILINDRO", "EJE", "ADICIÓN", "D.P."]
+    x_positions = [1*inch, 1.8*inch, 2.8*inch, 3.8*inch, 4.7*inch, 5.6*inch]
+    for i, header in enumerate(headers):
+        c.drawString(x_positions[i], y, header)
     
-    y -= 0.3*inch
-    c.setFont("Helvetica", 10)
-    c.drawString(1.5*inch, y, "OD")
-    c.drawString(2.5*inch, y, str(rx.get("od_sphere", "-") or "-"))
-    c.drawString(3.5*inch, y, str(rx.get("od_cylinder", "-") or "-"))
-    c.drawString(4.5*inch, y, str(rx.get("od_axis", "-") or "-"))
-    c.drawString(5.5*inch, y, str(rx.get("od_addition", "-") or "-"))
-    c.drawString(6.5*inch, y, str(rx.get("od_dp", "-") or "-"))
+    y -= 0.35*inch
+    c.setFont("Helvetica", 11)
+    c.drawString(x_positions[0], y, "OD")
+    c.drawString(x_positions[1], y, str(rx.get("od_sphere") or "-"))
+    c.drawString(x_positions[2], y, str(rx.get("od_cylinder") or "-"))
+    c.drawString(x_positions[3], y, str(rx.get("od_axis") or "-") + "°" if rx.get("od_axis") else "-")
+    c.drawString(x_positions[4], y, str(rx.get("od_addition") or "-"))
+    c.drawString(x_positions[5], y, str(rx.get("od_dp") or "-"))
     
-    y -= 0.3*inch
-    c.drawString(1.5*inch, y, "OI")
-    c.drawString(2.5*inch, y, str(rx.get("oi_sphere", "-") or "-"))
-    c.drawString(3.5*inch, y, str(rx.get("oi_cylinder", "-") or "-"))
-    c.drawString(4.5*inch, y, str(rx.get("oi_axis", "-") or "-"))
-    c.drawString(5.5*inch, y, str(rx.get("oi_addition", "-") or "-"))
-    c.drawString(6.5*inch, y, str(rx.get("oi_dp", "-") or "-"))
+    y -= 0.35*inch
+    c.drawString(x_positions[0], y, "OI")
+    c.drawString(x_positions[1], y, str(rx.get("oi_sphere") or "-"))
+    c.drawString(x_positions[2], y, str(rx.get("oi_cylinder") or "-"))
+    c.drawString(x_positions[3], y, str(rx.get("oi_axis") or "-") + "°" if rx.get("oi_axis") else "-")
+    c.drawString(x_positions[4], y, str(rx.get("oi_addition") or "-"))
+    c.drawString(x_positions[5], y, str(rx.get("oi_dp") or "-"))
     
-    # Observations
+    # Detalles adicionales
+    y -= 0.6*inch
+    if rx.get("lens_type"):
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(1*inch, y, "Tipo de Lente:")
+        c.setFont("Helvetica", 10)
+        c.drawString(2.2*inch, y, rx["lens_type"])
+        y -= 0.25*inch
+    
     if rx.get("observations"):
-        y -= 0.6*inch
         c.setFont("Helvetica-Bold", 10)
         c.drawString(1*inch, y, "Observaciones:")
         c.setFont("Helvetica", 10)
-        c.drawString(1*inch, y - 0.2*inch, rx["observations"][:100])
+        c.drawString(2.4*inch, y, rx["observations"][:80])
     
-    # Lens type
-    if rx.get("lens_type"):
-        y -= 0.6*inch
-        c.drawString(1*inch, y, f"Tipo de lente: {rx['lens_type']}")
-    
-    c.save()
-    buffer.seek(0)
-    
-    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=receta_anteojos_{rx_id}.pdf"})
-
-@prescriptions_router.get("/medical")
-async def list_medical_prescriptions(user: dict = Depends(get_current_user), patient_id: Optional[str] = None):
-    if user["role"] == "superadmin":
-        raise HTTPException(status_code=403, detail="Acceso denegado")
-    query = {"company_id": ObjectId(user["company_id"])}
-    if patient_id:
-        query["patient_id"] = ObjectId(patient_id)
-    prescriptions = await db.medical_prescriptions.find(query).sort("created_at", -1).to_list(100)
-    for rx in prescriptions:
-        rx["_id"] = str(rx["_id"])
-        rx["patient_id"] = str(rx["patient_id"])
-        rx["company_id"] = str(rx["company_id"])
-        patient = await db.patients.find_one({"_id": ObjectId(rx["patient_id"])}, {"first_name": 1, "last_name": 1})
-        if patient:
-            rx["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
-    return prescriptions
-
-@prescriptions_router.post("/medical")
-async def create_medical_prescription(data: MedicalPrescriptionCreate, user: dict = Depends(get_current_user)):
-    if user["role"] == "superadmin":
-        raise HTTPException(status_code=403, detail="Acceso denegado")
-    
-    rx_doc = {
-        "company_id": ObjectId(user["company_id"]),
-        "patient_id": ObjectId(data.patient_id),
-        "diagnosis": data.diagnosis,
-        "medications": data.medications,
-        "instructions": data.instructions,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "created_by": ObjectId(user["_id"])
-    }
-    result = await db.medical_prescriptions.insert_one(rx_doc)
-    return {"_id": str(result.inserted_id), "message": "Receta médica creada"}
-
-@prescriptions_router.get("/medical/{rx_id}/pdf")
-async def get_medical_prescription_pdf(rx_id: str, user: dict = Depends(get_current_user)):
-    rx = await db.medical_prescriptions.find_one({"_id": ObjectId(rx_id)})
-    if not rx or str(rx["company_id"]) != user["company_id"]:
-        raise HTTPException(status_code=404, detail="Receta no encontrada")
-    
-    patient = await db.patients.find_one({"_id": rx["patient_id"]})
-    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
-    
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
-    
-    # Header
-    c.setFont("Helvetica-Bold", 18)
-    c.drawString(1*inch, height - 1*inch, company["name"] if company else "Óptica")
-    c.setFont("Helvetica", 10)
-    c.drawString(1*inch, height - 1.3*inch, company.get("address", "") if company else "")
-    
-    # Title
-    c.setFont("Helvetica-Bold", 14)
-    c.drawCentredString(width/2, height - 2*inch, "RECETA MÉDICA")
-    
-    # Patient info
-    c.setFont("Helvetica", 11)
-    c.drawString(1*inch, height - 2.5*inch, f"Paciente: {patient['first_name']} {patient['last_name']}" if patient else "")
-    c.drawString(1*inch, height - 2.7*inch, f"Fecha: {rx['created_at'][:10]}")
-    
-    # Diagnosis
-    y = height - 3.2*inch
-    if rx.get("diagnosis"):
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(1*inch, y, "Diagnóstico:")
-        c.setFont("Helvetica", 10)
-        c.drawString(1*inch, y - 0.2*inch, rx["diagnosis"][:100])
-        y -= 0.5*inch
-    
-    # Medications
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(1*inch, y, "Medicamentos:")
-    y -= 0.3*inch
-    c.setFont("Helvetica", 10)
-    for med in rx.get("medications", []):
-        c.drawString(1.2*inch, y, f"• {med.get('name', '')}")
-        c.drawString(3*inch, y, f"Dosis: {med.get('dosage', '')}")
-        c.drawString(5*inch, y, f"Duración: {med.get('duration', '')}")
-        y -= 0.25*inch
-    
-    # Instructions
-    if rx.get("instructions"):
-        y -= 0.3*inch
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(1*inch, y, "Instrucciones:")
-        c.setFont("Helvetica", 10)
-        c.drawString(1*inch, y - 0.2*inch, rx["instructions"][:150])
+    # Firma
+    y = 2*inch
+    c.line(1*inch, y, 3*inch, y)
+    c.setFont("Helvetica", 9)
+    c.drawString(1*inch, y - 0.2*inch, rx.get("professional_name", ""))
+    c.drawString(1*inch, y - 0.4*inch, "Profesional de la Salud Visual")
     
     c.save()
     buffer.seek(0)
     
-    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=receta_medica_{rx_id}.pdf"})
+    return StreamingResponse(buffer, media_type="application/pdf", 
+                           headers={"Content-Disposition": f"attachment; filename=receta_anteojos_{rx_id}.pdf"})
 
-# ==================== CONTACT LENS PRESCRIPTIONS ====================
+# ==================== PRESCRIPTIONS - CONTACT LENS ====================
 @prescriptions_router.get("/contact")
 async def list_contact_lens_prescriptions(user: dict = Depends(get_current_user), patient_id: Optional[str] = None):
     if user["role"] == "superadmin":
@@ -923,26 +899,15 @@ async def create_contact_lens_prescription(data: ContactLensPrescriptionCreate, 
         raise HTTPException(status_code=403, detail="Acceso denegado")
     
     rx_doc = {
-        "company_id": ObjectId(user["company_id"]),
-        "patient_id": ObjectId(data.patient_id),
-        "od_power": data.od_power,
-        "od_bc": data.od_bc,
-        "od_dia": data.od_dia,
-        "od_cylinder": data.od_cylinder,
-        "od_axis": data.od_axis,
-        "od_addition": data.od_addition,
-        "oi_power": data.oi_power,
-        "oi_bc": data.oi_bc,
-        "oi_dia": data.oi_dia,
-        "oi_cylinder": data.oi_cylinder,
-        "oi_axis": data.oi_axis,
-        "oi_addition": data.oi_addition,
-        "brand": data.brand,
-        "lens_type": data.lens_type,
-        "replacement": data.replacement,
+        "company_id": ObjectId(user["company_id"]), "patient_id": ObjectId(data.patient_id),
+        "professional_name": data.professional_name or user["name"],
+        "od_power": data.od_power, "od_bc": data.od_bc, "od_dia": data.od_dia,
+        "od_cylinder": data.od_cylinder, "od_axis": data.od_axis, "od_addition": data.od_addition,
+        "oi_power": data.oi_power, "oi_bc": data.oi_bc, "oi_dia": data.oi_dia,
+        "oi_cylinder": data.oi_cylinder, "oi_axis": data.oi_axis, "oi_addition": data.oi_addition,
+        "brand": data.brand, "lens_type": data.lens_type, "replacement": data.replacement,
         "observations": data.observations,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "created_by": ObjectId(user["_id"])
+        "created_at": datetime.now(timezone.utc).isoformat(), "created_by": ObjectId(user["_id"])
     }
     result = await db.contact_lens_prescriptions.insert_one(rx_doc)
     return {"_id": str(result.inserted_id), "message": "Receta de lentes de contacto creada"}
@@ -961,75 +926,190 @@ async def get_contact_lens_prescription_pdf(rx_id: str, user: dict = Depends(get
     width, height = letter
     
     # Header
-    c.setFont("Helvetica-Bold", 18)
-    c.drawString(1*inch, height - 1*inch, company["name"] if company else "Óptica")
+    c.setFillColor(colors.HexColor("#0F4C3A"))
+    c.rect(0, height - 1.2*inch, width, 1.2*inch, fill=True, stroke=False)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 22)
+    c.drawString(1*inch, height - 0.8*inch, company["name"] if company else "Cortexia Optical")
     c.setFont("Helvetica", 10)
-    c.drawString(1*inch, height - 1.3*inch, company.get("address", "") if company else "")
-    c.drawString(1*inch, height - 1.5*inch, f"Tel: {company.get('phone', '')}" if company else "")
+    c.drawString(1*inch, height - 1*inch, company.get("address", "") if company else "")
     
-    # Title
-    c.setFont("Helvetica-Bold", 14)
-    c.drawCentredString(width/2, height - 2*inch, "RECETA DE LENTES DE CONTACTO")
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(width/2, height - 1.7*inch, "RECETA DE LENTES DE CONTACTO")
     
-    # Patient info
     c.setFont("Helvetica", 11)
-    c.drawString(1*inch, height - 2.5*inch, f"Paciente: {patient['first_name']} {patient['last_name']}" if patient else "")
-    c.drawString(1*inch, height - 2.7*inch, f"Fecha: {rx['created_at'][:10]}")
+    y = height - 2.2*inch
+    c.drawString(1*inch, y, f"Paciente: {patient['first_name']} {patient['last_name']}" if patient else "")
+    c.drawString(4.5*inch, y, f"Fecha: {rx['created_at'][:10]}")
+    y -= 0.25*inch
+    c.drawString(4.5*inch, y, f"Profesional: {rx.get('professional_name', '')}")
     
-    # Prescription table
-    y = height - 3.2*inch
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(1.5*inch, y, "OJO")
-    c.drawString(2.3*inch, y, "PODER")
-    c.drawString(3.1*inch, y, "B.C.")
-    c.drawString(3.9*inch, y, "DIA")
-    c.drawString(4.7*inch, y, "CIL")
-    c.drawString(5.5*inch, y, "EJE")
-    c.drawString(6.3*inch, y, "ADD")
+    # Tabla
+    y -= 0.5*inch
+    c.setFillColor(colors.HexColor("#F1F5F9"))
+    c.rect(0.8*inch, y - 0.8*inch, 6.4*inch, 1*inch, fill=True, stroke=False)
+    c.setFillColor(colors.black)
     
-    y -= 0.3*inch
+    c.setFont("Helvetica-Bold", 9)
+    headers = ["", "ESFERA", "CIL", "EJE", "ADD", "DIA", "B.C."]
+    x_pos = [1*inch, 1.7*inch, 2.5*inch, 3.3*inch, 4.1*inch, 4.9*inch, 5.7*inch]
+    for i, h in enumerate(headers):
+        c.drawString(x_pos[i], y, h)
+    
+    y -= 0.35*inch
     c.setFont("Helvetica", 10)
-    c.drawString(1.5*inch, y, "OD")
-    c.drawString(2.3*inch, y, str(rx.get("od_power", "-") or "-"))
-    c.drawString(3.1*inch, y, str(rx.get("od_bc", "-") or "-"))
-    c.drawString(3.9*inch, y, str(rx.get("od_dia", "-") or "-"))
-    c.drawString(4.7*inch, y, str(rx.get("od_cylinder", "-") or "-"))
-    c.drawString(5.5*inch, y, str(rx.get("od_axis", "-") or "-"))
-    c.drawString(6.3*inch, y, str(rx.get("od_addition", "-") or "-"))
+    c.drawString(x_pos[0], y, "OD")
+    c.drawString(x_pos[1], y, str(rx.get("od_power") or "-"))
+    c.drawString(x_pos[2], y, str(rx.get("od_cylinder") or "-"))
+    c.drawString(x_pos[3], y, str(rx.get("od_axis") or "-"))
+    c.drawString(x_pos[4], y, str(rx.get("od_addition") or "-"))
+    c.drawString(x_pos[5], y, str(rx.get("od_dia") or "-"))
+    c.drawString(x_pos[6], y, str(rx.get("od_bc") or "-"))
     
-    y -= 0.3*inch
-    c.drawString(1.5*inch, y, "OI")
-    c.drawString(2.3*inch, y, str(rx.get("oi_power", "-") or "-"))
-    c.drawString(3.1*inch, y, str(rx.get("oi_bc", "-") or "-"))
-    c.drawString(3.9*inch, y, str(rx.get("oi_dia", "-") or "-"))
-    c.drawString(4.7*inch, y, str(rx.get("oi_cylinder", "-") or "-"))
-    c.drawString(5.5*inch, y, str(rx.get("oi_axis", "-") or "-"))
-    c.drawString(6.3*inch, y, str(rx.get("oi_addition", "-") or "-"))
+    y -= 0.35*inch
+    c.drawString(x_pos[0], y, "OI")
+    c.drawString(x_pos[1], y, str(rx.get("oi_power") or "-"))
+    c.drawString(x_pos[2], y, str(rx.get("oi_cylinder") or "-"))
+    c.drawString(x_pos[3], y, str(rx.get("oi_axis") or "-"))
+    c.drawString(x_pos[4], y, str(rx.get("oi_addition") or "-"))
+    c.drawString(x_pos[5], y, str(rx.get("oi_dia") or "-"))
+    c.drawString(x_pos[6], y, str(rx.get("oi_bc") or "-"))
     
-    # Product info
     y -= 0.6*inch
     if rx.get("brand"):
-        c.drawString(1*inch, y, f"Marca: {rx['brand']}")
-        y -= 0.25*inch
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(1*inch, y, "Marca:")
+        c.setFont("Helvetica", 10)
+        c.drawString(1.8*inch, y, rx["brand"])
     if rx.get("lens_type"):
-        c.drawString(1*inch, y, f"Tipo: {rx['lens_type']}")
-        y -= 0.25*inch
+        c.drawString(3.5*inch, y, f"Tipo: {rx['lens_type']}")
+    y -= 0.25*inch
     if rx.get("replacement"):
         c.drawString(1*inch, y, f"Reemplazo: {rx['replacement']}")
-        y -= 0.25*inch
     
-    # Observations
     if rx.get("observations"):
-        y -= 0.3*inch
+        y -= 0.4*inch
         c.setFont("Helvetica-Bold", 10)
         c.drawString(1*inch, y, "Observaciones:")
         c.setFont("Helvetica", 10)
-        c.drawString(1*inch, y - 0.2*inch, rx["observations"][:150])
+        c.drawString(2.4*inch, y, rx["observations"][:80])
+    
+    y = 2*inch
+    c.line(1*inch, y, 3*inch, y)
+    c.setFont("Helvetica", 9)
+    c.drawString(1*inch, y - 0.2*inch, rx.get("professional_name", ""))
     
     c.save()
     buffer.seek(0)
     
-    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=receta_contacto_{rx_id}.pdf"})
+    return StreamingResponse(buffer, media_type="application/pdf",
+                           headers={"Content-Disposition": f"attachment; filename=receta_contacto_{rx_id}.pdf"})
+
+# ==================== PRESCRIPTIONS - MEDICAL ====================
+@prescriptions_router.get("/medical")
+async def list_medical_prescriptions(user: dict = Depends(get_current_user), patient_id: Optional[str] = None):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    query = {"company_id": ObjectId(user["company_id"])}
+    if patient_id:
+        query["patient_id"] = ObjectId(patient_id)
+    prescriptions = await db.medical_prescriptions.find(query).sort("created_at", -1).to_list(100)
+    for rx in prescriptions:
+        rx["_id"] = str(rx["_id"])
+        rx["patient_id"] = str(rx["patient_id"])
+        rx["company_id"] = str(rx["company_id"])
+        patient = await db.patients.find_one({"_id": ObjectId(rx["patient_id"])}, {"first_name": 1, "last_name": 1})
+        if patient:
+            rx["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
+    return prescriptions
+
+@prescriptions_router.post("/medical")
+async def create_medical_prescription(data: MedicalPrescriptionCreate, user: dict = Depends(get_current_user)):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    rx_doc = {
+        "company_id": ObjectId(user["company_id"]), "patient_id": ObjectId(data.patient_id),
+        "professional_name": data.professional_name or user["name"],
+        "diagnosis": data.diagnosis, "medications": data.medications, "instructions": data.instructions,
+        "created_at": datetime.now(timezone.utc).isoformat(), "created_by": ObjectId(user["_id"])
+    }
+    result = await db.medical_prescriptions.insert_one(rx_doc)
+    return {"_id": str(result.inserted_id), "message": "Receta médica creada"}
+
+@prescriptions_router.get("/medical/{rx_id}/pdf")
+async def get_medical_prescription_pdf(rx_id: str, user: dict = Depends(get_current_user)):
+    rx = await db.medical_prescriptions.find_one({"_id": ObjectId(rx_id)})
+    if not rx or str(rx["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Receta no encontrada")
+    
+    patient = await db.patients.find_one({"_id": rx["patient_id"]})
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
+    
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    
+    # Header
+    c.setFillColor(colors.HexColor("#0F4C3A"))
+    c.rect(0, height - 1.2*inch, width, 1.2*inch, fill=True, stroke=False)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 22)
+    c.drawString(1*inch, height - 0.8*inch, company["name"] if company else "Cortexia Optical")
+    c.setFont("Helvetica", 10)
+    c.drawString(1*inch, height - 1*inch, company.get("address", "") if company else "")
+    
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(width/2, height - 1.7*inch, "RECETA MÉDICA")
+    
+    c.setFont("Helvetica", 11)
+    y = height - 2.2*inch
+    c.drawString(1*inch, y, f"Paciente: {patient['first_name']} {patient['last_name']}" if patient else "")
+    c.drawString(4.5*inch, y, f"Fecha: {rx['created_at'][:10]}")
+    y -= 0.25*inch
+    c.drawString(4.5*inch, y, f"Profesional: {rx.get('professional_name', '')}")
+    
+    if rx.get("diagnosis"):
+        y -= 0.5*inch
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(1*inch, y, "Diagnóstico:")
+        c.setFont("Helvetica", 11)
+        c.drawString(2.2*inch, y, rx["diagnosis"][:70])
+    
+    y -= 0.5*inch
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(1*inch, y, "Medicamentos:")
+    y -= 0.3*inch
+    c.setFont("Helvetica", 10)
+    for med in rx.get("medications", []):
+        c.drawString(1.2*inch, y, f"• {med.get('name', '')}")
+        c.drawString(3.5*inch, y, f"Dosis: {med.get('dosage', '')}")
+        c.drawString(5*inch, y, f"Duración: {med.get('duration', '')}")
+        y -= 0.25*inch
+        if med.get("frequency"):
+            c.drawString(1.4*inch, y, f"Frecuencia: {med['frequency']}")
+            y -= 0.25*inch
+    
+    if rx.get("instructions"):
+        y -= 0.3*inch
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(1*inch, y, "Indicaciones:")
+        c.setFont("Helvetica", 10)
+        y -= 0.25*inch
+        c.drawString(1.2*inch, y, rx["instructions"][:100])
+    
+    y = 2*inch
+    c.line(1*inch, y, 3*inch, y)
+    c.setFont("Helvetica", 9)
+    c.drawString(1*inch, y - 0.2*inch, rx.get("professional_name", ""))
+    
+    c.save()
+    buffer.seek(0)
+    
+    return StreamingResponse(buffer, media_type="application/pdf",
+                           headers={"Content-Disposition": f"attachment; filename=receta_medica_{rx_id}.pdf"})
 
 # ==================== INVENTORY ROUTES ====================
 @inventory_router.get("/products")
@@ -1037,7 +1117,7 @@ async def list_products(user: dict = Depends(get_current_user), category: Option
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
     
-    query = {"company_id": ObjectId(user["company_id"])}
+    query = {"company_id": ObjectId(user["company_id"]), "is_active": {"$ne": False}}
     if category:
         query["category"] = category
     if search:
@@ -1051,28 +1131,40 @@ async def list_products(user: dict = Depends(get_current_user), category: Option
     for p in products:
         p["_id"] = str(p["_id"])
         p["company_id"] = str(p["company_id"])
+        # Get current stock
+        branch_id = ObjectId(user["branch_id"]) if user.get("branch_id") else None
+        stock_query = {"company_id": ObjectId(user["company_id"]), "product_id": ObjectId(p["_id"])}
+        if branch_id:
+            stock_query["branch_id"] = branch_id
+        stock_item = await db.stock.find_one(stock_query)
+        p["stock_actual"] = stock_item["quantity"] if stock_item else 0
     return products
 
 @inventory_router.post("/products")
 async def create_product(data: ProductCreate, user: dict = Depends(get_current_user)):
     if user["role"] not in ["admin"]:
-        raise HTTPException(status_code=403, detail="Acceso denegado")
+        raise HTTPException(status_code=403, detail="Solo administradores pueden crear productos")
     
     product_doc = {
         "company_id": ObjectId(user["company_id"]),
-        "name": data.name,
-        "sku": data.sku,
-        "category": data.category,
-        "brand": data.brand,
-        "description": data.description,
-        "cost_price": data.cost_price,
-        "sale_price": data.sale_price,
-        "min_stock": data.min_stock,
-        "is_active": True,
+        "name": data.name, "sku": data.sku, "category": data.category, "brand": data.brand,
+        "description": data.description, "cost_price": data.cost_price, "sale_price": data.sale_price,
+        "min_stock": data.min_stock, "is_active": True,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     result = await db.products.insert_one(product_doc)
     return {"_id": str(result.inserted_id), "message": "Producto creado"}
+
+@inventory_router.put("/products/{product_id}")
+async def update_product(product_id: str, data: ProductUpdate, user: dict = Depends(get_current_user)):
+    if user["role"] not in ["admin"]:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden actualizar productos")
+    product = await db.products.find_one({"_id": ObjectId(product_id)})
+    if not product or str(product["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    await db.products.update_one({"_id": ObjectId(product_id)}, {"$set": update_data})
+    return {"message": "Producto actualizado"}
 
 @inventory_router.get("/stock")
 async def get_stock(user: dict = Depends(get_current_user), branch_id: Optional[str] = None):
@@ -1091,12 +1183,13 @@ async def get_stock(user: dict = Depends(get_current_user), branch_id: Optional[
         s["product_id"] = str(s["product_id"])
         s["company_id"] = str(s["company_id"])
         s["branch_id"] = str(s["branch_id"])
-        product = await db.products.find_one({"_id": ObjectId(s["product_id"])}, {"name": 1, "sku": 1, "min_stock": 1, "sale_price": 1})
+        product = await db.products.find_one({"_id": ObjectId(s["product_id"])}, {"name": 1, "sku": 1, "min_stock": 1, "sale_price": 1, "cost_price": 1})
         if product:
             s["product_name"] = product["name"]
             s["sku"] = product["sku"]
             s["min_stock"] = product.get("min_stock", 5)
             s["sale_price"] = product.get("sale_price", 0)
+            s["cost_price"] = product.get("cost_price", 0)
     return stock
 
 @inventory_router.post("/movement")
@@ -1104,14 +1197,18 @@ async def create_inventory_movement(data: InventoryMovement, user: dict = Depend
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
     
-    # Update or create stock record
+    # Verify product exists
+    product = await db.products.find_one({"_id": ObjectId(data.product_id)})
+    if not product or str(product["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    
     stock = await db.stock.find_one({
         "company_id": ObjectId(user["company_id"]),
         "branch_id": ObjectId(data.branch_id),
         "product_id": ObjectId(data.product_id)
     })
     
-    quantity_change = data.quantity if data.type == "in" else -data.quantity
+    quantity_change = data.quantity if data.type == "entrada" else -data.quantity
     
     if stock:
         new_quantity = stock["quantity"] + quantity_change
@@ -1132,7 +1229,7 @@ async def create_inventory_movement(data: InventoryMovement, user: dict = Depend
             "created_at": datetime.now(timezone.utc).isoformat()
         })
     
-    # Record movement
+    # Record movement history
     movement_doc = {
         "company_id": ObjectId(user["company_id"]),
         "branch_id": ObjectId(data.branch_id),
@@ -1140,12 +1237,42 @@ async def create_inventory_movement(data: InventoryMovement, user: dict = Depend
         "type": data.type,
         "quantity": data.quantity,
         "notes": data.notes,
+        "reference": data.reference,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "created_by": ObjectId(user["_id"])
     }
     await db.inventory_movements.insert_one(movement_doc)
     
     return {"message": "Movimiento registrado"}
+
+@inventory_router.get("/movements")
+async def list_inventory_movements(
+    user: dict = Depends(get_current_user),
+    product_id: Optional[str] = None,
+    branch_id: Optional[str] = None,
+    limit: int = 100
+):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    query = {"company_id": ObjectId(user["company_id"])}
+    if product_id:
+        query["product_id"] = ObjectId(product_id)
+    if branch_id:
+        query["branch_id"] = ObjectId(branch_id)
+    elif user.get("branch_id"):
+        query["branch_id"] = ObjectId(user["branch_id"])
+    
+    movements = await db.inventory_movements.find(query).sort("created_at", -1).limit(limit).to_list(limit)
+    for m in movements:
+        m["_id"] = str(m["_id"])
+        m["product_id"] = str(m["product_id"])
+        m["company_id"] = str(m["company_id"])
+        m["branch_id"] = str(m["branch_id"])
+        product = await db.products.find_one({"_id": ObjectId(m["product_id"])}, {"name": 1})
+        if product:
+            m["product_name"] = product["name"]
+    return movements
 
 @inventory_router.get("/alerts")
 async def get_stock_alerts(user: dict = Depends(get_current_user)):
@@ -1159,11 +1286,12 @@ async def get_stock_alerts(user: dict = Depends(get_current_user)):
     stock_items = await db.stock.find(query).to_list(1000)
     alerts = []
     for s in stock_items:
-        product = await db.products.find_one({"_id": s["product_id"]}, {"name": 1, "min_stock": 1})
+        product = await db.products.find_one({"_id": s["product_id"]}, {"name": 1, "min_stock": 1, "sku": 1})
         if product and s["quantity"] <= product.get("min_stock", 5):
             alerts.append({
                 "product_id": str(s["product_id"]),
                 "product_name": product["name"],
+                "sku": product.get("sku", ""),
                 "current_stock": s["quantity"],
                 "min_stock": product.get("min_stock", 5),
                 "branch_id": str(s["branch_id"])
@@ -1176,7 +1304,8 @@ async def list_sales(
     user: dict = Depends(get_current_user),
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    branch_id: Optional[str] = None
+    branch_id: Optional[str] = None,
+    limit: int = 100
 ):
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
@@ -1188,9 +1317,9 @@ async def list_sales(
         query["branch_id"] = ObjectId(user["branch_id"])
     
     if date_from and date_to:
-        query["created_at"] = {"$gte": date_from, "$lte": date_to}
+        query["created_at"] = {"$gte": date_from, "$lte": date_to + "T23:59:59"}
     
-    sales = await db.sales.find(query).sort("created_at", -1).to_list(200)
+    sales = await db.sales.find(query).sort("created_at", -1).limit(limit).to_list(limit)
     for s in sales:
         s["_id"] = str(s["_id"])
         s["company_id"] = str(s["company_id"])
@@ -1201,6 +1330,11 @@ async def list_sales(
             patient = await db.patients.find_one({"_id": ObjectId(s["patient_id"])}, {"first_name": 1, "last_name": 1})
             if patient:
                 s["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
+        if s.get("created_by"):
+            s["created_by"] = str(s["created_by"])
+            seller = await db.users.find_one({"_id": ObjectId(s["created_by"])}, {"name": 1})
+            if seller:
+                s["seller_name"] = seller["name"]
     return sales
 
 @sales_router.post("")
@@ -1215,34 +1349,42 @@ async def create_sale(data: SaleCreate, user: dict = Depends(get_current_user)):
         "branch_id": branch_id,
         "patient_id": ObjectId(data.patient_id) if data.patient_id else None,
         "items": data.items,
-        "subtotal": data.subtotal,
-        "discount": data.discount,
-        "tax": data.tax,
-        "total": data.total,
-        "payment_method": data.payment_method,
-        "amount_paid": data.amount_paid,
+        "subtotal": data.subtotal, "discount": data.discount, "tax": data.tax, "total": data.total,
+        "payment_method": data.payment_method, "amount_paid": data.amount_paid,
         "balance": data.total - data.amount_paid,
-        "status": "completed" if data.amount_paid >= data.total else "pending",
+        "status": "completada" if data.amount_paid >= data.total else "pendiente",
         "notes": data.notes,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "created_by": ObjectId(user["_id"])
     }
     result = await db.sales.insert_one(sale_doc)
     
-    # Update stock
+    # Update stock for each item
     for item in data.items:
         if item.get("product_id") and branch_id:
             await db.stock.update_one(
                 {"product_id": ObjectId(item["product_id"]), "branch_id": branch_id},
                 {"$inc": {"quantity": -item.get("quantity", 1)}}
             )
+            # Record movement
+            await db.inventory_movements.insert_one({
+                "company_id": ObjectId(user["company_id"]),
+                "branch_id": branch_id,
+                "product_id": ObjectId(item["product_id"]),
+                "type": "salida",
+                "quantity": item.get("quantity", 1),
+                "notes": f"Venta #{str(result.inserted_id)[-6:]}",
+                "reference": str(result.inserted_id),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_by": ObjectId(user["_id"])
+            })
     
-    # Create finance entry
+    # Create finance entry for income
     finance_doc = {
         "company_id": ObjectId(user["company_id"]),
         "branch_id": branch_id,
-        "type": "income",
-        "category": "sales",
+        "type": "ingreso",
+        "category": "ventas",
         "amount": data.amount_paid,
         "description": f"Venta #{str(result.inserted_id)[-6:]}",
         "reference_id": result.inserted_id,
@@ -1255,27 +1397,43 @@ async def create_sale(data: SaleCreate, user: dict = Depends(get_current_user)):
     
     return {"_id": str(result.inserted_id), "message": "Venta registrada"}
 
+@sales_router.get("/{sale_id}")
+async def get_sale(sale_id: str, user: dict = Depends(get_current_user)):
+    sale = await db.sales.find_one({"_id": ObjectId(sale_id)})
+    if not sale or str(sale["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    sale["_id"] = str(sale["_id"])
+    sale["company_id"] = str(sale["company_id"])
+    if sale.get("branch_id"):
+        sale["branch_id"] = str(sale["branch_id"])
+    if sale.get("patient_id"):
+        sale["patient_id"] = str(sale["patient_id"])
+        patient = await db.patients.find_one({"_id": ObjectId(sale["patient_id"])}, {"first_name": 1, "last_name": 1})
+        if patient:
+            sale["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
+    return sale
+
 @sales_router.post("/{sale_id}/payment")
-async def add_payment(sale_id: str, amount: float, user: dict = Depends(get_current_user)):
+async def add_payment(sale_id: str, amount: float = Query(...), user: dict = Depends(get_current_user)):
     sale = await db.sales.find_one({"_id": ObjectId(sale_id)})
     if not sale or str(sale["company_id"]) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
     
     new_paid = sale.get("amount_paid", 0) + amount
     new_balance = sale["total"] - new_paid
-    status = "completed" if new_balance <= 0 else "pending"
+    status = "completada" if new_balance <= 0 else "pendiente"
     
     await db.sales.update_one(
         {"_id": ObjectId(sale_id)},
-        {"$set": {"amount_paid": new_paid, "balance": new_balance, "status": status}}
+        {"$set": {"amount_paid": new_paid, "balance": max(0, new_balance), "status": status}}
     )
     
     # Create finance entry
     finance_doc = {
         "company_id": ObjectId(user["company_id"]),
         "branch_id": sale.get("branch_id"),
-        "type": "income",
-        "category": "sales",
+        "type": "ingreso",
+        "category": "ventas",
         "amount": amount,
         "description": f"Abono venta #{sale_id[-6:]}",
         "reference_id": ObjectId(sale_id),
@@ -1286,7 +1444,7 @@ async def add_payment(sale_id: str, amount: float, user: dict = Depends(get_curr
     }
     await db.finance_entries.insert_one(finance_doc)
     
-    return {"message": "Pago registrado", "new_balance": new_balance}
+    return {"message": "Pago registrado", "new_balance": max(0, new_balance)}
 
 # ==================== FINANCE ROUTES ====================
 @finance_router.get("")
@@ -1295,7 +1453,8 @@ async def list_finance_entries(
     type: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    branch_id: Optional[str] = None
+    branch_id: Optional[str] = None,
+    category: Optional[str] = None
 ):
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
@@ -1303,6 +1462,8 @@ async def list_finance_entries(
     query = {"company_id": ObjectId(user["company_id"])}
     if type:
         query["type"] = type
+    if category:
+        query["category"] = category
     if branch_id:
         query["branch_id"] = ObjectId(branch_id)
     elif user.get("branch_id"):
@@ -1365,17 +1526,64 @@ async def get_finance_summary(
     
     entries = await db.finance_entries.find(query).to_list(1000)
     
-    income = sum(e["amount"] for e in entries if e["type"] == "income")
-    expense = sum(e["amount"] for e in entries if e["type"] == "expense")
+    income = sum(e["amount"] for e in entries if e["type"] == "ingreso")
+    expense = sum(e["amount"] for e in entries if e["type"] == "egreso")
+    
+    # Group by category
+    income_by_category = {}
+    expense_by_category = {}
+    for e in entries:
+        if e["type"] == "ingreso":
+            income_by_category[e["category"]] = income_by_category.get(e["category"], 0) + e["amount"]
+        else:
+            expense_by_category[e["category"]] = expense_by_category.get(e["category"], 0) + e["amount"]
     
     return {
         "income": income,
         "expense": expense,
         "profit": income - expense,
+        "income_by_category": income_by_category,
+        "expense_by_category": expense_by_category,
         "period": {"from": date_from or month_start, "to": date_to or today}
     }
 
-# ==================== REPORTS ROUTES ====================
+@finance_router.get("/dashboard")
+async def get_finance_dashboard(user: dict = Depends(get_current_user)):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    month_start = datetime.now(timezone.utc).strftime("%Y-%m-01")
+    
+    query = {"company_id": ObjectId(user["company_id"]), "date": {"$gte": month_start, "$lte": today}}
+    if user.get("branch_id"):
+        query["branch_id"] = ObjectId(user["branch_id"])
+    
+    entries = await db.finance_entries.find(query).to_list(1000)
+    
+    income = sum(e["amount"] for e in entries if e["type"] == "ingreso")
+    expense = sum(e["amount"] for e in entries if e["type"] == "egreso")
+    
+    # Today's data
+    today_query = {**query, "date": today}
+    today_entries = await db.finance_entries.find(today_query).to_list(100)
+    today_income = sum(e["amount"] for e in today_entries if e["type"] == "ingreso")
+    today_expense = sum(e["amount"] for e in today_entries if e["type"] == "egreso")
+    
+    return {
+        "month": {
+            "income": income,
+            "expense": expense,
+            "profit": income - expense
+        },
+        "today": {
+            "income": today_income,
+            "expense": today_expense,
+            "profit": today_income - today_expense
+        }
+    }
+
+# ==================== REPORTS / DASHBOARD ====================
 @reports_router.get("/dashboard")
 async def get_dashboard(user: dict = Depends(get_current_user), branch_id: Optional[str] = None):
     if user["role"] == "superadmin":
@@ -1391,75 +1599,59 @@ async def get_dashboard(user: dict = Depends(get_current_user), branch_id: Optio
     elif user.get("branch_id"):
         branch_filter["branch_id"] = ObjectId(user["branch_id"])
     
-    # Appointments today
+    # Citas del día
     apt_query = {"company_id": company_id, "date": today, **branch_filter}
     appointments_today = await db.appointments.count_documents(apt_query)
+    appointments_pending = await db.appointments.count_documents({**apt_query, "status": "pendiente"})
     
-    # New patients this month
+    # Pacientes nuevos del mes
     patients_query = {"company_id": company_id, "created_at": {"$gte": month_start}}
     new_patients = await db.patients.count_documents(patients_query)
     
-    # Sales this month
-    sales_query = {"company_id": company_id, "created_at": {"$gte": month_start}, **branch_filter}
-    sales = await db.sales.find(sales_query).to_list(1000)
-    total_sales = sum(s.get("total", 0) for s in sales)
-    sales_count = len(sales)
+    # Ventas del día
+    sales_today_query = {"company_id": company_id, "created_at": {"$gte": today}, **branch_filter}
+    sales_today = await db.sales.find(sales_today_query).to_list(100)
+    total_sales_today = sum(s.get("total", 0) for s in sales_today)
+    sales_count_today = len(sales_today)
     
-    # Finance summary
+    # Ventas del mes
+    sales_month_query = {"company_id": company_id, "created_at": {"$gte": month_start}, **branch_filter}
+    sales_month = await db.sales.find(sales_month_query).to_list(1000)
+    total_sales_month = sum(s.get("total", 0) for s in sales_month)
+    
+    # Finanzas del mes
     finance_query = {"company_id": company_id, "date": {"$gte": month_start, "$lte": today}, **branch_filter}
     finance_entries = await db.finance_entries.find(finance_query).to_list(1000)
-    income = sum(e["amount"] for e in finance_entries if e["type"] == "income")
-    expense = sum(e["amount"] for e in finance_entries if e["type"] == "expense")
+    income = sum(e["amount"] for e in finance_entries if e["type"] == "ingreso")
+    expense = sum(e["amount"] for e in finance_entries if e["type"] == "egreso")
     
-    # Stock alerts
+    # Alertas de inventario
     stock_alerts = await get_stock_alerts_count(company_id, branch_filter.get("branch_id"))
     
-    # Upcoming appointments - simplified to avoid ObjectId issues
-    upcoming_apts_raw = await db.appointments.find({
-        "company_id": company_id,
-        "date": {"$gte": today},
-        "status": "scheduled",
+    # Próximas citas
+    upcoming_apts = await db.appointments.find({
+        "company_id": company_id, "date": {"$gte": today}, "status": {"$in": ["pendiente", "confirmada"]},
         **branch_filter
     }).sort([("date", 1), ("time", 1)]).limit(5).to_list(5)
     
-    upcoming_apts = []
-    for apt in upcoming_apts_raw:
-        # Convert all ObjectId fields to strings
-        clean_apt = {
-            "_id": str(apt["_id"]),
-            "patient_id": str(apt["patient_id"]),
-            "company_id": str(apt["company_id"]),
-            "date": apt.get("date", ""),
-            "time": apt.get("time", ""),
-            "type": apt.get("type", ""),
-            "status": apt.get("status", "")
-        }
-        if apt.get("branch_id"):
-            clean_apt["branch_id"] = str(apt["branch_id"])
-        if apt.get("professional_id"):
-            clean_apt["professional_id"] = str(apt["professional_id"])
-        
-        # Get patient name
+    for apt in upcoming_apts:
+        apt["_id"] = str(apt["_id"])
+        apt["patient_id"] = str(apt["patient_id"])
         patient = await db.patients.find_one({"_id": ObjectId(apt["patient_id"])}, {"first_name": 1, "last_name": 1})
         if patient:
-            clean_apt["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
-        
-        upcoming_apts.append(clean_apt)
-    
-    # Recent prescriptions
-    recent_rx = await db.eyeglass_prescriptions.find({"company_id": company_id}).sort("created_at", -1).limit(5).to_list(5)
-    rx_count = len(recent_rx)
+            apt["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
     
     return {
         "appointments_today": appointments_today,
+        "appointments_pending": appointments_pending,
         "new_patients": new_patients,
-        "sales_count": sales_count,
-        "total_sales": total_sales,
+        "sales_count_today": sales_count_today,
+        "total_sales_today": total_sales_today,
+        "total_sales_month": total_sales_month,
         "income": income,
         "expense": expense,
         "profit": income - expense,
         "stock_alerts": stock_alerts,
-        "prescriptions_count": rx_count,
         "upcoming_appointments": upcoming_apts
     }
 
@@ -1489,14 +1681,16 @@ async def get_sales_report(
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     month_start = datetime.now(timezone.utc).strftime("%Y-%m-01")
     
-    query = {
-        "company_id": ObjectId(user["company_id"]),
-        "created_at": {"$gte": date_from or month_start, "$lte": date_to or today}
-    }
+    query = {"company_id": ObjectId(user["company_id"])}
     if branch_id:
         query["branch_id"] = ObjectId(branch_id)
     elif user.get("branch_id"):
         query["branch_id"] = ObjectId(user["branch_id"])
+    
+    if date_from and date_to:
+        query["created_at"] = {"$gte": date_from, "$lte": date_to + "T23:59:59"}
+    else:
+        query["created_at"] = {"$gte": month_start, "$lte": today + "T23:59:59"}
     
     sales = await db.sales.find(query).to_list(1000)
     
@@ -1504,14 +1698,15 @@ async def get_sales_report(
     count = len(sales)
     by_payment = {}
     for s in sales:
-        pm = s.get("payment_method", "other")
+        pm = s.get("payment_method", "otro")
         by_payment[pm] = by_payment.get(pm, 0) + s.get("total", 0)
     
     return {
         "total": total,
         "count": count,
         "average": total / count if count > 0 else 0,
-        "by_payment_method": by_payment
+        "by_payment_method": by_payment,
+        "period": {"from": date_from or month_start, "to": date_to or today}
     }
 
 # ==================== USERS ROUTES ====================
@@ -1543,14 +1738,10 @@ async def create_user(data: UserCreate, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="El email ya está registrado")
     
     user_doc = {
-        "email": data.email.lower(),
-        "password_hash": hash_password(data.password),
-        "name": data.name,
-        "role": data.role,
-        "company_id": ObjectId(user["company_id"]),
+        "email": data.email.lower(), "password_hash": hash_password(data.password),
+        "name": data.name, "role": data.role, "company_id": ObjectId(user["company_id"]),
         "branch_id": ObjectId(data.branch_id) if data.branch_id else None,
-        "is_active": True,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "is_active": True, "created_at": datetime.now(timezone.utc).isoformat()
     }
     result = await db.users.insert_one(user_doc)
     return {"_id": str(result.inserted_id), "message": "Usuario creado"}
@@ -1592,7 +1783,7 @@ async def deactivate_user(user_id: str, user: dict = Depends(get_current_user)):
     await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"is_active": False}})
     return {"message": "Usuario desactivado"}
 
-# Include all routers
+# ==================== INCLUDE ROUTERS ====================
 api_router.include_router(auth_router)
 api_router.include_router(companies_router)
 api_router.include_router(branches_router)
@@ -1616,176 +1807,128 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Startup event - seed admin and demo data
+# ==================== STARTUP ====================
 @app.on_event("startup")
 async def startup():
     # Create indexes
     await db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
     await db.patients.create_index([("company_id", 1), ("last_name", 1)])
+    await db.patients.create_index([("company_id", 1), ("phone", 1)])
     await db.appointments.create_index([("company_id", 1), ("date", 1)])
     await db.stock.create_index([("company_id", 1), ("branch_id", 1), ("product_id", 1)], unique=True)
+    await db.inventory_movements.create_index([("company_id", 1), ("created_at", -1)])
+    await db.sales.create_index([("company_id", 1), ("created_at", -1)])
+    await db.finance_entries.create_index([("company_id", 1), ("date", -1)])
     
     # Seed superadmin
-    admin_email = os.environ.get("ADMIN_EMAIL", "superadmin@opticasaas.com")
+    admin_email = os.environ.get("ADMIN_EMAIL", "superadmin@cortexia.com")
     admin_password = os.environ.get("ADMIN_PASSWORD", "Admin123!")
     existing = await db.users.find_one({"email": admin_email})
     if not existing:
         await db.users.insert_one({
-            "email": admin_email,
-            "password_hash": hash_password(admin_password),
-            "name": "Super Administrador",
-            "role": "superadmin",
-            "company_id": None,
-            "branch_id": None,
-            "is_active": True,
+            "email": admin_email, "password_hash": hash_password(admin_password),
+            "name": "Super Administrador", "role": "superadmin",
+            "company_id": None, "branch_id": None, "is_active": True,
             "created_at": datetime.now(timezone.utc).isoformat()
         })
         logger.info(f"SuperAdmin created: {admin_email}")
-    elif not verify_password(admin_password, existing["password_hash"]):
-        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
-        logger.info("SuperAdmin password updated")
     
     # Seed demo company
-    demo_company = await db.companies.find_one({"name": "Óptica Visión Clara"})
+    demo_company = await db.companies.find_one({"name": "Cortexia Optical Demo"})
     if not demo_company:
         company_result = await db.companies.insert_one({
-            "name": "Óptica Visión Clara",
-            "legal_name": "Óptica Visión Clara S.A.",
-            "tax_id": "12345678-9",
-            "address": "6ta Avenida 12-34, Zona 1, Ciudad de Guatemala",
-            "phone": "+502 2234-5678",
-            "email": "info@visionclara.gt",
-            "is_active": True,
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "name": "Cortexia Optical Demo", "legal_name": "Cortexia Optical S.A.",
+            "tax_id": "12345678-9", "address": "6ta Avenida 12-34, Zona 1, Ciudad de Guatemala",
+            "phone": "+502 2234-5678", "email": "info@cortexia.gt",
+            "is_active": True, "created_at": datetime.now(timezone.utc).isoformat()
         })
         company_id = company_result.inserted_id
         
-        # Create admin for demo company
-        demo_admin = await db.users.find_one({"email": "admin@visionclara.gt"})
-        if not demo_admin:
-            await db.users.insert_one({
-                "email": "admin@visionclara.gt",
-                "password_hash": hash_password("Demo123!"),
-                "name": "Carlos Mendoza",
-                "role": "admin",
-                "company_id": company_id,
-                "branch_id": None,
-                "is_active": True,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            })
+        # Create admin
+        await db.users.insert_one({
+            "email": "admin@cortexia.gt", "password_hash": hash_password("Demo123!"),
+            "name": "Dr. Carlos Mendoza", "role": "admin", "company_id": company_id,
+            "branch_id": None, "is_active": True, "created_at": datetime.now(timezone.utc).isoformat()
+        })
         
-        # Create demo branch
+        # Create branch
         branch_result = await db.branches.insert_one({
-            "company_id": company_id,
-            "name": "Sede Central - Zona 1",
-            "address": "6ta Avenida 12-34, Zona 1, Ciudad de Guatemala",
-            "phone": "+502 2234-5678",
-            "email": "central@visionclara.gt",
-            "is_active": True,
+            "company_id": company_id, "name": "Sede Central - Zona 1",
+            "address": "6ta Avenida 12-34, Zona 1", "phone": "+502 2234-5678",
+            "email": "central@cortexia.gt", "is_active": True,
             "created_at": datetime.now(timezone.utc).isoformat()
         })
         branch_id = branch_result.inserted_id
         
-        # Create demo user
+        # Create user
         await db.users.insert_one({
-            "email": "vendedor@visionclara.gt",
-            "password_hash": hash_password("Demo123!"),
-            "name": "María López",
-            "role": "user",
-            "company_id": company_id,
-            "branch_id": branch_id,
-            "is_active": True,
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "email": "vendedor@cortexia.gt", "password_hash": hash_password("Demo123!"),
+            "name": "María López", "role": "user", "company_id": company_id,
+            "branch_id": branch_id, "is_active": True, "created_at": datetime.now(timezone.utc).isoformat()
         })
         
-        # Create demo patients
+        # Create patients
         patients_data = [
-            {"first_name": "Juan", "last_name": "Pérez García", "phone": "+502 5555-1234", "dpi": "1234567890101", "gender": "M", "birth_date": "1985-03-15"},
-            {"first_name": "Ana", "last_name": "Martínez Ruiz", "phone": "+502 5555-2345", "dpi": "2345678901212", "gender": "F", "birth_date": "1990-07-22"},
-            {"first_name": "Roberto", "last_name": "González López", "phone": "+502 5555-3456", "dpi": "3456789012323", "gender": "M", "birth_date": "1978-11-08"},
-            {"first_name": "Sofía", "last_name": "Hernández Cruz", "phone": "+502 5555-4567", "dpi": "4567890123434", "gender": "F", "birth_date": "1995-01-30"},
-            {"first_name": "Luis", "last_name": "Ramírez Morales", "phone": "+502 5555-5678", "dpi": "5678901234545", "gender": "M", "birth_date": "1982-09-12"}
+            {"first_name": "Juan", "last_name": "Pérez García", "phone": "+502 5555-1234", "whatsapp": "+502 5555-1234", "dpi": "1234567890101", "gender": "M", "birth_date": "1985-03-15", "city": "Guatemala", "country": "Guatemala"},
+            {"first_name": "Ana", "last_name": "Martínez Ruiz", "phone": "+502 5555-2345", "whatsapp": "+502 5555-2345", "dpi": "2345678901212", "gender": "F", "birth_date": "1990-07-22", "city": "Mixco", "country": "Guatemala"},
+            {"first_name": "Roberto", "last_name": "González López", "phone": "+502 5555-3456", "whatsapp": "+502 5555-3456", "dpi": "3456789012323", "gender": "M", "birth_date": "1978-11-08", "city": "Villa Nueva", "country": "Guatemala"},
+            {"first_name": "Sofía", "last_name": "Hernández Cruz", "phone": "+502 5555-4567", "whatsapp": "+502 5555-4567", "dpi": "4567890123434", "gender": "F", "birth_date": "1995-01-30", "city": "Guatemala", "country": "Guatemala"},
+            {"first_name": "Luis", "last_name": "Ramírez Morales", "phone": "+502 5555-5678", "whatsapp": "+502 5555-5678", "dpi": "5678901234545", "gender": "M", "birth_date": "1982-09-12", "city": "Petapa", "country": "Guatemala"}
         ]
         
         patient_ids = []
         for p in patients_data:
             result = await db.patients.insert_one({
-                **p,
-                "company_id": company_id,
-                "branch_id": branch_id,
-                "address": "Ciudad de Guatemala",
-                "email": f"{p['first_name'].lower()}@email.com",
+                **p, "company_id": company_id, "branch_id": branch_id,
+                "address": "Ciudad de Guatemala", "email": f"{p['first_name'].lower()}@email.com",
                 "created_at": datetime.now(timezone.utc).isoformat()
             })
             patient_ids.append(result.inserted_id)
         
-        # Create demo products
+        # Create products
         products_data = [
-            {"name": "Armazón Ray-Ban RB5154", "sku": "ARZ-RB5154", "category": "armazones", "brand": "Ray-Ban", "cost_price": 450, "sale_price": 850},
-            {"name": "Armazón Oakley OX8046", "sku": "ARZ-OX8046", "category": "armazones", "brand": "Oakley", "cost_price": 380, "sale_price": 720},
-            {"name": "Lente Progresivo Essilor", "sku": "LNT-PROG-ESS", "category": "lentes", "brand": "Essilor", "cost_price": 600, "sale_price": 1200},
-            {"name": "Lente Bifocal Zeiss", "sku": "LNT-BIF-ZEI", "category": "lentes", "brand": "Zeiss", "cost_price": 450, "sale_price": 900},
-            {"name": "Lente de Contacto Acuvue", "sku": "LC-ACUVUE", "category": "contactos", "brand": "Acuvue", "cost_price": 180, "sale_price": 350},
-            {"name": "Solución para Lentes 360ml", "sku": "SOL-360", "category": "accesorios", "brand": "Opti-Free", "cost_price": 45, "sale_price": 95},
-            {"name": "Estuche Premium", "sku": "EST-PREM", "category": "accesorios", "brand": "Generic", "cost_price": 25, "sale_price": 65}
+            {"name": "Armazón Ray-Ban RB5154", "sku": "ARZ-RB5154", "category": "armazones", "brand": "Ray-Ban", "cost_price": 450, "sale_price": 850, "min_stock": 3},
+            {"name": "Armazón Oakley OX8046", "sku": "ARZ-OX8046", "category": "armazones", "brand": "Oakley", "cost_price": 380, "sale_price": 720, "min_stock": 3},
+            {"name": "Lente Progresivo Essilor", "sku": "LNT-PROG-ESS", "category": "lentes", "brand": "Essilor", "cost_price": 600, "sale_price": 1200, "min_stock": 5},
+            {"name": "Lente Bifocal Zeiss", "sku": "LNT-BIF-ZEI", "category": "lentes", "brand": "Zeiss", "cost_price": 450, "sale_price": 900, "min_stock": 5},
+            {"name": "Lente de Contacto Acuvue Oasys", "sku": "LC-ACUVUE", "category": "contactos", "brand": "Acuvue", "cost_price": 180, "sale_price": 350, "min_stock": 10},
+            {"name": "Solución ReNu 360ml", "sku": "SOL-360", "category": "accesorios", "brand": "ReNu", "cost_price": 45, "sale_price": 95, "min_stock": 8},
+            {"name": "Estuche Premium para Anteojos", "sku": "EST-PREM", "category": "accesorios", "brand": "Generic", "cost_price": 25, "sale_price": 65, "min_stock": 10}
         ]
         
-        product_ids = []
         for pr in products_data:
             result = await db.products.insert_one({
-                **pr,
-                "company_id": company_id,
-                "min_stock": 5,
-                "is_active": True,
+                **pr, "company_id": company_id, "is_active": True,
                 "created_at": datetime.now(timezone.utc).isoformat()
             })
-            product_ids.append(result.inserted_id)
-            
             # Add stock
             await db.stock.insert_one({
-                "company_id": company_id,
-                "branch_id": branch_id,
-                "product_id": result.inserted_id,
-                "quantity": 15,
+                "company_id": company_id, "branch_id": branch_id,
+                "product_id": result.inserted_id, "quantity": 15,
                 "created_at": datetime.now(timezone.utc).isoformat()
             })
         
-        # Create demo appointments
+        # Create appointments
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         for i, pid in enumerate(patient_ids[:3]):
             await db.appointments.insert_one({
-                "company_id": company_id,
-                "branch_id": branch_id,
-                "patient_id": pid,
-                "date": today,
-                "time": f"{9 + i}:00",
-                "duration": 30,
-                "type": "consulta",
-                "status": "scheduled",
+                "company_id": company_id, "branch_id": branch_id, "patient_id": pid,
+                "date": today, "time": f"{9 + i}:00", "duration": 30,
+                "type": "consulta", "status": "pendiente", "professional_name": "Dr. Carlos Mendoza",
                 "created_at": datetime.now(timezone.utc).isoformat()
             })
         
-        # Create demo prescriptions
+        # Create prescription
         await db.eyeglass_prescriptions.insert_one({
-            "company_id": company_id,
-            "patient_id": patient_ids[0],
-            "od_sphere": -2.50,
-            "od_cylinder": -0.75,
-            "od_axis": 90,
-            "od_addition": None,
-            "od_dp": 32,
-            "oi_sphere": -2.25,
-            "oi_cylinder": -0.50,
-            "oi_axis": 85,
-            "oi_addition": None,
-            "oi_dp": 32,
-            "observations": "Miopía con astigmatismo leve",
-            "lens_type": "Monofocal",
+            "company_id": company_id, "patient_id": patient_ids[0],
+            "professional_name": "Dr. Carlos Mendoza",
+            "od_sphere": -2.50, "od_cylinder": -0.75, "od_axis": 90, "od_dp": 32,
+            "oi_sphere": -2.25, "oi_cylinder": -0.50, "oi_axis": 85, "oi_dp": 32,
+            "observations": "Miopía con astigmatismo leve", "lens_type": "Monofocal",
             "created_at": datetime.now(timezone.utc).isoformat()
         })
         
@@ -1794,29 +1937,19 @@ async def startup():
     # Write test credentials
     Path("/app/memory").mkdir(parents=True, exist_ok=True)
     with open("/app/memory/test_credentials.md", "w") as f:
-        f.write("""# Test Credentials
+        f.write("""# Test Credentials - Cortexia Optical
 
 ## SuperAdmin
-- Email: superadmin@opticasaas.com
+- Email: superadmin@cortexia.com
 - Password: Admin123!
-- Role: superadmin
 
-## Demo Company Admin (Óptica Visión Clara)
-- Email: admin@visionclara.gt
+## Demo Company Admin
+- Email: admin@cortexia.gt
 - Password: Demo123!
-- Role: admin
 
 ## Demo User
-- Email: vendedor@visionclara.gt
+- Email: vendedor@cortexia.gt
 - Password: Demo123!
-- Role: user
-
-## Auth Endpoints
-- POST /api/auth/login
-- POST /api/auth/register
-- POST /api/auth/logout
-- GET /api/auth/me
-- POST /api/auth/refresh
 """)
 
 @app.on_event("shutdown")
