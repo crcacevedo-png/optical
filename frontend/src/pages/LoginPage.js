@@ -41,7 +41,7 @@ export default function LoginPage() {
             <img 
               src="https://customer-assets.emergentagent.com/job_eyecare-erp/artifacts/80lobcqc_logo%20cortexia%20optical%20transparente.png" 
               alt="Cortexia Optical" 
-              className="h-20 object-contain"
+              className="h-60 object-contain"
             />
           </div>
 
