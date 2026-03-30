@@ -206,12 +206,12 @@ export default function SalesPage() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Cliente (Opcional)</Label>
-                    <Select value={saleForm.patient_id} onValueChange={(v) => setSaleForm({...saleForm, patient_id: v})}>
+                    <Select value={saleForm.patient_id || "none"} onValueChange={(v) => setSaleForm({...saleForm, patient_id: v === "none" ? "" : v})}>
                       <SelectTrigger data-testid="sale-patient">
                         <SelectValue placeholder="Seleccionar cliente" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Sin cliente</SelectItem>
+                        <SelectItem value="none">Sin cliente</SelectItem>
                         {patients.map((p) => (
                           <SelectItem key={p._id} value={p._id}>
                             {p.first_name} {p.last_name}
