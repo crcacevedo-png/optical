@@ -389,16 +389,8 @@ export default function PrescriptionsPage() {
                       <h3 className="font-semibold text-blue-900 mb-3">Ojo Derecho (OD)</h3>
                       <div className="grid grid-cols-6 gap-3">
                         <div className="space-y-1">
-                          <Label className="text-xs">Poder</Label>
-                          <Input type="number" step="0.25" value={contactForm.od_power} onChange={(e) => setContactForm({...contactForm, od_power: e.target.value})} placeholder="-2.50" className="h-9" data-testid="od-power" />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">B.C.</Label>
-                          <Input type="number" step="0.1" value={contactForm.od_bc} onChange={(e) => setContactForm({...contactForm, od_bc: e.target.value})} placeholder="8.6" className="h-9" data-testid="od-bc" />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">DIA</Label>
-                          <Input type="number" step="0.1" value={contactForm.od_dia} onChange={(e) => setContactForm({...contactForm, od_dia: e.target.value})} placeholder="14.2" className="h-9" data-testid="od-dia" />
+                          <Label className="text-xs">Esfera</Label>
+                          <Input type="number" step="0.25" value={contactForm.od_power} onChange={(e) => setContactForm({...contactForm, od_power: e.target.value})} placeholder="-2.50" className="h-9" data-testid="od-esfera" />
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs">Cilindro</Label>
@@ -412,6 +404,14 @@ export default function PrescriptionsPage() {
                           <Label className="text-xs">Adición</Label>
                           <Input type="number" step="0.25" value={contactForm.od_addition} onChange={(e) => setContactForm({...contactForm, od_addition: e.target.value})} placeholder="+1.50" className="h-9" />
                         </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">DIA</Label>
+                          <Input type="number" step="0.1" value={contactForm.od_dia} onChange={(e) => setContactForm({...contactForm, od_dia: e.target.value})} placeholder="14.2" className="h-9" data-testid="od-dia" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">B.C.</Label>
+                          <Input type="number" step="0.1" value={contactForm.od_bc} onChange={(e) => setContactForm({...contactForm, od_bc: e.target.value})} placeholder="8.6" className="h-9" data-testid="od-bc" />
+                        </div>
                       </div>
                     </div>
 
@@ -420,16 +420,8 @@ export default function PrescriptionsPage() {
                       <h3 className="font-semibold text-green-900 mb-3">Ojo Izquierdo (OI)</h3>
                       <div className="grid grid-cols-6 gap-3">
                         <div className="space-y-1">
-                          <Label className="text-xs">Poder</Label>
-                          <Input type="number" step="0.25" value={contactForm.oi_power} onChange={(e) => setContactForm({...contactForm, oi_power: e.target.value})} placeholder="-2.25" className="h-9" data-testid="oi-power" />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">B.C.</Label>
-                          <Input type="number" step="0.1" value={contactForm.oi_bc} onChange={(e) => setContactForm({...contactForm, oi_bc: e.target.value})} placeholder="8.6" className="h-9" data-testid="oi-bc" />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">DIA</Label>
-                          <Input type="number" step="0.1" value={contactForm.oi_dia} onChange={(e) => setContactForm({...contactForm, oi_dia: e.target.value})} placeholder="14.2" className="h-9" data-testid="oi-dia" />
+                          <Label className="text-xs">Esfera</Label>
+                          <Input type="number" step="0.25" value={contactForm.oi_power} onChange={(e) => setContactForm({...contactForm, oi_power: e.target.value})} placeholder="-2.25" className="h-9" data-testid="oi-esfera" />
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs">Cilindro</Label>
@@ -442,6 +434,14 @@ export default function PrescriptionsPage() {
                         <div className="space-y-1">
                           <Label className="text-xs">Adición</Label>
                           <Input type="number" step="0.25" value={contactForm.oi_addition} onChange={(e) => setContactForm({...contactForm, oi_addition: e.target.value})} placeholder="+1.50" className="h-9" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">DIA</Label>
+                          <Input type="number" step="0.1" value={contactForm.oi_dia} onChange={(e) => setContactForm({...contactForm, oi_dia: e.target.value})} placeholder="14.2" className="h-9" data-testid="oi-dia" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">B.C.</Label>
+                          <Input type="number" step="0.1" value={contactForm.oi_bc} onChange={(e) => setContactForm({...contactForm, oi_bc: e.target.value})} placeholder="8.6" className="h-9" data-testid="oi-bc" />
                         </div>
                       </div>
                     </div>
@@ -499,8 +499,8 @@ export default function PrescriptionsPage() {
                   <TableRow className="data-table-header">
                     <TableHead>Fecha</TableHead>
                     <TableHead>Paciente</TableHead>
-                    <TableHead>OD (Poder/BC/DIA)</TableHead>
-                    <TableHead>OI (Poder/BC/DIA)</TableHead>
+                    <TableHead>OD (Esf/Cil/Eje)</TableHead>
+                    <TableHead>OI (Esf/Cil/Eje)</TableHead>
                     <TableHead>Marca</TableHead>
                     <TableHead>Reemplazo</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
@@ -511,8 +511,8 @@ export default function PrescriptionsPage() {
                     <TableRow key={rx._id} className="data-table-row">
                       <TableCell>{rx.created_at?.slice(0, 10)}</TableCell>
                       <TableCell className="font-medium">{rx.patient_name || 'Paciente'}</TableCell>
-                      <TableCell className="text-sm">{rx.od_power || '-'} / {rx.od_bc || '-'} / {rx.od_dia || '-'}</TableCell>
-                      <TableCell className="text-sm">{rx.oi_power || '-'} / {rx.oi_bc || '-'} / {rx.oi_dia || '-'}</TableCell>
+                      <TableCell className="text-sm">{rx.od_power || '-'} / {rx.od_cylinder || '-'} x {rx.od_axis || '-'}</TableCell>
+                      <TableCell className="text-sm">{rx.oi_power || '-'} / {rx.oi_cylinder || '-'} x {rx.oi_axis || '-'}</TableCell>
                       <TableCell>{rx.brand || '-'}</TableCell>
                       <TableCell>{rx.replacement || '-'}</TableCell>
                       <TableCell className="text-right">
