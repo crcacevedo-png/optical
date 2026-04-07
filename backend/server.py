@@ -701,6 +701,16 @@ async def update_branch(branch_id: str, data: BranchCreate, user: dict = Depends
     await db.branches.update_one({"_id": ObjectId(branch_id)}, {"$set": update_data})
     return {"message": "Sucursal actualizada"}
 
+@branches_router.delete("/{branch_id}")
+async def delete_branch(branch_id: str, user: dict = Depends(get_current_user)):
+    if user["role"] != "superadmin":
+        raise HTTPException(status_code=403, detail="Solo SuperAdmin puede eliminar sucursales")
+    branch = await db.branches.find_one({"_id": ObjectId(branch_id)})
+    if not branch:
+        raise HTTPException(status_code=404, detail="Sucursal no encontrada")
+    await db.branches.delete_one({"_id": ObjectId(branch_id)})
+    return {"message": "Sucursal eliminada"}
+
 # ==================== PATIENTS ROUTES ====================
 @patients_router.get("")
 async def list_patients(

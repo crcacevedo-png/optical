@@ -11,7 +11,7 @@ import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   Plus, Building2, MapPin, Phone, Mail, Users, GitBranch,
-  Shield, UserCheck, UserX, Eye, EyeOff, ChevronRight, Store, UserCog, Upload, Image
+  Shield, UserCheck, UserX, Eye, EyeOff, ChevronRight, Store, UserCog, Upload, Image, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -54,6 +54,17 @@ export default function AdminOpticasPage() {
       toast.error(formatApiErrorDetail(err?.response?.data?.detail));
     } finally {
       setUploadingLogo(false);
+    }
+  };
+
+  const deleteBranch = async (branchId) => {
+    if (!window.confirm('Eliminar esta sucursal? Esta accion no se puede deshacer.')) return;
+    try {
+      await api.delete(`/api/branches/${branchId}`);
+      toast.success('Sucursal eliminada');
+      loadCompanyDetail(selectedCompany);
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err?.response?.data?.detail));
     }
   };
 
@@ -346,11 +357,17 @@ export default function AdminOpticasPage() {
                                 <p className="text-xs text-slate-400">{b.address} &middot; {b.phone}</p>
                               </div>
                             </div>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                              b.is_active !== false ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                            }`}>
-                              {b.is_active !== false ? 'Activa' : 'Inactiva'}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                                b.is_active !== false ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                              }`}>
+                                {b.is_active !== false ? 'Activa' : 'Inactiva'}
+                              </span>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => deleteBranch(b._id)} data-testid={`delete-branch-${b._id}`}>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
