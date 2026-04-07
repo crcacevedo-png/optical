@@ -12,19 +12,28 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 ## Lo Implementado (7 Abr 2026)
 
 ### Modulos Funcionales (100% testeados)
-- **Auth**: JWT login, register, logout, refresh, brute force protection, auto-refresh interceptor
-- **Panel SuperAdmin**: Gestion de Opticas + Sucursales + Usuarios por empresa
-- **Dashboard**: 4 cards estadisticas + 3 cards financieros + proximas citas + alertas stock + **filtro por sucursal**
-- **Pacientes**: lista + busqueda + detalle con tabs
-- **Agenda**: 3 vistas (Dia/Semana/Mes) + crear citas + estados + **filtro por sucursal**
-- **Recetas**: 3 tabs (anteojos, lentes de contacto, medicas) + PDF
+- **Auth**: JWT login, register, logout, refresh, brute force, auto-refresh
+- **Panel SuperAdmin**: CRUD Opticas + Sucursales + Usuarios por empresa. Persona de contacto.
+- **Dashboard**: 4 cards estadisticas + 3 financieros + citas + alertas + filtro sucursal
+- **Pacientes**: lista + busqueda + detalle con tabs (Consultas, Recetas, Citas, Compras, Info)
+- **Consultas**: Entidad clinica principal. CRUD completo con ficha clinica (motivo, anamnesis, hallazgos, diagnostico, plan, recomendaciones). Generar recetas de anteojos y medicas vinculadas a consultation_id.
+- **Agenda**: 3 vistas (Dia/Semana/Mes) + CRUD citas + filtro sucursal
+- **Recetas**: 3 tabs (anteojos OD/OI, lentes de contacto, medicas) + PDF + consultation_id
 - **Cotizaciones**: CRUD + estados + convertir a venta + PDF
-- **Inventario**: productos + stock + movimientos + alertas + **filtro por sucursal**
-- **Ventas**: POS con carrito + metodos de pago + **filtro por sucursal**
+- **Inventario**: productos + stock + movimientos + alertas + filtro sucursal
+- **Ventas**: POS con carrito + metodos de pago + filtro sucursal
 - **Finanzas**: ingresos/egresos + resumen mensual
 - **Sucursales**: lista (admin) + gestion por empresa (superadmin)
 - **Usuarios**: lista + crear + editar + activar/desactivar
-- **BranchFilter**: componente reutilizable, se oculta si solo hay 1 sucursal
+- **BranchFilter**: componente reutilizable en Dashboard, Agenda, Inventario, Ventas, Consultas
+
+### Flujo Clinico
+1. Seleccionar paciente
+2. Crear nueva consulta
+3. Registrar datos clinicos
+4. Guardar consulta
+5. Desde la consulta generar receta de anteojos o receta medica
+6. Todo queda enlazado al historial del paciente
 
 ## Backlog Priorizado
 
