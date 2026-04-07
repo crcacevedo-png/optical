@@ -288,21 +288,6 @@ export default function LoginPage() {
               ))}
             </div>
           </div>
-
-          {/* Stats Row */}
-          <div className="flex items-center justify-between mt-7 px-3">
-            {[
-              { value: '500+', label: 'Ópticas' },
-              { value: '50K+', label: 'Pacientes' },
-              { value: '99.9%', label: 'Uptime' },
-            ].map(({ value, label }) => (
-              <div key={label} className="text-center">
-                <div className="text-lg font-bold text-white/70 font-heading">{value}</div>
-                <div className="text-[11px] text-white/25 font-medium tracking-wide">{label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );
