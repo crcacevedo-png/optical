@@ -168,7 +168,7 @@ export default function UsersPage() {
                         <SelectValue placeholder="Seleccionar" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Sin asignar</SelectItem>
+                        <SelectItem value="none">Sin asignar</SelectItem>
                         {branches.map((b) => (
                           <SelectItem key={b._id} value={b._id}>{b.name}</SelectItem>
                         ))}
