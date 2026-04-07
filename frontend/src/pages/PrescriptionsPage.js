@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from '../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Plus, Eye, Pill, FileText, Download, Trash2, CircleDot } from 'lucide-react';
+import { Plus, Eye, Pill, Download, Trash2, CircleDot } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function PrescriptionsPage() {

@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { api, formatApiErrorDetail } from '../context/AuthContext';
 import { useAuth } from '../context/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Plus, Building2, MapPin, Phone, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 

@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { 
-  Users, Calendar, Receipt, TrendingUp, TrendingDown, 
-  AlertTriangle, Clock, DollarSign, ShoppingBag, Stethoscope
+  Users, Calendar, TrendingUp, TrendingDown, 
+  AlertTriangle, Clock, DollarSign, ShoppingBag
 } from 'lucide-react';
 import { BranchFilter } from '../components/BranchFilter';
 

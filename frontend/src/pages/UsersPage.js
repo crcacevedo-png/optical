@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-import { Plus, Users, Shield, UserCheck, UserX } from 'lucide-react';
+import { Plus, Users, UserCheck, UserX } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function UsersPage() {

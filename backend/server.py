@@ -18,7 +18,6 @@ from datetime import datetime, timezone, timedelta, date
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
 import io
-import shutil
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
@@ -82,7 +81,7 @@ def calculate_age(birth_date_str: str) -> int:
         birth = datetime.strptime(birth_date_str[:10], "%Y-%m-%d").date()
         today = date.today()
         return today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
-    except:
+    except (ValueError, TypeError):
         return None
 
 async def get_current_user(request: Request) -> dict:
