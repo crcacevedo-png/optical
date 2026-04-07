@@ -11,7 +11,7 @@ import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   Plus, Building2, MapPin, Phone, Mail, Users, GitBranch,
-  Shield, UserCheck, UserX, Eye, ChevronRight, Store, UserCog
+  Shield, UserCheck, UserX, Eye, EyeOff, ChevronRight, Store, UserCog
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -32,6 +32,8 @@ export default function AdminOpticasPage() {
   });
   const [branchForm, setBranchForm] = useState({ name: '', address: '', phone: '', email: '' });
   const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'user', branch_id: '' });
+  const [showCompanyPassword, setShowCompanyPassword] = useState(false);
+  const [showUserPassword, setShowUserPassword] = useState(false);
 
   const loadCompanies = useCallback(async () => {
     try {
@@ -68,6 +70,7 @@ export default function AdminOpticasPage() {
       await api.post('/api/companies', companyForm);
       toast.success('Optica creada exitosamente');
       setShowCreateCompany(false);
+      setShowCompanyPassword(false);
       setCompanyForm({ name: '', legal_name: '', tax_id: '', address: '', phone: '', email: '', admin_name: '', admin_email: '', admin_password: '' });
       loadCompanies();
     } catch (err) {
@@ -95,6 +98,7 @@ export default function AdminOpticasPage() {
       await api.post(`/api/users?company_id=${selectedCompany._id}`, userForm);
       toast.success('Usuario creado exitosamente');
       setShowCreateUser(false);
+      setShowUserPassword(false);
       setUserForm({ name: '', email: '', password: '', role: 'user', branch_id: '' });
       loadCompanyDetail(selectedCompany);
       loadCompanies();
@@ -397,7 +401,12 @@ export default function AdminOpticasPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Contrasena del Admin *</Label>
-                  <Input type="password" value={companyForm.admin_password} onChange={(e) => setCompanyForm({...companyForm, admin_password: e.target.value})} required data-testid="company-admin-password" />
+                  <div className="relative">
+                    <Input type={showCompanyPassword ? "text" : "password"} value={companyForm.admin_password} onChange={(e) => setCompanyForm({...companyForm, admin_password: e.target.value})} required className="pr-10" data-testid="company-admin-password" />
+                    <button type="button" onClick={() => setShowCompanyPassword(!showCompanyPassword)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" data-testid="toggle-company-password">
+                      {showCompanyPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -462,7 +471,12 @@ export default function AdminOpticasPage() {
             </div>
             <div className="space-y-2">
               <Label>Contrasena *</Label>
-              <Input type="password" value={userForm.password} onChange={(e) => setUserForm({...userForm, password: e.target.value})} required data-testid="sa-user-password" />
+              <div className="relative">
+                <Input type={showUserPassword ? "text" : "password"} value={userForm.password} onChange={(e) => setUserForm({...userForm, password: e.target.value})} required className="pr-10" data-testid="sa-user-password" />
+                <button type="button" onClick={() => setShowUserPassword(!showUserPassword)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" data-testid="toggle-user-password">
+                  {showUserPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
