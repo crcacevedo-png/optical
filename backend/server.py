@@ -161,7 +161,7 @@ class PatientCreate(BaseModel):
     gender: Optional[str] = None
     phone: str
     whatsapp: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     address: Optional[str] = None
     city: Optional[str] = None
     country: Optional[str] = "Guatemala"
@@ -178,7 +178,7 @@ class PatientUpdate(BaseModel):
     gender: Optional[str] = None
     phone: Optional[str] = None
     whatsapp: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     address: Optional[str] = None
     city: Optional[str] = None
     country: Optional[str] = None
