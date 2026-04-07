@@ -11,9 +11,18 @@ import { ScrollArea } from '../components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   Search, Plus, User, Phone, Mail, Calendar, 
-  FileText, Eye, ShoppingBag, ChevronRight, Stethoscope
+  FileText, Eye, ShoppingBag, ChevronRight, Stethoscope,
+  ChevronLeft, Save
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+const CONSULTATION_TYPES = [
+  { value: 'general', label: 'Consulta General' },
+  { value: 'control', label: 'Control' },
+  { value: 'urgencia', label: 'Urgencia' },
+  { value: 'primera_vez', label: 'Primera Vez' },
+  { value: 'seguimiento', label: 'Seguimiento' },
+];
 
 export default function PatientsPage() {
   const [patients, setPatients] = useState([]);
@@ -21,6 +30,9 @@ export default function PatientsPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [page, setPage] = useState(0);
+  const [totalPatients, setTotalPatients] = useState(0);
+  const PAGE_SIZE = 30;
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -35,15 +47,34 @@ export default function PatientsPage() {
     notes: ''
   });
 
+  // Consultation form state
+  const [showConsultationDialog, setShowConsultationDialog] = useState(false);
+  const [consultationForm, setConsultationForm] = useState({
+    consultation_date: new Date().toISOString().slice(0, 10),
+    consultation_time: new Date().toTimeString().slice(0, 5),
+    consultation_type: 'general',
+    chief_complaint: '',
+    anamnesis: '',
+    findings: '',
+    diagnosis: '',
+    treatment_plan: '',
+    recommendations: '',
+    notes: ''
+  });
+  const [savingConsultation, setSavingConsultation] = useState(false);
+
   useEffect(() => {
     fetchPatients();
-  }, []);
+  }, [page]);
 
   const fetchPatients = async (searchTerm = '') => {
     try {
-      const params = searchTerm ? { search: searchTerm } : {};
+      setLoading(true);
+      const params = { limit: PAGE_SIZE, skip: page * PAGE_SIZE };
+      if (searchTerm) params.search = searchTerm;
       const { data } = await api.get('/api/patients', { params });
       setPatients(data.patients || []);
+      setTotalPatients(data.total || 0);
     } catch (error) {
       console.error('Error fetching patients:', error);
     } finally {
@@ -63,8 +94,47 @@ export default function PatientsPage() {
   const handleSearch = (e) => {
     const value = e.target.value;
     setSearch(value);
+    setPage(0);
     if (value.length >= 2 || value.length === 0) {
       fetchPatients(value);
+    }
+  };
+
+  const totalPages = Math.ceil(totalPatients / PAGE_SIZE);
+
+  const resetConsultationForm = () => {
+    setConsultationForm({
+      consultation_date: new Date().toISOString().slice(0, 10),
+      consultation_time: new Date().toTimeString().slice(0, 5),
+      consultation_type: 'general',
+      chief_complaint: '',
+      anamnesis: '',
+      findings: '',
+      diagnosis: '',
+      treatment_plan: '',
+      recommendations: '',
+      notes: ''
+    });
+  };
+
+  const handleCreateConsultation = async () => {
+    if (!consultationForm.chief_complaint) {
+      return toast.error('Ingrese el motivo de consulta');
+    }
+    setSavingConsultation(true);
+    try {
+      await api.post('/api/consultations', {
+        patient_id: selectedPatient._id,
+        ...consultationForm
+      });
+      toast.success('Consulta registrada exitosamente');
+      setShowConsultationDialog(false);
+      resetConsultationForm();
+      fetchPatientDetails(selectedPatient._id);
+    } catch (error) {
+      toast.error(formatApiErrorDetail(error.response?.data?.detail));
+    } finally {
+      setSavingConsultation(false);
     }
   };
 
@@ -233,8 +303,8 @@ export default function PatientsPage() {
             />
           </div>
         </CardHeader>
-        <CardContent className="p-0">
-          <ScrollArea className="h-[calc(100vh-16rem)]">
+        <CardContent className="p-0 flex flex-col" style={{ height: 'calc(100vh - 16rem)' }}>
+          <ScrollArea className="flex-1">
             {loading ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pine-900"></div>
@@ -270,6 +340,22 @@ export default function PatientsPage() {
               </div>
             )}
           </ScrollArea>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100" data-testid="patients-pagination">
+              <span className="text-xs text-slate-500">{totalPatients} pacientes</span>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={page === 0}
+                  onClick={() => setPage(p => p - 1)} data-testid="prev-page-btn">
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="text-xs text-slate-600 px-2">{page + 1}/{totalPages}</span>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={page >= totalPages - 1}
+                  onClick={() => setPage(p => p + 1)} data-testid="next-page-btn">
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -328,7 +414,13 @@ export default function PatientsPage() {
 
                 <ScrollArea className="h-[calc(100vh-20rem)]">
                   <TabsContent value="consultations" className="p-4 m-0">
-                    <h3 className="font-medium text-slate-900 mb-3">Historial de Consultas</h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-medium text-slate-900">Historial de Consultas</h3>
+                      <Button size="sm" className="bg-pine-700 hover:bg-pine-800" data-testid="new-consultation-from-patient-btn"
+                        onClick={() => { resetConsultationForm(); setShowConsultationDialog(true); }}>
+                        <Plus className="w-4 h-4 mr-1" /> Nueva Consulta
+                      </Button>
+                    </div>
                     {selectedPatient.consultations?.length > 0 ? (
                       <div className="space-y-3">
                         {selectedPatient.consultations.map((con) => (
@@ -524,6 +616,95 @@ export default function PatientsPage() {
           </Card>
         )}
       </div>
+
+      {/* Nueva Consulta Dialog */}
+      <Dialog open={showConsultationDialog} onOpenChange={setShowConsultationDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-heading">
+              <Stethoscope className="w-5 h-5 text-pine-700" />
+              Nueva Consulta - {selectedPatient?.first_name} {selectedPatient?.last_name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Fecha *</Label>
+                <Input type="date" value={consultationForm.consultation_date}
+                  onChange={(e) => setConsultationForm(f => ({ ...f, consultation_date: e.target.value }))}
+                  data-testid="consultation-date" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Hora</Label>
+                <Input type="time" value={consultationForm.consultation_time}
+                  onChange={(e) => setConsultationForm(f => ({ ...f, consultation_time: e.target.value }))}
+                  data-testid="consultation-time" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Tipo de Consulta</Label>
+                <Select value={consultationForm.consultation_type}
+                  onValueChange={(v) => setConsultationForm(f => ({ ...f, consultation_type: v }))}>
+                  <SelectTrigger data-testid="consultation-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CONSULTATION_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Motivo de Consulta *</Label>
+              <Textarea value={consultationForm.chief_complaint} rows={2}
+                onChange={(e) => setConsultationForm(f => ({ ...f, chief_complaint: e.target.value }))}
+                placeholder="Motivo principal de la visita..." data-testid="consultation-chief-complaint" />
+            </div>
+            <div className="space-y-2">
+              <Label>Historia / Anamnesis</Label>
+              <Textarea value={consultationForm.anamnesis} rows={2}
+                onChange={(e) => setConsultationForm(f => ({ ...f, anamnesis: e.target.value }))}
+                placeholder="Antecedentes, sintomas previos, uso actual de lentes..." data-testid="consultation-anamnesis" />
+            </div>
+            <div className="space-y-2">
+              <Label>Hallazgos</Label>
+              <Textarea value={consultationForm.findings} rows={2}
+                onChange={(e) => setConsultationForm(f => ({ ...f, findings: e.target.value }))}
+                placeholder="Resultados del examen visual, agudeza visual..." data-testid="consultation-findings" />
+            </div>
+            <div className="space-y-2">
+              <Label>Diagnostico</Label>
+              <Textarea value={consultationForm.diagnosis} rows={2}
+                onChange={(e) => setConsultationForm(f => ({ ...f, diagnosis: e.target.value }))}
+                placeholder="Diagnostico o impresion clinica..." data-testid="consultation-diagnosis" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Plan / Tratamiento</Label>
+                <Textarea value={consultationForm.treatment_plan} rows={2}
+                  onChange={(e) => setConsultationForm(f => ({ ...f, treatment_plan: e.target.value }))}
+                  placeholder="Plan de tratamiento..." data-testid="consultation-treatment" />
+              </div>
+              <div className="space-y-2">
+                <Label>Recomendaciones</Label>
+                <Textarea value={consultationForm.recommendations} rows={2}
+                  onChange={(e) => setConsultationForm(f => ({ ...f, recommendations: e.target.value }))}
+                  placeholder="Recomendaciones al paciente..." data-testid="consultation-recommendations" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Observaciones</Label>
+              <Textarea value={consultationForm.notes} rows={2}
+                onChange={(e) => setConsultationForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="Notas adicionales..." data-testid="consultation-notes" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setShowConsultationDialog(false)}>Cancelar</Button>
+              <Button className="bg-pine-700 hover:bg-pine-800" onClick={handleCreateConsultation}
+                disabled={!consultationForm.chief_complaint || savingConsultation} data-testid="save-consultation-from-patient-btn">
+                <Save className="w-4 h-4 mr-2" /> Guardar Consulta
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

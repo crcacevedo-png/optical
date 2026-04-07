@@ -10,9 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   Plus, TrendingUp, TrendingDown, DollarSign, 
-  ArrowUpCircle, ArrowDownCircle, Wallet
+  ArrowUpCircle, ArrowDownCircle, Wallet, Filter, BarChart3
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { BranchFilter } from '../components/BranchFilter';
 
 export default function FinancePage() {
   const [entries, setEntries] = useState([]);
@@ -20,6 +21,9 @@ export default function FinancePage() {
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const [branchId, setBranchId] = useState('');
+  const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 8) + '01');
+  const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
 
   const [formData, setFormData] = useState({
     type: 'ingreso',
@@ -48,13 +52,18 @@ export default function FinancePage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [branchId, dateFrom, dateTo]);
 
   const fetchData = async () => {
     try {
+      setLoading(true);
+      const params = {};
+      if (branchId) params.branch_id = branchId;
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
       const [entriesRes, summaryRes] = await Promise.all([
-        api.get('/api/finance'),
-        api.get('/api/finance/summary')
+        api.get('/api/finance', { params }),
+        api.get('/api/finance/summary', { params })
       ]);
       setEntries(entriesRes.data || []);
       setSummary(summaryRes.data);
@@ -109,12 +118,14 @@ export default function FinancePage() {
           <h1 className="font-heading text-2xl sm:text-3xl font-semibold text-slate-900">Finanzas</h1>
           <p className="text-slate-500 mt-1">Control de ingresos y egresos</p>
         </div>
-        <Dialog open={showDialog} onOpenChange={setShowDialog}>
-          <DialogTrigger asChild>
-            <Button className="bg-pine-900 hover:bg-pine-700" data-testid="add-entry-btn">
-              <Plus className="w-4 h-4 mr-2" /> Nueva Entrada
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          <BranchFilter value={branchId} onChange={setBranchId} />
+          <Dialog open={showDialog} onOpenChange={setShowDialog}>
+            <DialogTrigger asChild>
+              <Button className="bg-pine-900 hover:bg-pine-700" data-testid="add-entry-btn">
+                <Plus className="w-4 h-4 mr-2" /> Nueva Entrada
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle className="font-heading">Nueva Entrada Financiera</DialogTitle>
@@ -220,7 +231,27 @@ export default function FinancePage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
+      {/* Date Filters */}
+      <Card className="border-slate-200/80">
+        <CardContent className="py-3 px-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Filter className="w-4 h-4 text-slate-400" />
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-slate-500 whitespace-nowrap">Desde:</Label>
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+                className="h-8 text-sm w-auto" data-testid="finance-date-from" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-slate-500 whitespace-nowrap">Hasta:</Label>
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+                className="h-8 text-sm w-auto" data-testid="finance-date-to" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -271,6 +302,62 @@ export default function FinancePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Category Breakdown */}
+      {(Object.keys(summary?.income_by_category || {}).length > 0 || Object.keys(summary?.expense_by_category || {}).length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="category-breakdown">
+          {Object.keys(summary?.income_by_category || {}).length > 0 && (
+            <Card className="border-slate-200/80">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-green-600" /> Ingresos por Categoria
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Object.entries(summary.income_by_category).sort(([,a],[,b]) => b - a).map(([cat, amount]) => {
+                    const pct = summary.income > 0 ? (amount / summary.income) * 100 : 0;
+                    return (
+                      <div key={cat} className="flex items-center gap-3" data-testid={`income-cat-${cat}`}>
+                        <span className="text-xs text-slate-600 w-24 capitalize truncate">{cat.replace('_', ' ')}</span>
+                        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-xs font-medium text-slate-700 w-20 text-right">{formatCurrency(amount)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {Object.keys(summary?.expense_by_category || {}).length > 0 && (
+            <Card className="border-slate-200/80">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-red-600" /> Egresos por Categoria
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Object.entries(summary.expense_by_category).sort(([,a],[,b]) => b - a).map(([cat, amount]) => {
+                    const pct = summary.expense > 0 ? (amount / summary.expense) * 100 : 0;
+                    return (
+                      <div key={cat} className="flex items-center gap-3" data-testid={`expense-cat-${cat}`}>
+                        <span className="text-xs text-slate-600 w-24 capitalize truncate">{cat.replace('_', ' ')}</span>
+                        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-red-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-xs font-medium text-slate-700 w-20 text-right">{formatCurrency(amount)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Transactions */}
       <Card className="border-slate-200/80">

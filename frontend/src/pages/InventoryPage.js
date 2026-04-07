@@ -312,19 +312,28 @@ export default function InventoryPage() {
 
       {/* Alerts */}
       {alerts.length > 0 && (
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="py-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-amber-800">
-                  {alerts.length} producto{alerts.length !== 1 ? 's' : ''} con stock bajo
-                </p>
-                <p className="text-sm text-amber-700 mt-1">
-                  {alerts.slice(0, 3).map(a => a.product_name).join(', ')}
-                  {alerts.length > 3 && ` y ${alerts.length - 3} más`}
-                </p>
-              </div>
+        <Card className="border-amber-200 bg-amber-50" data-testid="inventory-alerts">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2 text-amber-800">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+              {alerts.length} producto{alerts.length !== 1 ? 's' : ''} con stock bajo
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {alerts.map((a) => (
+                <div key={a.product_id} className="flex items-center justify-between p-2 bg-white rounded-lg border border-amber-200" data-testid={`alert-${a.product_id}`}>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-slate-900 truncate">{a.product_name}</p>
+                    <p className="text-xs text-slate-500">{a.sku}</p>
+                  </div>
+                  <div className="text-right ml-3 flex-shrink-0">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">
+                      {a.current_stock} / {a.min_stock}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

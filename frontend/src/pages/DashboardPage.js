@@ -3,12 +3,13 @@ import { api } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { 
   Users, Calendar, Receipt, TrendingUp, TrendingDown, 
-  AlertTriangle, Clock, DollarSign, ShoppingBag
+  AlertTriangle, Clock, DollarSign, ShoppingBag, Stethoscope
 } from 'lucide-react';
 import { BranchFilter } from '../components/BranchFilter';
 
 export default function DashboardPage() {
   const [data, setData] = useState(null);
+  const [alertDetails, setAlertDetails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [branchId, setBranchId] = useState('');
 
@@ -19,8 +20,12 @@ export default function DashboardPage() {
   const fetchDashboard = async () => {
     try {
       const params = branchId ? { branch_id: branchId } : {};
-      const { data } = await api.get('/api/reports/dashboard', { params });
-      setData(data);
+      const [dashRes, alertsRes] = await Promise.all([
+        api.get('/api/reports/dashboard', { params }),
+        api.get('/api/inventory/alerts', { params }).catch(() => ({ data: [] }))
+      ]);
+      setData(dashRes.data);
+      setAlertDetails(alertsRes.data || []);
     } catch (error) {
       console.error('Error fetching dashboard:', error);
     } finally {
@@ -200,19 +205,24 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {data?.stock_alerts > 0 ? (
-              <div className="p-4 rounded-lg bg-amber-50 border border-amber-200">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-amber-800">
-                      {data.stock_alerts} producto{data.stock_alerts !== 1 ? 's' : ''} con stock bajo
-                    </p>
-                    <p className="text-sm text-amber-700 mt-1">
-                      Revise el inventario para evitar faltantes.
-                    </p>
+            {alertDetails.length > 0 ? (
+              <div className="space-y-2">
+                {alertDetails.slice(0, 5).map((a) => (
+                  <div key={a.product_id} className="flex items-center justify-between p-3 rounded-lg bg-amber-50 border border-amber-100" data-testid={`dashboard-alert-${a.product_id}`}>
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{a.product_name}</p>
+                      <p className="text-xs text-slate-500">{a.sku}</p>
+                    </div>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">
+                      {a.current_stock} / {a.min_stock}
+                    </span>
                   </div>
-                </div>
+                ))}
+                {alertDetails.length > 5 && (
+                  <p className="text-xs text-amber-600 text-center pt-1">
+                    y {alertDetails.length - 5} producto{alertDetails.length - 5 > 1 ? 's' : ''} mas
+                  </p>
+                )}
               </div>
             ) : (
               <div className="text-center py-8 text-slate-500">
