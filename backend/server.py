@@ -864,10 +864,15 @@ async def list_appointments(
     appointments = await db.appointments.find(query).sort([("date", 1), ("time", 1)]).to_list(500)
     for apt in appointments:
         serialize_doc(apt)
-        patient = await db.patients.find_one({"_id": ObjectId(apt["patient_id"])}, {"first_name": 1, "last_name": 1, "phone": 1})
-        if patient:
-            apt["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
-            apt["patient_phone"] = patient.get("phone", "")
+    patient_ids = list({ObjectId(a["patient_id"]) for a in appointments if a.get("patient_id")})
+    if patient_ids:
+        patients = await db.patients.find({"_id": {"$in": patient_ids}}, {"first_name": 1, "last_name": 1, "phone": 1}).to_list(len(patient_ids))
+        patient_map = {str(p["_id"]): p for p in patients}
+        for apt in appointments:
+            p = patient_map.get(apt.get("patient_id"))
+            if p:
+                apt["patient_name"] = f"{p['first_name']} {p['last_name']}"
+                apt["patient_phone"] = p.get("phone", "")
     
     return appointments
 
@@ -930,9 +935,14 @@ async def list_eyeglass_prescriptions(user: dict = Depends(get_current_user), pa
     prescriptions = await db.eyeglass_prescriptions.find(query).sort("created_at", -1).to_list(100)
     for rx in prescriptions:
         serialize_doc(rx)
-        patient = await db.patients.find_one({"_id": ObjectId(rx["patient_id"])}, {"first_name": 1, "last_name": 1})
-        if patient:
-            rx["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
+    patient_ids = list({ObjectId(rx["patient_id"]) for rx in prescriptions if rx.get("patient_id")})
+    if patient_ids:
+        patients = await db.patients.find({"_id": {"$in": patient_ids}}, {"first_name": 1, "last_name": 1}).to_list(len(patient_ids))
+        patient_map = {str(p["_id"]): p for p in patients}
+        for rx in prescriptions:
+            p = patient_map.get(rx.get("patient_id"))
+            if p:
+                rx["patient_name"] = f"{p['first_name']} {p['last_name']}"
     return prescriptions
 
 @prescriptions_router.post("/eyeglass")
@@ -1086,9 +1096,14 @@ async def list_contact_lens_prescriptions(user: dict = Depends(get_current_user)
     prescriptions = await db.contact_lens_prescriptions.find(query).sort("created_at", -1).to_list(100)
     for rx in prescriptions:
         serialize_doc(rx)
-        patient = await db.patients.find_one({"_id": ObjectId(rx["patient_id"])}, {"first_name": 1, "last_name": 1})
-        if patient:
-            rx["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
+    patient_ids = list({ObjectId(rx["patient_id"]) for rx in prescriptions if rx.get("patient_id")})
+    if patient_ids:
+        patients = await db.patients.find({"_id": {"$in": patient_ids}}, {"first_name": 1, "last_name": 1}).to_list(len(patient_ids))
+        patient_map = {str(p["_id"]): p for p in patients}
+        for rx in prescriptions:
+            p = patient_map.get(rx.get("patient_id"))
+            if p:
+                rx["patient_name"] = f"{p['first_name']} {p['last_name']}"
     return prescriptions
 
 @prescriptions_router.post("/contact")
@@ -1216,9 +1231,14 @@ async def list_medical_prescriptions(user: dict = Depends(get_current_user), pat
     prescriptions = await db.medical_prescriptions.find(query).sort("created_at", -1).to_list(100)
     for rx in prescriptions:
         serialize_doc(rx)
-        patient = await db.patients.find_one({"_id": ObjectId(rx["patient_id"])}, {"first_name": 1, "last_name": 1})
-        if patient:
-            rx["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
+    patient_ids = list({ObjectId(rx["patient_id"]) for rx in prescriptions if rx.get("patient_id")})
+    if patient_ids:
+        patients = await db.patients.find({"_id": {"$in": patient_ids}}, {"first_name": 1, "last_name": 1}).to_list(len(patient_ids))
+        patient_map = {str(p["_id"]): p for p in patients}
+        for rx in prescriptions:
+            p = patient_map.get(rx.get("patient_id"))
+            if p:
+                rx["patient_name"] = f"{p['first_name']} {p['last_name']}"
     return prescriptions
 
 @prescriptions_router.post("/medical")
@@ -1317,13 +1337,17 @@ async def list_products(user: dict = Depends(get_current_user), category: Option
     products = await db.products.find(query).to_list(500)
     for p in products:
         serialize_doc(p)
-        # Get current stock
-        branch_id = ObjectId(user["branch_id"]) if user.get("branch_id") else None
-        stock_query = {"company_id": ObjectId(user["company_id"]), "product_id": ObjectId(p["_id"])}
-        if branch_id:
-            stock_query["branch_id"] = branch_id
-        stock_item = await db.stock.find_one(stock_query)
-        p["stock_actual"] = stock_item["quantity"] if stock_item else 0
+    # Batch stock query
+    product_ids = [ObjectId(p["_id"]) for p in products]
+    if product_ids:
+        branch_id_val = ObjectId(user["branch_id"]) if user.get("branch_id") else None
+        stock_query = {"company_id": ObjectId(user["company_id"]), "product_id": {"$in": product_ids}}
+        if branch_id_val:
+            stock_query["branch_id"] = branch_id_val
+        stock_items = await db.stock.find(stock_query).to_list(len(product_ids))
+        stock_map = {str(s["product_id"]): s["quantity"] for s in stock_items}
+        for p in products:
+            p["stock_actual"] = stock_map.get(p["_id"], 0)
     return products
 
 @inventory_router.post("/products")
@@ -1366,13 +1390,19 @@ async def get_stock(user: dict = Depends(get_current_user), branch_id: Optional[
     stock = await db.stock.find(query).to_list(1000)
     for s in stock:
         serialize_doc(s)
-        product = await db.products.find_one({"_id": ObjectId(s["product_id"])}, {"name": 1, "sku": 1, "min_stock": 1, "sale_price": 1, "cost_price": 1})
-        if product:
-            s["product_name"] = product["name"]
-            s["sku"] = product["sku"]
-            s["min_stock"] = product.get("min_stock", 5)
-            s["sale_price"] = product.get("sale_price", 0)
-            s["cost_price"] = product.get("cost_price", 0)
+    # Batch product query
+    product_ids = list({ObjectId(s["product_id"]) for s in stock if s.get("product_id")})
+    if product_ids:
+        products = await db.products.find({"_id": {"$in": product_ids}}, {"name": 1, "sku": 1, "min_stock": 1, "sale_price": 1, "cost_price": 1}).to_list(len(product_ids))
+        product_map = {str(p["_id"]): p for p in products}
+        for s in stock:
+            prod = product_map.get(s.get("product_id"))
+            if prod:
+                s["product_name"] = prod["name"]
+                s["sku"] = prod["sku"]
+                s["min_stock"] = prod.get("min_stock", 5)
+                s["sale_price"] = prod.get("sale_price", 0)
+                s["cost_price"] = prod.get("cost_price", 0)
     return stock
 
 @inventory_router.post("/movement")
@@ -1449,9 +1479,12 @@ async def list_inventory_movements(
     movements = await db.inventory_movements.find(query).sort("created_at", -1).limit(limit).to_list(limit)
     for m in movements:
         serialize_doc(m)
-        product = await db.products.find_one({"_id": ObjectId(m["product_id"])}, {"name": 1})
-        if product:
-            m["product_name"] = product["name"]
+    product_ids = list({ObjectId(m["product_id"]) for m in movements if m.get("product_id")})
+    if product_ids:
+        products = await db.products.find({"_id": {"$in": product_ids}}, {"name": 1}).to_list(len(product_ids))
+        product_map = {str(p["_id"]): p["name"] for p in products}
+        for m in movements:
+            m["product_name"] = product_map.get(m.get("product_id"), "")
     return movements
 
 @inventory_router.get("/alerts")
@@ -1466,18 +1499,23 @@ async def get_stock_alerts(user: dict = Depends(get_current_user), branch_id: Op
         query["branch_id"] = ObjectId(user["branch_id"])
     
     stock_items = await db.stock.find(query).to_list(1000)
+    # Batch product query for alerts
+    product_ids = list({s["product_id"] for s in stock_items if s.get("product_id")})
     alerts = []
-    for s in stock_items:
-        product = await db.products.find_one({"_id": s["product_id"]}, {"name": 1, "min_stock": 1, "sku": 1})
-        if product and s["quantity"] <= product.get("min_stock", 5):
-            alerts.append({
-                "product_id": str(s["product_id"]),
-                "product_name": product["name"],
-                "sku": product.get("sku", ""),
-                "current_stock": s["quantity"],
-                "min_stock": product.get("min_stock", 5),
-                "branch_id": str(s["branch_id"])
-            })
+    if product_ids:
+        products = await db.products.find({"_id": {"$in": product_ids}}, {"name": 1, "min_stock": 1, "sku": 1}).to_list(len(product_ids))
+        product_map = {p["_id"]: p for p in products}
+        for s in stock_items:
+            product = product_map.get(s["product_id"])
+            if product and s["quantity"] <= product.get("min_stock", 5):
+                alerts.append({
+                    "product_id": str(s["product_id"]),
+                    "product_name": product["name"],
+                    "sku": product.get("sku", ""),
+                    "current_stock": s["quantity"],
+                    "min_stock": product.get("min_stock", 5),
+                    "branch_id": str(s["branch_id"])
+                })
     return alerts
 
 # ==================== SALES ROUTES ====================
