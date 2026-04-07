@@ -13,11 +13,12 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 
 ### Modulos Funcionales (100% testeados)
 - **Auth**: JWT login, register, logout, refresh, brute force, auto-refresh
+- **Login Page Premium**: Split-screen 50/50, panel izquierdo blanco con logo/form, panel derecho oscuro (#1B2A49) con red neuronal CSS, orbs de gradiente (#5A2D82, #1ABC9C), glassmorphism, feature tags, estadisticas, animaciones de entrada stagger
 - **Panel SuperAdmin**: CRUD Opticas + Sucursales (con eliminar) + Usuarios. Logo por optica. Persona de contacto.
 - **Dashboard**: estadisticas + financieros + citas + alertas detalladas por producto
-- **Pacientes**: lista + busqueda + paginacion + detalle con tabs + **edicion completa** + boton Nueva Consulta + ver consulta (read-only con PDF de recetas)
+- **Pacientes**: lista + busqueda + paginacion + detalle con tabs + edicion completa + boton Nueva Consulta + ver consulta (read-only con PDF de recetas)
 - **Consultas Opticas**: Ficha clinica completa (4 secciones): Motivo, Historia Clinica (oculares, sistemicos, familiares), Agudeza Visual (tabla OD/OI), Hallazgos y Plan. CRUD + edicion + recetas vinculadas.
-- **Recetas**: 3 tipos (anteojos, lentes contacto, medicas). Generacion desde consulta. **PDF con logo de optica**.
+- **Recetas**: 3 tipos (anteojos, lentes contacto, medicas). Generacion desde consulta. PDF con logo de optica.
 - **Busqueda Global (Ctrl+K)**: Busca pacientes, productos y consultas desde cualquier vista.
 - **Agenda**: 3 vistas (Dia/Semana/Mes) + CRUD citas + filtro sucursal
 - **Cotizaciones**: CRUD + estados + convertir a venta + PDF con logo
@@ -37,11 +38,10 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 
 ### P2 - Media
 - [ ] Reportes por sucursal + Exportacion a Excel
-- [ ] Recordatorios de citas
 - [ ] Portal del paciente (ver receta, proxima cita)
 
 ### P3 - Baja
-- [ ] Recordatorios reemplazo lentes de contacto
-- [ ] Marketing (origen de pacientes)
+- [ ] Recordatorios citas y reemplazo lentes de contacto (WhatsApp/SMS)
+- [ ] Marketing (origen de pacientes, segmentacion)
 - [ ] Recuperacion de contrasena
 - [ ] Gestion de proveedores
