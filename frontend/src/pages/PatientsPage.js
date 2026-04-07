@@ -84,6 +84,7 @@ export default function PatientsPage() {
     ...defaultClinicalFields
   });
   const [savingConsultation, setSavingConsultation] = useState(false);
+  const [savedConsultationId, setSavedConsultationId] = useState(null);
   const [viewConsultation, setViewConsultation] = useState(null);
   const [showViewConsultation, setShowViewConsultation] = useState(false);
   const [loadingConsultation, setLoadingConsultation] = useState(false);
@@ -167,13 +168,13 @@ export default function PatientsPage() {
     }
     setSavingConsultation(true);
     try {
-      await api.post('/api/consultations', {
+      const { data } = await api.post('/api/consultations', {
         patient_id: selectedPatient._id,
         ...consultationForm
       });
       toast.success('Consulta registrada exitosamente');
-      setShowConsultationDialog(false);
-      resetConsultationForm();
+      const newId = data._id || data.id;
+      setSavedConsultationId(newId);
       fetchPatientDetails(selectedPatient._id);
     } catch (error) {
       toast.error(formatApiErrorDetail(error.response?.data?.detail));
@@ -197,19 +198,21 @@ export default function PatientsPage() {
   };
 
   // Prescription handlers
+  const rxConsultationId = savedConsultationId;
+  const rxPatientId = selectedPatient?._id;
+
   const handleCreateEyeglassRx = async () => {
-    if (!viewConsultation) return;
+    if (!rxConsultationId) return;
     try {
       await api.post('/api/prescriptions/eyeglass', {
-        patient_id: viewConsultation.patient_id,
-        consultation_id: viewConsultation._id,
-        professional_name: viewConsultation.professional_name || user?.name,
+        patient_id: rxPatientId,
+        consultation_id: rxConsultationId,
+        professional_name: user?.name,
         ...eyeglassForm
       });
       toast.success('Receta de anteojos creada');
       setShowEyeglassRx(false);
       setEyeglassForm({ od_sphere: '', od_cylinder: '', od_axis: '', od_addition: '', od_dp: '', oi_sphere: '', oi_cylinder: '', oi_axis: '', oi_addition: '', oi_dp: '', lens_type: '', frame_type: '', observations: '' });
-      openConsultationDetail(viewConsultation._id);
       fetchPatientDetails(selectedPatient._id);
     } catch (err) {
       toast.error(formatApiErrorDetail(err?.response?.data?.detail));
@@ -217,18 +220,17 @@ export default function PatientsPage() {
   };
 
   const handleCreateContactRx = async () => {
-    if (!viewConsultation) return;
+    if (!rxConsultationId) return;
     try {
       await api.post('/api/prescriptions/contact-lens', {
-        patient_id: viewConsultation.patient_id,
-        consultation_id: viewConsultation._id,
-        professional_name: viewConsultation.professional_name || user?.name,
+        patient_id: rxPatientId,
+        consultation_id: rxConsultationId,
+        professional_name: user?.name,
         ...contactForm
       });
       toast.success('Receta de lentes de contacto creada');
       setShowContactRx(false);
       setContactForm({ od_power: '', od_bc: '', od_dia: '', od_cylinder: '', od_axis: '', od_addition: '', oi_power: '', oi_bc: '', oi_dia: '', oi_cylinder: '', oi_axis: '', oi_addition: '', brand: '', lens_type: '', replacement: '', observations: '' });
-      openConsultationDetail(viewConsultation._id);
       fetchPatientDetails(selectedPatient._id);
     } catch (err) {
       toast.error(formatApiErrorDetail(err?.response?.data?.detail));
@@ -236,18 +238,17 @@ export default function PatientsPage() {
   };
 
   const handleCreateMedicalRx = async () => {
-    if (!viewConsultation) return;
+    if (!rxConsultationId) return;
     try {
       await api.post('/api/prescriptions/medical', {
-        patient_id: viewConsultation.patient_id,
-        consultation_id: viewConsultation._id,
-        professional_name: viewConsultation.professional_name || user?.name,
+        patient_id: rxPatientId,
+        consultation_id: rxConsultationId,
+        professional_name: user?.name,
         ...medicalForm
       });
       toast.success('Receta medica creada');
       setShowMedicalRx(false);
       setMedicalForm({ diagnosis: '', medications: [{ name: '', dosage: '', frequency: '', duration: '' }], instructions: '' });
-      openConsultationDetail(viewConsultation._id);
       fetchPatientDetails(selectedPatient._id);
     } catch (err) {
       toast.error(formatApiErrorDetail(err?.response?.data?.detail));
@@ -502,7 +503,7 @@ export default function PatientsPage() {
                       {selectedPatient.first_name} {selectedPatient.last_name}
                     </CardTitle>
                     <Button size="sm" className="bg-pine-700 hover:bg-pine-800" data-testid="header-new-consultation-btn"
-                      onClick={() => { resetConsultationForm(); setShowConsultationDialog(true); }}>
+                      onClick={() => { resetConsultationForm(); setSavedConsultationId(null); setShowConsultationDialog(true); }}>
                       <Eye className="w-4 h-4 mr-1" /> Nueva Consulta
                     </Button>
                   </div>
@@ -1003,12 +1004,40 @@ export default function PatientsPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setShowConsultationDialog(false)}>Cancelar</Button>
-              <Button className="bg-pine-700 hover:bg-pine-800" onClick={handleCreateConsultation}
-                disabled={!consultationForm.chief_complaint || savingConsultation} data-testid="save-consultation-from-patient-btn">
-                <Save className="w-4 h-4 mr-2" /> Guardar Consulta
-              </Button>
+            <div className="flex justify-between items-center gap-2 pt-2 border-t">
+              {savedConsultationId ? (
+                <div className="flex flex-wrap gap-2" data-testid="new-rx-actions">
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => {
+                    setEyeglassForm({ od_sphere: '', od_cylinder: '', od_axis: '', od_addition: '', od_dp: '', oi_sphere: '', oi_cylinder: '', oi_axis: '', oi_addition: '', oi_dp: '', lens_type: '', frame_type: '', observations: '' });
+                    setShowEyeglassRx(true);
+                  }} data-testid="new-gen-eyeglass-rx-btn">
+                    <Glasses className="w-4 h-4 mr-1" /> Receta Anteojos
+                  </Button>
+                  <Button size="sm" className="bg-teal-600 hover:bg-teal-700" onClick={() => {
+                    setContactForm({ od_power: '', od_bc: '', od_dia: '', od_cylinder: '', od_axis: '', od_addition: '', oi_power: '', oi_bc: '', oi_dia: '', oi_cylinder: '', oi_axis: '', oi_addition: '', brand: '', lens_type: '', replacement: '', observations: '' });
+                    setShowContactRx(true);
+                  }} data-testid="new-gen-contact-rx-btn">
+                    <Eye className="w-4 h-4 mr-1" /> Lentes de Contacto
+                  </Button>
+                  <Button size="sm" className="bg-purple-600 hover:bg-purple-700" onClick={() => {
+                    setMedicalForm({ diagnosis: consultationForm.diagnosis || '', medications: [{ name: '', dosage: '', frequency: '', duration: '' }], instructions: '' });
+                    setShowMedicalRx(true);
+                  }} data-testid="new-gen-medical-rx-btn">
+                    <Pill className="w-4 h-4 mr-1" /> Receta Medica
+                  </Button>
+                </div>
+              ) : <div />}
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => { setShowConsultationDialog(false); setSavedConsultationId(null); resetConsultationForm(); }}>
+                  {savedConsultationId ? 'Cerrar' : 'Cancelar'}
+                </Button>
+                {!savedConsultationId && (
+                  <Button className="bg-pine-700 hover:bg-pine-800" onClick={handleCreateConsultation}
+                    disabled={!consultationForm.chief_complaint || savingConsultation} data-testid="save-consultation-from-patient-btn">
+                    <Save className="w-4 h-4 mr-2" /> Guardar Consulta
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </DialogContent>
@@ -1036,28 +1065,6 @@ export default function PatientsPage() {
                 <div className="flex items-center justify-between text-sm text-slate-500 pb-3 border-b">
                   <span>Hora: {viewConsultation.consultation_time || '-'}</span>
                   <span>Profesional: {viewConsultation.professional_name || '-'}</span>
-                </div>
-
-                {/* Prescription action buttons */}
-                <div className="flex flex-wrap gap-2" data-testid="rx-actions">
-                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => {
-                    setEyeglassForm({ od_sphere: '', od_cylinder: '', od_axis: '', od_addition: '', od_dp: '', oi_sphere: '', oi_cylinder: '', oi_axis: '', oi_addition: '', oi_dp: '', lens_type: '', frame_type: '', observations: '' });
-                    setShowEyeglassRx(true);
-                  }} data-testid="p-gen-eyeglass-rx-btn">
-                    <Glasses className="w-4 h-4 mr-1" /> Receta Anteojos
-                  </Button>
-                  <Button size="sm" className="bg-teal-600 hover:bg-teal-700" onClick={() => {
-                    setContactForm({ od_power: '', od_bc: '', od_dia: '', od_cylinder: '', od_axis: '', od_addition: '', oi_power: '', oi_bc: '', oi_dia: '', oi_cylinder: '', oi_axis: '', oi_addition: '', brand: '', lens_type: '', replacement: '', observations: '' });
-                    setShowContactRx(true);
-                  }} data-testid="p-gen-contact-rx-btn">
-                    <Eye className="w-4 h-4 mr-1" /> Receta Lentes de Contacto
-                  </Button>
-                  <Button size="sm" className="bg-purple-600 hover:bg-purple-700" onClick={() => {
-                    setMedicalForm({ diagnosis: viewConsultation.diagnosis || '', medications: [{ name: '', dosage: '', frequency: '', duration: '' }], instructions: '' });
-                    setShowMedicalRx(true);
-                  }} data-testid="p-gen-medical-rx-btn">
-                    <Pill className="w-4 h-4 mr-1" /> Receta Medica
-                  </Button>
                 </div>
 
                 {/* I. Motivo */}
