@@ -6,7 +6,7 @@ import { ScrollArea } from '../components/ui/scroll-area';
 import { 
   LayoutDashboard, Users, Calendar, FileText, Package, 
   ShoppingCart, DollarSign, Building2, UserCog, BarChart3,
-  Glasses, LogOut, Menu, X, ChevronDown
+  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -32,6 +32,7 @@ export default function MainLayout() {
     { path: '/patients', icon: Users, label: 'Pacientes' },
     { path: '/agenda', icon: Calendar, label: 'Agenda' },
     { path: '/prescriptions', icon: FileText, label: 'Recetas' },
+    { path: '/quotations', icon: ClipboardList, label: 'Cotizaciones' },
     { path: '/inventory', icon: Package, label: 'Inventario' },
     { path: '/sales', icon: ShoppingCart, label: 'Ventas' },
     { path: '/finance', icon: DollarSign, label: 'Finanzas' },

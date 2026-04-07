@@ -11,6 +11,7 @@ import AgendaPage from './pages/AgendaPage';
 import PrescriptionsPage from './pages/PrescriptionsPage';
 import InventoryPage from './pages/InventoryPage';
 import SalesPage from './pages/SalesPage';
+import QuotationsPage from './pages/QuotationsPage';
 import FinancePage from './pages/FinancePage';
 import BranchesPage from './pages/BranchesPage';
 import UsersPage from './pages/UsersPage';
@@ -38,6 +39,7 @@ function App() {
             <Route path="prescriptions" element={<PrescriptionsPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="sales" element={<SalesPage />} />
+            <Route path="quotations" element={<QuotationsPage />} />
             <Route path="finance" element={<FinancePage />} />
             <Route path="branches" element={<BranchesPage />} />
             <Route path="users" element={<UsersPage />} />
