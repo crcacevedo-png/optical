@@ -11,7 +11,7 @@ import { ScrollArea } from '../components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   Search, Plus, User, Phone, Mail, Calendar, 
-  FileText, Eye, ShoppingBag, ChevronRight
+  FileText, Eye, ShoppingBag, ChevronRight, Stethoscope
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -309,6 +309,9 @@ export default function PatientsPage() {
             <CardContent className="p-0">
               <Tabs defaultValue="prescriptions" className="h-full">
                 <TabsList className="w-full justify-start rounded-none border-b border-slate-100 h-12 p-0 bg-transparent">
+                  <TabsTrigger value="consultations" className="rounded-none border-b-2 border-transparent data-[state=active]:border-pine-700 data-[state=active]:bg-transparent">
+                    <Stethoscope className="w-4 h-4 mr-2" /> Consultas
+                  </TabsTrigger>
                   <TabsTrigger value="prescriptions" className="rounded-none border-b-2 border-transparent data-[state=active]:border-pine-700 data-[state=active]:bg-transparent">
                     <Eye className="w-4 h-4 mr-2" /> Recetas
                   </TabsTrigger>
@@ -324,6 +327,29 @@ export default function PatientsPage() {
                 </TabsList>
 
                 <ScrollArea className="h-[calc(100vh-20rem)]">
+                  <TabsContent value="consultations" className="p-4 m-0">
+                    <h3 className="font-medium text-slate-900 mb-3">Historial de Consultas</h3>
+                    {selectedPatient.consultations?.length > 0 ? (
+                      <div className="space-y-3">
+                        {selectedPatient.consultations.map((con) => (
+                          <div key={con._id} className="p-3 bg-slate-50 rounded-lg border">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-pine-700">{con.consultation_date?.slice(0, 10)}</span>
+                                <span className="px-2 py-0.5 bg-pine-50 text-pine-600 text-[10px] rounded-full font-medium">{con.consultation_type}</span>
+                              </div>
+                              <span className="text-xs text-slate-400">{con.professional_name || ''}</span>
+                            </div>
+                            <p className="text-sm text-slate-700 font-medium">{con.chief_complaint}</p>
+                            {con.diagnosis && <p className="text-xs text-slate-500 mt-1">Dx: {con.diagnosis}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-400">No hay consultas registradas</p>
+                    )}
+                  </TabsContent>
+
                   <TabsContent value="prescriptions" className="p-4 m-0">
                     <h3 className="font-medium text-slate-900 mb-3">Recetas de Anteojos</h3>
                     {selectedPatient.eyeglass_prescriptions?.length > 0 ? (

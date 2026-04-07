@@ -204,6 +204,7 @@ class AppointmentUpdate(BaseModel):
 
 class EyeglassPrescriptionCreate(BaseModel):
     patient_id: str
+    consultation_id: Optional[str] = None
     professional_name: Optional[str] = None
     od_sphere: Optional[float] = None
     od_cylinder: Optional[float] = None
@@ -221,6 +222,7 @@ class EyeglassPrescriptionCreate(BaseModel):
 
 class MedicalPrescriptionCreate(BaseModel):
     patient_id: str
+    consultation_id: Optional[str] = None
     professional_name: Optional[str] = None
     diagnosis: Optional[str] = None
     medications: List[dict]
@@ -228,6 +230,7 @@ class MedicalPrescriptionCreate(BaseModel):
 
 class ContactLensPrescriptionCreate(BaseModel):
     patient_id: str
+    consultation_id: Optional[str] = None
     professional_name: Optional[str] = None
     od_power: Optional[float] = None
     od_bc: Optional[float] = None
@@ -308,6 +311,30 @@ class QuotationCreate(BaseModel):
 class QuotationStatusUpdate(BaseModel):
     status: str  # 'aceptada', 'rechazada', 'vencida'
 
+class ConsultationCreate(BaseModel):
+    patient_id: str
+    appointment_id: Optional[str] = None
+    consultation_date: str
+    consultation_time: Optional[str] = None
+    consultation_type: str = "general"
+    chief_complaint: str
+    anamnesis: Optional[str] = None
+    findings: Optional[str] = None
+    diagnosis: Optional[str] = None
+    treatment_plan: Optional[str] = None
+    recommendations: Optional[str] = None
+    notes: Optional[str] = None
+
+class ConsultationUpdate(BaseModel):
+    consultation_type: Optional[str] = None
+    chief_complaint: Optional[str] = None
+    anamnesis: Optional[str] = None
+    findings: Optional[str] = None
+    diagnosis: Optional[str] = None
+    treatment_plan: Optional[str] = None
+    recommendations: Optional[str] = None
+    notes: Optional[str] = None
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
@@ -328,6 +355,7 @@ prescriptions_router = APIRouter(prefix="/prescriptions", tags=["Recetas"])
 inventory_router = APIRouter(prefix="/inventory", tags=["Inventario"])
 sales_router = APIRouter(prefix="/sales", tags=["Ventas"])
 quotations_router = APIRouter(prefix="/quotations", tags=["Cotizaciones"])
+consultations_router = APIRouter(prefix="/consultations", tags=["Consultas"])
 finance_router = APIRouter(prefix="/finance", tags=["Finanzas"])
 reports_router = APIRouter(prefix="/reports", tags=["Reportes"])
 users_router = APIRouter(prefix="/users", tags=["Usuarios"])
@@ -658,6 +686,15 @@ async def get_patient(patient_id: str, user: dict = Depends(get_current_user)):
         serialize_doc(s)
     patient["sales"] = sales
     
+    consultations = await db.optical_consultations.find({"patient_id": ObjectId(patient_id)}).sort("created_at", -1).to_list(50)
+    for con in consultations:
+        serialize_doc(con)
+        if con.get("professional_user_id"):
+            prof = await db.users.find_one({"_id": ObjectId(con["professional_user_id"])}, {"name": 1})
+            if prof:
+                con["professional_name"] = prof["name"]
+    patient["consultations"] = consultations
+    
     return patient
 
 @patients_router.put("/{patient_id}")
@@ -795,6 +832,7 @@ async def create_eyeglass_prescription(data: EyeglassPrescriptionCreate, user: d
     
     rx_doc = {
         "company_id": ObjectId(user["company_id"]), "patient_id": ObjectId(data.patient_id),
+        "consultation_id": ObjectId(data.consultation_id) if data.consultation_id else None,
         "professional_name": data.professional_name or user["name"],
         "od_sphere": data.od_sphere, "od_cylinder": data.od_cylinder, "od_axis": data.od_axis,
         "od_addition": data.od_addition, "od_dp": data.od_dp,
@@ -925,6 +963,7 @@ async def create_contact_lens_prescription(data: ContactLensPrescriptionCreate, 
     
     rx_doc = {
         "company_id": ObjectId(user["company_id"]), "patient_id": ObjectId(data.patient_id),
+        "consultation_id": ObjectId(data.consultation_id) if data.consultation_id else None,
         "professional_name": data.professional_name or user["name"],
         "od_power": data.od_power, "od_bc": data.od_bc, "od_dia": data.od_dia,
         "od_cylinder": data.od_cylinder, "od_axis": data.od_axis, "od_addition": data.od_addition,
@@ -1054,6 +1093,7 @@ async def create_medical_prescription(data: MedicalPrescriptionCreate, user: dic
     
     rx_doc = {
         "company_id": ObjectId(user["company_id"]), "patient_id": ObjectId(data.patient_id),
+        "consultation_id": ObjectId(data.consultation_id) if data.consultation_id else None,
         "professional_name": data.professional_name or user["name"],
         "diagnosis": data.diagnosis, "medications": data.medications, "instructions": data.instructions,
         "created_at": datetime.now(timezone.utc).isoformat(), "created_by": ObjectId(user["_id"])
@@ -1761,6 +1801,131 @@ async def get_quotation_pdf(quotation_id: str, user: dict = Depends(get_current_
     return StreamingResponse(buffer, media_type="application/pdf",
                            headers={"Content-Disposition": f"attachment; filename=cotizacion_{q.get('quotation_number', quotation_id)}.pdf"})
 
+# ==================== CONSULTATIONS ROUTES ====================
+@consultations_router.get("")
+async def list_consultations(
+    user: dict = Depends(get_current_user),
+    patient_id: Optional[str] = None,
+    branch_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: int = 100
+):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    query = {"company_id": ObjectId(user["company_id"])}
+    if patient_id:
+        query["patient_id"] = ObjectId(patient_id)
+    if branch_id:
+        query["branch_id"] = ObjectId(branch_id)
+    elif user.get("branch_id"):
+        query["branch_id"] = ObjectId(user["branch_id"])
+    if date_from and date_to:
+        query["consultation_date"] = {"$gte": date_from, "$lte": date_to}
+    elif date_from:
+        query["consultation_date"] = {"$gte": date_from}
+    
+    consultations = await db.optical_consultations.find(query).sort("created_at", -1).limit(limit).to_list(limit)
+    for c in consultations:
+        serialize_doc(c)
+        if c.get("patient_id"):
+            patient = await db.patients.find_one({"_id": ObjectId(c["patient_id"])}, {"first_name": 1, "last_name": 1})
+            if patient:
+                c["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
+        if c.get("professional_user_id"):
+            prof = await db.users.find_one({"_id": ObjectId(c["professional_user_id"])}, {"name": 1})
+            if prof:
+                c["professional_name"] = prof["name"]
+    return consultations
+
+@consultations_router.post("")
+async def create_consultation(data: ConsultationCreate, user: dict = Depends(get_current_user)):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    branch_id = ObjectId(user["branch_id"]) if user.get("branch_id") else None
+    now = datetime.now(timezone.utc)
+    
+    doc = {
+        "company_id": ObjectId(user["company_id"]),
+        "branch_id": branch_id,
+        "patient_id": ObjectId(data.patient_id),
+        "appointment_id": ObjectId(data.appointment_id) if data.appointment_id else None,
+        "professional_user_id": ObjectId(user["_id"]),
+        "consultation_date": data.consultation_date,
+        "consultation_time": data.consultation_time or now.strftime("%H:%M"),
+        "consultation_type": data.consultation_type,
+        "chief_complaint": data.chief_complaint,
+        "anamnesis": data.anamnesis or "",
+        "findings": data.findings or "",
+        "diagnosis": data.diagnosis or "",
+        "treatment_plan": data.treatment_plan or "",
+        "recommendations": data.recommendations or "",
+        "notes": data.notes or "",
+        "created_by": ObjectId(user["_id"]),
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat()
+    }
+    result = await db.optical_consultations.insert_one(doc)
+    return {"_id": str(result.inserted_id), "message": "Consulta registrada"}
+
+@consultations_router.get("/{consultation_id}")
+async def get_consultation(consultation_id: str, user: dict = Depends(get_current_user)):
+    c = await db.optical_consultations.find_one({"_id": ObjectId(consultation_id)})
+    if not c or str(c["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+    serialize_doc(c)
+    
+    # Patient info
+    if c.get("patient_id"):
+        patient = await db.patients.find_one({"_id": ObjectId(c["patient_id"])}, {"first_name": 1, "last_name": 1, "phone": 1, "birth_date": 1, "gender": 1})
+        if patient:
+            c["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
+            c["patient_phone"] = patient.get("phone", "")
+            c["patient_birth_date"] = patient.get("birth_date", "")
+            c["patient_gender"] = patient.get("gender", "")
+    
+    # Professional info
+    if c.get("professional_user_id"):
+        prof = await db.users.find_one({"_id": ObjectId(c["professional_user_id"])}, {"name": 1, "email": 1})
+        if prof:
+            c["professional_name"] = prof["name"]
+    
+    # Linked prescriptions
+    eyeglass_rx = await db.eyeglass_prescriptions.find({"consultation_id": ObjectId(consultation_id)}).sort("created_at", -1).to_list(10)
+    for rx in eyeglass_rx:
+        serialize_doc(rx)
+    c["eyeglass_prescriptions"] = eyeglass_rx
+    
+    contact_rx = await db.contact_lens_prescriptions.find({"consultation_id": ObjectId(consultation_id)}).sort("created_at", -1).to_list(10)
+    for rx in contact_rx:
+        serialize_doc(rx)
+    c["contact_prescriptions"] = contact_rx
+    
+    medical_rx = await db.medical_prescriptions.find({"consultation_id": ObjectId(consultation_id)}).sort("created_at", -1).to_list(10)
+    for rx in medical_rx:
+        serialize_doc(rx)
+    c["medical_prescriptions"] = medical_rx
+    
+    return c
+
+@consultations_router.put("/{consultation_id}")
+async def update_consultation(consultation_id: str, data: ConsultationUpdate, user: dict = Depends(get_current_user)):
+    c = await db.optical_consultations.find_one({"_id": ObjectId(consultation_id)})
+    if not c or str(c["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+    
+    update_data = {}
+    for field in ["consultation_type", "chief_complaint", "anamnesis", "findings", "diagnosis", "treatment_plan", "recommendations", "notes"]:
+        val = getattr(data, field, None)
+        if val is not None:
+            update_data[field] = val
+    
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.optical_consultations.update_one({"_id": ObjectId(consultation_id)}, {"$set": update_data})
+    return {"message": "Consulta actualizada"}
+
 # ==================== FINANCE ROUTES ====================
 @finance_router.get("")
 async def list_finance_entries(
@@ -2112,6 +2277,7 @@ api_router.include_router(prescriptions_router)
 api_router.include_router(inventory_router)
 api_router.include_router(sales_router)
 api_router.include_router(quotations_router)
+api_router.include_router(consultations_router)
 api_router.include_router(finance_router)
 api_router.include_router(reports_router)
 api_router.include_router(users_router)
@@ -2145,6 +2311,8 @@ async def startup():
     await db.finance_entries.create_index([("company_id", 1), ("date", -1)])
     await db.quotations.create_index([("company_id", 1), ("created_at", -1)])
     await db.quotations.create_index([("company_id", 1), ("status", 1)])
+    await db.optical_consultations.create_index([("company_id", 1), ("patient_id", 1)])
+    await db.optical_consultations.create_index([("company_id", 1), ("created_at", -1)])
     
     # Seed superadmin
     admin_email = os.environ.get("ADMIN_EMAIL", "superadmin@cortexia.com")

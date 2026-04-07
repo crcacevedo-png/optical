@@ -8,6 +8,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import PatientsPage from './pages/PatientsPage';
 import AgendaPage from './pages/AgendaPage';
+import ConsultationsPage from './pages/ConsultationsPage';
 import PrescriptionsPage from './pages/PrescriptionsPage';
 import InventoryPage from './pages/InventoryPage';
 import SalesPage from './pages/SalesPage';
@@ -37,6 +38,7 @@ function App() {
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="patients" element={<PatientsPage />} />
             <Route path="agenda" element={<AgendaPage />} />
+            <Route path="consultations" element={<ConsultationsPage />} />
             <Route path="prescriptions" element={<PrescriptionsPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="sales" element={<SalesPage />} />
