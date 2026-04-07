@@ -442,13 +442,7 @@ export default function PatientsPage() {
 
                 <ScrollArea className="h-[calc(100vh-20rem)]">
                   <TabsContent value="consultations" className="p-4 m-0">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-medium text-slate-900">Historial de Consultas</h3>
-                      <Button size="sm" className="bg-pine-700 hover:bg-pine-800" data-testid="new-consultation-from-patient-btn"
-                        onClick={() => { resetConsultationForm(); setShowConsultationDialog(true); }}>
-                        <Plus className="w-4 h-4 mr-1" /> Nueva Consulta
-                      </Button>
-                    </div>
+                    <h3 className="font-medium text-slate-900 mb-3">Historial de Consultas</h3>
                     {selectedPatient.consultations?.length > 0 ? (
                       <div className="space-y-3">
                         {selectedPatient.consultations.map((con) => (
