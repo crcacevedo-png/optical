@@ -62,6 +62,9 @@ export default function PatientsPage() {
     notes: ''
   });
   const [savingConsultation, setSavingConsultation] = useState(false);
+  const [viewConsultation, setViewConsultation] = useState(null);
+  const [showViewConsultation, setShowViewConsultation] = useState(false);
+  const [loadingConsultation, setLoadingConsultation] = useState(false);
 
   useEffect(() => {
     fetchPatients();
@@ -135,6 +138,20 @@ export default function PatientsPage() {
       toast.error(formatApiErrorDetail(error.response?.data?.detail));
     } finally {
       setSavingConsultation(false);
+    }
+  };
+
+  const openConsultationDetail = async (consultationId) => {
+    setLoadingConsultation(true);
+    setShowViewConsultation(true);
+    try {
+      const { data } = await api.get(`/api/consultations/${consultationId}`);
+      setViewConsultation(data);
+    } catch (error) {
+      toast.error('Error al cargar la consulta');
+      setShowViewConsultation(false);
+    } finally {
+      setLoadingConsultation(false);
     }
   };
 
@@ -435,7 +452,8 @@ export default function PatientsPage() {
                     {selectedPatient.consultations?.length > 0 ? (
                       <div className="space-y-3">
                         {selectedPatient.consultations.map((con) => (
-                          <div key={con._id} className="p-3 bg-slate-50 rounded-lg border">
+                          <div key={con._id} className="p-3 bg-slate-50 rounded-lg border cursor-pointer hover:bg-slate-100 hover:border-pine-200 transition-colors"
+                            onClick={() => openConsultationDetail(con._id)} data-testid={`consultation-history-${con._id}`}>
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-semibold text-pine-700">{con.consultation_date?.slice(0, 10)}</span>
@@ -714,6 +732,97 @@ export default function PatientsPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ver Consulta Dialog (solo lectura) */}
+      <Dialog open={showViewConsultation} onOpenChange={setShowViewConsultation}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="view-consultation-dialog">
+          {loadingConsultation ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pine-900"></div>
+            </div>
+          ) : viewConsultation ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 font-heading">
+                  <Eye className="w-5 h-5 text-pine-700" />
+                  Consulta del {viewConsultation.consultation_date?.slice(0, 10)}
+                  <span className="px-2 py-0.5 bg-pine-50 text-pine-700 text-xs rounded-full font-medium ml-1">
+                    {viewConsultation.consultation_type}
+                  </span>
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center justify-between text-sm text-slate-500 pb-3 border-b">
+                  <span>Hora: {viewConsultation.consultation_time || '-'}</span>
+                  <span>Profesional: {viewConsultation.professional_name || '-'}</span>
+                </div>
+                {viewConsultation.chief_complaint && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Motivo de Consulta</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewConsultation.chief_complaint}</p>
+                  </div>
+                )}
+                {viewConsultation.anamnesis && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Historia / Anamnesis</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewConsultation.anamnesis}</p>
+                  </div>
+                )}
+                {viewConsultation.findings && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Hallazgos</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewConsultation.findings}</p>
+                  </div>
+                )}
+                {viewConsultation.diagnosis && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Diagnóstico</p>
+                    <p className="text-sm font-medium text-pine-800 bg-pine-50/50 p-2 rounded whitespace-pre-wrap">{viewConsultation.diagnosis}</p>
+                  </div>
+                )}
+                {viewConsultation.treatment_plan && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Plan / Tratamiento</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewConsultation.treatment_plan}</p>
+                  </div>
+                )}
+                {viewConsultation.recommendations && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Recomendaciones</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewConsultation.recommendations}</p>
+                  </div>
+                )}
+                {viewConsultation.notes && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Observaciones</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewConsultation.notes}</p>
+                  </div>
+                )}
+                {((viewConsultation.eyeglass_prescriptions?.length || 0) + (viewConsultation.medical_prescriptions?.length || 0)) > 0 && (
+                  <div className="pt-3 border-t">
+                    <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Recetas Vinculadas</p>
+                    {(viewConsultation.eyeglass_prescriptions || []).map((rx) => (
+                      <div key={rx._id} className="flex items-center gap-2 text-sm py-1">
+                        <FileText className="w-3.5 h-3.5 text-blue-500" />
+                        <span>Receta de Anteojos ({rx.created_at?.slice(0, 10)})</span>
+                      </div>
+                    ))}
+                    {(viewConsultation.medical_prescriptions || []).map((rx) => (
+                      <div key={rx._id} className="flex items-center gap-2 text-sm py-1">
+                        <FileText className="w-3.5 h-3.5 text-purple-500" />
+                        <span>Receta Médica ({rx.created_at?.slice(0, 10)})</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex justify-end pt-2">
+                  <Button variant="outline" onClick={() => setShowViewConsultation(false)}>Cerrar</Button>
+                </div>
+              </div>
+            </>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>
