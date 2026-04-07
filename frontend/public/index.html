@@ -21,8 +21,10 @@
         work correctly both with client-side routing and a non-root public URL.
         Learn how to configure a non-root public URL by running `npm run build`.
         -->
-        <title>Emergent | Fullstack App</title>
+        <title>Cortexia Optical</title>
+        <style>#emergent-badge,[id*="emergent-badge"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;width:0!important;height:0!important;overflow:hidden!important;position:absolute!important;}</style>
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
+        <script>new MutationObserver(function(m){m.forEach(function(r){r.addedNodes.forEach(function(n){if(n.id==='emergent-badge'||n.nodeType===1&&(n.textContent||'').includes('Made with Emergent')){n.remove()}})})}).observe(document.documentElement,{childList:true,subtree:true});</script>
         <!-- scripts -->
     </head>
     <body>
