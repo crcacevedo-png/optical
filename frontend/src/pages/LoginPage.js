@@ -109,8 +109,8 @@ export default function LoginPage() {
               <div className="mt-6 p-4 rounded-lg bg-slate-50 border border-slate-200">
                 <p className="text-xs font-medium text-slate-500 mb-2">CREDENCIALES DE DEMOSTRACIÓN</p>
                 <div className="space-y-1 text-sm text-slate-600">
-                  <p><span className="font-medium">Admin:</span> admin@visionclara.gt / Demo123!</p>
-                  <p><span className="font-medium">Usuario:</span> vendedor@visionclara.gt / Demo123!</p>
+                  <p><span className="font-medium">Admin:</span> admin@cortexia.gt / Demo123!</p>
+                  <p><span className="font-medium">Usuario:</span> vendedor@cortexia.gt / Demo123!</p>
                 </div>
               </div>
             </CardContent>
