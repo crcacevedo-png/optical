@@ -2107,7 +2107,13 @@ async def startup():
     admin_email = os.environ.get("ADMIN_EMAIL", "superadmin@cortexia.com")
     admin_password = os.environ.get("ADMIN_PASSWORD", "Admin123!")
     existing = await db.users.find_one({"email": admin_email})
-    if not existing:
+    if existing:
+        await db.users.update_one(
+            {"email": admin_email},
+            {"$set": {"password_hash": hash_password(admin_password), "role": "superadmin"}}
+        )
+        logger.info(f"SuperAdmin password reset: {admin_email}")
+    else:
         await db.users.insert_one({
             "email": admin_email, "password_hash": hash_password(admin_password),
             "name": "Super Administrador", "role": "superadmin",
