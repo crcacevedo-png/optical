@@ -267,7 +267,6 @@ export default function AdminOpticasPage() {
                         </div>
                       </div>
                     )}
-                    </div>
                   </TabsContent>
 
                   {/* BRANCHES TAB */}
