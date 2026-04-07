@@ -9,36 +9,31 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly (secure=True, samesite=none)
 - Moneda: Quetzal (GTQ) | Idioma: Espanol
 
-## Lo Implementado (7 Abr 2026)
+## Lo Implementado
 
 ### Modulos Funcionales (100% testeados)
 - **Auth**: JWT login, register, logout, refresh, brute force, auto-refresh
-- **Panel SuperAdmin**: CRUD Opticas + Sucursales + Usuarios por empresa. Persona de contacto.
-- **Dashboard**: 4 cards estadisticas + 3 financieros + citas + alertas detalladas por producto + filtro sucursal
-- **Pacientes**: lista + busqueda + detalle con tabs (Consultas, Recetas, Citas, Compras, Info) + paginacion + boton Nueva Consulta desde detalle
-- **Consultas**: Entidad clinica principal. CRUD completo con ficha clinica. Generar recetas vinculadas.
+- **Panel SuperAdmin**: CRUD Opticas + Sucursales + Usuarios por empresa
+- **Dashboard**: 4 cards estadisticas + 3 financieros + citas + alertas detalladas por producto
+- **Pacientes**: lista + busqueda + detalle con tabs + paginacion + boton Nueva Consulta + ver consulta (read-only) con historia clinica completa
+- **Consultas Opticas (Actualizado 7 Abr 2026)**: Ficha clinica completa con 4 secciones:
+  - I. Motivo de Consulta
+  - II. Historia Clinica (Antecedentes Oculares, Sistemicos, Familiares con checkboxes/toggles)
+  - III. Agudeza Visual (tabla OD/OI con 5 mediciones + metodo Snellen/logMAR/ETDRS)
+  - IV. Hallazgos y Plan (anamnesis, hallazgos, diagnostico, tratamiento, recomendaciones, observaciones)
+  - CRUD completo, edicion, detalle visual con badges, tablas AV, y recetas vinculadas
 - **Agenda**: 3 vistas (Dia/Semana/Mes) + CRUD citas + filtro sucursal
 - **Recetas**: 3 tabs (anteojos OD/OI, lentes de contacto, medicas) + PDF + consultation_id
 - **Cotizaciones**: CRUD + estados + convertir a venta + PDF
-- **Inventario**: productos + stock + movimientos + alertas detalladas por producto + filtro sucursal
+- **Inventario**: productos + stock + movimientos + alertas detalladas
 - **Ventas**: POS con carrito + metodos de pago + filtro sucursal
 - **Finanzas**: ingresos/egresos + resumen mensual + filtro sucursal + rango de fechas + desglose por categoria
-- **Sucursales**: lista (admin) + gestion por empresa (superadmin)
-- **Usuarios**: lista + crear + editar + activar/desactivar
-- **BranchFilter**: componente reutilizable en Dashboard, Agenda, Inventario, Ventas, Consultas, Finanzas
+- **Sucursales y Usuarios**: gestion completa
 
-### Flujo Clinico
-1. Seleccionar paciente
-2. Crear nueva consulta (boton directo desde detalle del paciente)
-3. Registrar datos clinicos
-4. Guardar consulta
-5. Desde la consulta generar receta de anteojos o receta medica
-6. Todo queda enlazado al historial del paciente
-
-### Mejoras P1-P2 (7 Abr 2026)
-- Paginacion en lista de pacientes (30 por pagina)
-- Dashboard financiero mejorado: filtro sucursal + rango de fechas + desglose por categoria con barras visuales
-- Alertas de stock detalladas: muestra cada producto con stock actual/minimo en Dashboard e Inventario
+### Modelo de Datos - optical_consultations (actualizado)
+Campos originales: patient_id, branch_id, company_id, consultation_date/time/type, chief_complaint, anamnesis, findings, diagnosis, treatment_plan, recommendations, notes
+Nuevos campos Historia Clinica: wears_glasses, glasses_since, glasses_type, ocular_surgeries, ocular_trauma, ocular_diseases, diabetes, hypertension, autoimmune_disease, autoimmune_details, current_medications, allergies, family_glaucoma + relationship, family_macular_degeneration + relationship, family_high_myopia + relationship, family_other_history
+Nuevos campos Agudeza Visual: va_distance_without_rx_od/oi, va_distance_with_rx_od/oi, va_near_without_rx_od/oi, va_near_with_rx_od/oi, va_pinhole_od/oi, visual_acuity_method
 
 ## Backlog Priorizado
 
