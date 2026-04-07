@@ -345,8 +345,8 @@ async def register(data: UserRegister, response: Response):
     access_token = create_access_token(user_id, email, "user")
     refresh_token = create_refresh_token(user_id)
     
-    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=False, samesite="lax", max_age=86400, path="/")
-    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
+    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="none", max_age=86400, path="/")
+    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="none", max_age=604800, path="/")
     
     return {"_id": user_id, "email": email, "name": data.name, "role": "user"}
 
@@ -383,8 +383,8 @@ async def login(data: UserLogin, response: Response, request: Request):
     access_token = create_access_token(user_id, email, user["role"], company_id)
     refresh_token = create_refresh_token(user_id)
     
-    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=False, samesite="lax", max_age=86400, path="/")
-    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
+    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="none", max_age=86400, path="/")
+    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="none", max_age=604800, path="/")
     
     return {
         "_id": user_id, "email": user["email"], "name": user["name"], "role": user["role"],
@@ -404,8 +404,8 @@ async def increment_login_attempts(identifier: str):
 
 @auth_router.post("/logout")
 async def logout(response: Response):
-    response.delete_cookie("access_token", path="/")
-    response.delete_cookie("refresh_token", path="/")
+    response.delete_cookie("access_token", path="/", secure=True, samesite="none")
+    response.delete_cookie("refresh_token", path="/", secure=True, samesite="none")
     return {"message": "Sesión cerrada"}
 
 @auth_router.get("/me")
@@ -428,7 +428,7 @@ async def refresh_token(request: Request, response: Response):
         user_id = str(user["_id"])
         company_id = str(user["company_id"]) if user.get("company_id") else None
         access_token = create_access_token(user_id, user["email"], user["role"], company_id)
-        response.set_cookie(key="access_token", value=access_token, httponly=True, secure=False, samesite="lax", max_age=86400, path="/")
+        response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="none", max_age=86400, path="/")
         return {"message": "Token renovado"}
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expirado")
