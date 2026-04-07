@@ -394,7 +394,7 @@ export default function PatientsPage() {
                         <Calendar className="w-4 h-4" /> {selectedPatient.birth_date}
                         {selectedPatient.age != null && (
                           <span className="ml-1 px-1.5 py-0.5 bg-pine-50 text-pine-700 rounded text-xs font-medium">
-                            {selectedPatient.age} anios
+                            {selectedPatient.age} años
                           </span>
                         )}
                       </span>
