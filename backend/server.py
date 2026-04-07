@@ -324,6 +324,40 @@ class ConsultationCreate(BaseModel):
     treatment_plan: Optional[str] = None
     recommendations: Optional[str] = None
     notes: Optional[str] = None
+    # Historia Clinica - Antecedentes Oculares
+    wears_glasses: Optional[bool] = None
+    glasses_since: Optional[str] = None
+    glasses_type: Optional[str] = None
+    ocular_surgeries: Optional[str] = None
+    ocular_trauma: Optional[str] = None
+    ocular_diseases: Optional[str] = None
+    # Historia Clinica - Antecedentes Sistemicos
+    diabetes: Optional[bool] = None
+    hypertension: Optional[bool] = None
+    autoimmune_disease: Optional[bool] = None
+    autoimmune_details: Optional[str] = None
+    current_medications: Optional[str] = None
+    allergies: Optional[str] = None
+    # Historia Clinica - Antecedentes Familiares
+    family_glaucoma: Optional[bool] = None
+    family_glaucoma_relationship: Optional[str] = None
+    family_macular_degeneration: Optional[bool] = None
+    family_macular_relationship: Optional[str] = None
+    family_high_myopia: Optional[bool] = None
+    family_high_myopia_relationship: Optional[str] = None
+    family_other_history: Optional[str] = None
+    # Agudeza Visual
+    va_distance_without_rx_od: Optional[str] = None
+    va_distance_without_rx_oi: Optional[str] = None
+    va_distance_with_rx_od: Optional[str] = None
+    va_distance_with_rx_oi: Optional[str] = None
+    va_near_without_rx_od: Optional[str] = None
+    va_near_without_rx_oi: Optional[str] = None
+    va_near_with_rx_od: Optional[str] = None
+    va_near_with_rx_oi: Optional[str] = None
+    va_pinhole_od: Optional[str] = None
+    va_pinhole_oi: Optional[str] = None
+    visual_acuity_method: Optional[str] = None
 
 class ConsultationUpdate(BaseModel):
     consultation_type: Optional[str] = None
@@ -334,6 +368,36 @@ class ConsultationUpdate(BaseModel):
     treatment_plan: Optional[str] = None
     recommendations: Optional[str] = None
     notes: Optional[str] = None
+    wears_glasses: Optional[bool] = None
+    glasses_since: Optional[str] = None
+    glasses_type: Optional[str] = None
+    ocular_surgeries: Optional[str] = None
+    ocular_trauma: Optional[str] = None
+    ocular_diseases: Optional[str] = None
+    diabetes: Optional[bool] = None
+    hypertension: Optional[bool] = None
+    autoimmune_disease: Optional[bool] = None
+    autoimmune_details: Optional[str] = None
+    current_medications: Optional[str] = None
+    allergies: Optional[str] = None
+    family_glaucoma: Optional[bool] = None
+    family_glaucoma_relationship: Optional[str] = None
+    family_macular_degeneration: Optional[bool] = None
+    family_macular_relationship: Optional[str] = None
+    family_high_myopia: Optional[bool] = None
+    family_high_myopia_relationship: Optional[str] = None
+    family_other_history: Optional[str] = None
+    va_distance_without_rx_od: Optional[str] = None
+    va_distance_without_rx_oi: Optional[str] = None
+    va_distance_with_rx_od: Optional[str] = None
+    va_distance_with_rx_oi: Optional[str] = None
+    va_near_without_rx_od: Optional[str] = None
+    va_near_without_rx_oi: Optional[str] = None
+    va_near_with_rx_od: Optional[str] = None
+    va_near_with_rx_oi: Optional[str] = None
+    va_pinhole_od: Optional[str] = None
+    va_pinhole_oi: Optional[str] = None
+    visual_acuity_method: Optional[str] = None
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -1863,6 +1927,38 @@ async def create_consultation(data: ConsultationCreate, user: dict = Depends(get
         "treatment_plan": data.treatment_plan or "",
         "recommendations": data.recommendations or "",
         "notes": data.notes or "",
+        # Historia Clinica
+        "wears_glasses": data.wears_glasses,
+        "glasses_since": data.glasses_since or "",
+        "glasses_type": data.glasses_type or "",
+        "ocular_surgeries": data.ocular_surgeries or "",
+        "ocular_trauma": data.ocular_trauma or "",
+        "ocular_diseases": data.ocular_diseases or "",
+        "diabetes": data.diabetes,
+        "hypertension": data.hypertension,
+        "autoimmune_disease": data.autoimmune_disease,
+        "autoimmune_details": data.autoimmune_details or "",
+        "current_medications": data.current_medications or "",
+        "allergies": data.allergies or "",
+        "family_glaucoma": data.family_glaucoma,
+        "family_glaucoma_relationship": data.family_glaucoma_relationship or "",
+        "family_macular_degeneration": data.family_macular_degeneration,
+        "family_macular_relationship": data.family_macular_relationship or "",
+        "family_high_myopia": data.family_high_myopia,
+        "family_high_myopia_relationship": data.family_high_myopia_relationship or "",
+        "family_other_history": data.family_other_history or "",
+        # Agudeza Visual
+        "va_distance_without_rx_od": data.va_distance_without_rx_od or "",
+        "va_distance_without_rx_oi": data.va_distance_without_rx_oi or "",
+        "va_distance_with_rx_od": data.va_distance_with_rx_od or "",
+        "va_distance_with_rx_oi": data.va_distance_with_rx_oi or "",
+        "va_near_without_rx_od": data.va_near_without_rx_od or "",
+        "va_near_without_rx_oi": data.va_near_without_rx_oi or "",
+        "va_near_with_rx_od": data.va_near_with_rx_od or "",
+        "va_near_with_rx_oi": data.va_near_with_rx_oi or "",
+        "va_pinhole_od": data.va_pinhole_od or "",
+        "va_pinhole_oi": data.va_pinhole_oi or "",
+        "visual_acuity_method": data.visual_acuity_method or "",
         "created_by": ObjectId(user["_id"]),
         "created_at": now.isoformat(),
         "updated_at": now.isoformat()
@@ -1917,7 +2013,18 @@ async def update_consultation(consultation_id: str, data: ConsultationUpdate, us
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
     
     update_data = {}
-    for field in ["consultation_type", "chief_complaint", "anamnesis", "findings", "diagnosis", "treatment_plan", "recommendations", "notes"]:
+    all_fields = [
+        "consultation_type", "chief_complaint", "anamnesis", "findings", "diagnosis",
+        "treatment_plan", "recommendations", "notes",
+        "wears_glasses", "glasses_since", "glasses_type", "ocular_surgeries", "ocular_trauma", "ocular_diseases",
+        "diabetes", "hypertension", "autoimmune_disease", "autoimmune_details", "current_medications", "allergies",
+        "family_glaucoma", "family_glaucoma_relationship", "family_macular_degeneration", "family_macular_relationship",
+        "family_high_myopia", "family_high_myopia_relationship", "family_other_history",
+        "va_distance_without_rx_od", "va_distance_without_rx_oi", "va_distance_with_rx_od", "va_distance_with_rx_oi",
+        "va_near_without_rx_od", "va_near_without_rx_oi", "va_near_with_rx_od", "va_near_with_rx_oi",
+        "va_pinhole_od", "va_pinhole_oi", "visual_acuity_method"
+    ]
+    for field in all_fields:
         val = getattr(data, field, None)
         if val is not None:
             update_data[field] = val

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Textarea } from '../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Checkbox } from '../components/ui/checkbox';
 import { BranchFilter } from '../components/BranchFilter';
 import {
   Plus, Search, Eye, Pencil, Stethoscope, FileText, Pill,
@@ -44,11 +45,28 @@ export default function ConsultationsPage() {
   const [isEditing, setIsEditing] = useState(false);
 
   // Form state
+  const defaultClinical = {
+    wears_glasses: false, glasses_since: '', glasses_type: '',
+    ocular_surgeries: '', ocular_trauma: '', ocular_diseases: '',
+    diabetes: false, hypertension: false, autoimmune_disease: false, autoimmune_details: '',
+    current_medications: '', allergies: '',
+    family_glaucoma: false, family_glaucoma_relationship: '',
+    family_macular_degeneration: false, family_macular_relationship: '',
+    family_high_myopia: false, family_high_myopia_relationship: '',
+    family_other_history: '',
+    va_distance_without_rx_od: '', va_distance_without_rx_oi: '',
+    va_distance_with_rx_od: '', va_distance_with_rx_oi: '',
+    va_near_without_rx_od: '', va_near_without_rx_oi: '',
+    va_near_with_rx_od: '', va_near_with_rx_oi: '',
+    va_pinhole_od: '', va_pinhole_oi: '',
+    visual_acuity_method: 'Snellen'
+  };
   const [form, setForm] = useState({
     patient_id: '', consultation_date: new Date().toISOString().slice(0, 10),
     consultation_time: new Date().toTimeString().slice(0, 5),
     consultation_type: 'general', chief_complaint: '', anamnesis: '',
-    findings: '', diagnosis: '', treatment_plan: '', recommendations: '', notes: ''
+    findings: '', diagnosis: '', treatment_plan: '', recommendations: '', notes: '',
+    ...defaultClinical
   });
   const [patientSearch, setPatientSearch] = useState('');
 
@@ -91,7 +109,8 @@ export default function ConsultationsPage() {
       patient_id: '', consultation_date: new Date().toISOString().slice(0, 10),
       consultation_time: new Date().toTimeString().slice(0, 5),
       consultation_type: 'general', chief_complaint: '', anamnesis: '',
-      findings: '', diagnosis: '', treatment_plan: '', recommendations: '', notes: ''
+      findings: '', diagnosis: '', treatment_plan: '', recommendations: '', notes: '',
+      ...defaultClinical
     });
     setPatientSearch('');
   };
@@ -117,7 +136,23 @@ export default function ConsultationsPage() {
       chief_complaint: c.chief_complaint || '', anamnesis: c.anamnesis || '',
       findings: c.findings || '', diagnosis: c.diagnosis || '',
       treatment_plan: c.treatment_plan || '', recommendations: c.recommendations || '',
-      notes: c.notes || ''
+      notes: c.notes || '',
+      wears_glasses: c.wears_glasses || false, glasses_since: c.glasses_since || '',
+      glasses_type: c.glasses_type || '', ocular_surgeries: c.ocular_surgeries || '',
+      ocular_trauma: c.ocular_trauma || '', ocular_diseases: c.ocular_diseases || '',
+      diabetes: c.diabetes || false, hypertension: c.hypertension || false,
+      autoimmune_disease: c.autoimmune_disease || false, autoimmune_details: c.autoimmune_details || '',
+      current_medications: c.current_medications || '', allergies: c.allergies || '',
+      family_glaucoma: c.family_glaucoma || false, family_glaucoma_relationship: c.family_glaucoma_relationship || '',
+      family_macular_degeneration: c.family_macular_degeneration || false, family_macular_relationship: c.family_macular_relationship || '',
+      family_high_myopia: c.family_high_myopia || false, family_high_myopia_relationship: c.family_high_myopia_relationship || '',
+      family_other_history: c.family_other_history || '',
+      va_distance_without_rx_od: c.va_distance_without_rx_od || '', va_distance_without_rx_oi: c.va_distance_without_rx_oi || '',
+      va_distance_with_rx_od: c.va_distance_with_rx_od || '', va_distance_with_rx_oi: c.va_distance_with_rx_oi || '',
+      va_near_without_rx_od: c.va_near_without_rx_od || '', va_near_without_rx_oi: c.va_near_without_rx_oi || '',
+      va_near_with_rx_od: c.va_near_with_rx_od || '', va_near_with_rx_oi: c.va_near_with_rx_oi || '',
+      va_pinhole_od: c.va_pinhole_od || '', va_pinhole_oi: c.va_pinhole_oi || '',
+      visual_acuity_method: c.visual_acuity_method || 'Snellen'
     });
     setPatientSearch(c.patient_name || '');
     setSelectedConsultation(c);
@@ -382,24 +417,212 @@ export default function ConsultationsPage() {
 
         {/* Center & Right - Clinical Data */}
         <div className="lg:col-span-2 space-y-4">
+          {/* I. Motivo de Consulta */}
           <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-sm text-slate-500">Ficha Clinica</CardTitle></CardHeader>
+            <CardHeader className="pb-3"><CardTitle className="text-sm text-slate-500">I. Motivo de Consulta</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Motivo de Consulta *</Label>
                 <Textarea value={form.chief_complaint} rows={2}
                   onChange={(e) => setForm(f => ({ ...f, chief_complaint: e.target.value }))}
-                  placeholder="Motivo principal de la visita..." data-testid="form-chief-complaint" />
+                  placeholder="Describir sintomas principales, duracion y factores asociados" data-testid="form-chief-complaint" />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* II. Historia Clinica */}
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-sm text-slate-500">II. Historia Clinica</CardTitle></CardHeader>
+            <CardContent className="space-y-5">
+              {/* A. Antecedentes Oculares */}
+              <div>
+                <p className="text-xs font-semibold text-pine-700 uppercase tracking-wide mb-3">A. Antecedentes Oculares Personales</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Checkbox id="wears_glasses" checked={form.wears_glasses}
+                        onCheckedChange={(v) => setForm(f => ({ ...f, wears_glasses: !!v }))} data-testid="form-wears-glasses" />
+                      <Label htmlFor="wears_glasses" className="text-sm cursor-pointer">Usa lentes</Label>
+                    </div>
+                    {form.wears_glasses && (
+                      <div className="space-y-2 pl-6">
+                        <Input placeholder="Desde cuando" value={form.glasses_since}
+                          onChange={(e) => setForm(f => ({ ...f, glasses_since: e.target.value }))} className="h-8 text-sm" />
+                        <Input placeholder="Tipo de lentes" value={form.glasses_type}
+                          onChange={(e) => setForm(f => ({ ...f, glasses_type: e.target.value }))} className="h-8 text-sm" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Cirugias oculares</Label>
+                    <Input value={form.ocular_surgeries} placeholder="Ninguna"
+                      onChange={(e) => setForm(f => ({ ...f, ocular_surgeries: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Traumatismos</Label>
+                    <Input value={form.ocular_trauma} placeholder="Ninguno"
+                      onChange={(e) => setForm(f => ({ ...f, ocular_trauma: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <Label className="text-xs">Enfermedades oculares</Label>
+                  <Input value={form.ocular_diseases} placeholder="Ninguna"
+                    onChange={(e) => setForm(f => ({ ...f, ocular_diseases: e.target.value }))} className="h-8 text-sm mt-1" />
+                </div>
+              </div>
+
+              {/* B. Antecedentes Sistemicos */}
+              <div className="pt-3 border-t">
+                <p className="text-xs font-semibold text-pine-700 uppercase tracking-wide mb-3">B. Antecedentes Sistemicos</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="diabetes" checked={form.diabetes}
+                      onCheckedChange={(v) => setForm(f => ({ ...f, diabetes: !!v }))} data-testid="form-diabetes" />
+                    <Label htmlFor="diabetes" className="text-sm cursor-pointer">Diabetes</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="hypertension" checked={form.hypertension}
+                      onCheckedChange={(v) => setForm(f => ({ ...f, hypertension: !!v }))} data-testid="form-hypertension" />
+                    <Label htmlFor="hypertension" className="text-sm cursor-pointer">Hipertension</Label>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Checkbox id="autoimmune" checked={form.autoimmune_disease}
+                        onCheckedChange={(v) => setForm(f => ({ ...f, autoimmune_disease: !!v }))} />
+                      <Label htmlFor="autoimmune" className="text-sm cursor-pointer">Enfermedad autoinmune</Label>
+                    </div>
+                    {form.autoimmune_disease && (
+                      <Input placeholder="Cual" value={form.autoimmune_details} className="h-8 text-sm pl-6"
+                        onChange={(e) => setForm(f => ({ ...f, autoimmune_details: e.target.value }))} />
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mt-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Medicamentos actuales</Label>
+                    <Input value={form.current_medications} placeholder="Ninguno"
+                      onChange={(e) => setForm(f => ({ ...f, current_medications: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Alergias</Label>
+                    <Input value={form.allergies} placeholder="Ninguna"
+                      onChange={(e) => setForm(f => ({ ...f, allergies: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                </div>
+              </div>
+
+              {/* C. Antecedentes Familiares */}
+              <div className="pt-3 border-t">
+                <p className="text-xs font-semibold text-pine-700 uppercase tracking-wide mb-3">C. Antecedentes Familiares Oculares</p>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Checkbox id="fam_glaucoma" checked={form.family_glaucoma}
+                        onCheckedChange={(v) => setForm(f => ({ ...f, family_glaucoma: !!v }))} />
+                      <Label htmlFor="fam_glaucoma" className="text-sm cursor-pointer">Glaucoma</Label>
+                    </div>
+                    {form.family_glaucoma && (
+                      <Input placeholder="Parentesco" value={form.family_glaucoma_relationship} className="h-8 text-sm w-40"
+                        onChange={(e) => setForm(f => ({ ...f, family_glaucoma_relationship: e.target.value }))} />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Checkbox id="fam_macular" checked={form.family_macular_degeneration}
+                        onCheckedChange={(v) => setForm(f => ({ ...f, family_macular_degeneration: !!v }))} />
+                      <Label htmlFor="fam_macular" className="text-sm cursor-pointer">Degeneracion macular</Label>
+                    </div>
+                    {form.family_macular_degeneration && (
+                      <Input placeholder="Parentesco" value={form.family_macular_relationship} className="h-8 text-sm w-40"
+                        onChange={(e) => setForm(f => ({ ...f, family_macular_relationship: e.target.value }))} />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Checkbox id="fam_myopia" checked={form.family_high_myopia}
+                        onCheckedChange={(v) => setForm(f => ({ ...f, family_high_myopia: !!v }))} />
+                      <Label htmlFor="fam_myopia" className="text-sm cursor-pointer">Miopia alta</Label>
+                    </div>
+                    {form.family_high_myopia && (
+                      <Input placeholder="Parentesco" value={form.family_high_myopia_relationship} className="h-8 text-sm w-40"
+                        onChange={(e) => setForm(f => ({ ...f, family_high_myopia_relationship: e.target.value }))} />
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Otros antecedentes familiares</Label>
+                    <Input value={form.family_other_history} placeholder="Ninguno"
+                      onChange={(e) => setForm(f => ({ ...f, family_other_history: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* III. Agudeza Visual */}
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-sm text-slate-500">III. Agudeza Visual</CardTitle></CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" data-testid="va-table">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500 uppercase w-1/2">Agudeza Visual</th>
+                      <th className="text-center py-2 px-2 text-xs font-semibold text-blue-700 uppercase w-1/4">OD</th>
+                      <th className="text-center py-2 px-2 text-xs font-semibold text-green-700 uppercase w-1/4">OI</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { label: 'AV Lejos sin Rx', od: 'va_distance_without_rx_od', oi: 'va_distance_without_rx_oi' },
+                      { label: 'AV Lejos con Rx', od: 'va_distance_with_rx_od', oi: 'va_distance_with_rx_oi' },
+                      { label: 'AV Cerca sin Rx', od: 'va_near_without_rx_od', oi: 'va_near_without_rx_oi' },
+                      { label: 'AV Cerca con Rx', od: 'va_near_with_rx_od', oi: 'va_near_with_rx_oi' },
+                      { label: 'AV con Estenopeico', od: 'va_pinhole_od', oi: 'va_pinhole_oi' },
+                    ].map((row) => (
+                      <tr key={row.od} className="border-b last:border-0">
+                        <td className="py-2 pr-4 text-slate-700 font-medium">{row.label}</td>
+                        <td className="py-2 px-1">
+                          <Input className="h-8 text-sm text-center" value={form[row.od]}
+                            onChange={(e) => setForm(f => ({ ...f, [row.od]: e.target.value }))}
+                            placeholder="20/20" data-testid={`form-${row.od}`} />
+                        </td>
+                        <td className="py-2 px-1">
+                          <Input className="h-8 text-sm text-center" value={form[row.oi]}
+                            onChange={(e) => setForm(f => ({ ...f, [row.oi]: e.target.value }))}
+                            placeholder="20/20" data-testid={`form-${row.oi}`} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-3 space-y-1">
+                <Label className="text-xs">Metodo utilizado</Label>
+                <Select value={form.visual_acuity_method} onValueChange={(v) => setForm(f => ({ ...f, visual_acuity_method: v }))}>
+                  <SelectTrigger className="w-48" data-testid="form-va-method"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Snellen">Snellen</SelectItem>
+                    <SelectItem value="logMAR">logMAR</SelectItem>
+                    <SelectItem value="ETDRS">ETDRS</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* IV. Hallazgos, Diagnostico, Plan */}
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-sm text-slate-500">IV. Hallazgos y Plan</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Historia / Anamnesis</Label>
-                <Textarea value={form.anamnesis} rows={3}
+                <Textarea value={form.anamnesis} rows={2}
                   onChange={(e) => setForm(f => ({ ...f, anamnesis: e.target.value }))}
                   placeholder="Antecedentes, sintomas previos, uso actual de lentes..." data-testid="form-anamnesis" />
               </div>
               <div className="space-y-2">
                 <Label>Hallazgos</Label>
-                <Textarea value={form.findings} rows={3}
+                <Textarea value={form.findings} rows={2}
                   onChange={(e) => setForm(f => ({ ...f, findings: e.target.value }))}
                   placeholder="Resultados del examen visual, agudeza visual, biomicroscopia..." data-testid="form-findings" />
               </div>
@@ -412,13 +635,13 @@ export default function ConsultationsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Plan / Tratamiento</Label>
-                  <Textarea value={form.treatment_plan} rows={3}
+                  <Textarea value={form.treatment_plan} rows={2}
                     onChange={(e) => setForm(f => ({ ...f, treatment_plan: e.target.value }))}
                     placeholder="Plan de tratamiento, prescripcion optica..." data-testid="form-treatment-plan" />
                 </div>
                 <div className="space-y-2">
                   <Label>Recomendaciones</Label>
-                  <Textarea value={form.recommendations} rows={3}
+                  <Textarea value={form.recommendations} rows={2}
                     onChange={(e) => setForm(f => ({ ...f, recommendations: e.target.value }))}
                     placeholder="Recomendaciones al paciente..." data-testid="form-recommendations" />
                 </div>
@@ -524,30 +747,107 @@ export default function ConsultationsPage() {
           </Card>
 
           {/* Clinical data */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-4">
+            {/* I. Motivo */}
+            {c.chief_complaint && (
+              <Card>
+                <CardContent className="pt-4">
+                  <Section title="I. Motivo de Consulta" text={c.chief_complaint} />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* II. Historia Clinica */}
+            {(c.wears_glasses || c.diabetes || c.hypertension || c.autoimmune_disease || c.ocular_surgeries || c.ocular_diseases || c.family_glaucoma || c.family_macular_degeneration || c.family_high_myopia || c.current_medications || c.allergies) && (
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">II. Historia Clinica</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Oculares */}
+                  {(c.wears_glasses || c.ocular_surgeries || c.ocular_trauma || c.ocular_diseases) && (
+                    <div>
+                      <p className="text-xs font-semibold text-pine-700 uppercase tracking-wide mb-2">A. Antecedentes Oculares</p>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                        {c.wears_glasses && <div><span className="text-slate-500">Usa lentes:</span> <span className="font-medium">Si{c.glasses_since ? `, desde ${c.glasses_since}` : ''}{c.glasses_type ? ` (${c.glasses_type})` : ''}</span></div>}
+                        {c.ocular_surgeries && <div><span className="text-slate-500">Cirugias:</span> <span className="font-medium">{c.ocular_surgeries}</span></div>}
+                        {c.ocular_trauma && <div><span className="text-slate-500">Traumatismos:</span> <span className="font-medium">{c.ocular_trauma}</span></div>}
+                        {c.ocular_diseases && <div><span className="text-slate-500">Enfermedades:</span> <span className="font-medium">{c.ocular_diseases}</span></div>}
+                      </div>
+                    </div>
+                  )}
+                  {/* Sistemicos */}
+                  {(c.diabetes || c.hypertension || c.autoimmune_disease || c.current_medications || c.allergies) && (
+                    <div className="pt-3 border-t">
+                      <p className="text-xs font-semibold text-pine-700 uppercase tracking-wide mb-2">B. Antecedentes Sistemicos</p>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {c.diabetes && <span className="px-2 py-0.5 bg-amber-50 text-amber-800 rounded text-xs font-medium">Diabetes</span>}
+                        {c.hypertension && <span className="px-2 py-0.5 bg-red-50 text-red-800 rounded text-xs font-medium">Hipertension</span>}
+                        {c.autoimmune_disease && <span className="px-2 py-0.5 bg-purple-50 text-purple-800 rounded text-xs font-medium">Autoinmune: {c.autoimmune_details || 'Si'}</span>}
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                        {c.current_medications && <div><span className="text-slate-500">Medicamentos:</span> <span className="font-medium">{c.current_medications}</span></div>}
+                        {c.allergies && <div><span className="text-slate-500">Alergias:</span> <span className="font-medium">{c.allergies}</span></div>}
+                      </div>
+                    </div>
+                  )}
+                  {/* Familiares */}
+                  {(c.family_glaucoma || c.family_macular_degeneration || c.family_high_myopia || c.family_other_history) && (
+                    <div className="pt-3 border-t">
+                      <p className="text-xs font-semibold text-pine-700 uppercase tracking-wide mb-2">C. Antecedentes Familiares</p>
+                      <div className="flex flex-wrap gap-2">
+                        {c.family_glaucoma && <span className="px-2 py-0.5 bg-blue-50 text-blue-800 rounded text-xs font-medium">Glaucoma{c.family_glaucoma_relationship ? ` (${c.family_glaucoma_relationship})` : ''}</span>}
+                        {c.family_macular_degeneration && <span className="px-2 py-0.5 bg-blue-50 text-blue-800 rounded text-xs font-medium">Deg. Macular{c.family_macular_relationship ? ` (${c.family_macular_relationship})` : ''}</span>}
+                        {c.family_high_myopia && <span className="px-2 py-0.5 bg-blue-50 text-blue-800 rounded text-xs font-medium">Miopia Alta{c.family_high_myopia_relationship ? ` (${c.family_high_myopia_relationship})` : ''}</span>}
+                      </div>
+                      {c.family_other_history && <p className="text-sm text-slate-600 mt-2">Otros: {c.family_other_history}</p>}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* III. Agudeza Visual */}
+            {(c.va_distance_without_rx_od || c.va_distance_without_rx_oi || c.va_distance_with_rx_od || c.va_near_without_rx_od || c.va_pinhole_od) && (
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">III. Agudeza Visual {c.visual_acuity_method ? `(${c.visual_acuity_method})` : ''}</CardTitle></CardHeader>
+                <CardContent>
+                  <table className="w-full text-sm" data-testid="detail-va-table">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500 uppercase">Medicion</th>
+                        <th className="text-center py-2 px-4 text-xs font-semibold text-blue-700 uppercase">OD</th>
+                        <th className="text-center py-2 px-4 text-xs font-semibold text-green-700 uppercase">OI</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { label: 'AV Lejos sin Rx', od: c.va_distance_without_rx_od, oi: c.va_distance_without_rx_oi },
+                        { label: 'AV Lejos con Rx', od: c.va_distance_with_rx_od, oi: c.va_distance_with_rx_oi },
+                        { label: 'AV Cerca sin Rx', od: c.va_near_without_rx_od, oi: c.va_near_without_rx_oi },
+                        { label: 'AV Cerca con Rx', od: c.va_near_with_rx_od, oi: c.va_near_with_rx_oi },
+                        { label: 'AV con Estenopeico', od: c.va_pinhole_od, oi: c.va_pinhole_oi },
+                      ].filter(r => r.od || r.oi).map((r) => (
+                        <tr key={r.label} className="border-b last:border-0">
+                          <td className="py-2 pr-4 text-slate-700 font-medium">{r.label}</td>
+                          <td className="py-2 px-4 text-center font-mono">{r.od || '-'}</td>
+                          <td className="py-2 px-4 text-center font-mono">{r.oi || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* IV. Hallazgos y Plan */}
             <Card>
-              <CardContent className="pt-4 space-y-5">
-                {c.chief_complaint && (
-                  <Section title="Motivo de Consulta" text={c.chief_complaint} />
-                )}
-                {c.anamnesis && (
-                  <Section title="Historia / Anamnesis" text={c.anamnesis} />
-                )}
-                {c.findings && (
-                  <Section title="Hallazgos" text={c.findings} />
-                )}
-                {c.diagnosis && (
-                  <Section title="Diagnostico / Impresion Clinica" text={c.diagnosis} highlight />
-                )}
-                {c.treatment_plan && (
-                  <Section title="Plan / Tratamiento" text={c.treatment_plan} />
-                )}
-                {c.recommendations && (
-                  <Section title="Recomendaciones" text={c.recommendations} />
-                )}
-                {c.notes && (
-                  <Section title="Observaciones" text={c.notes} />
-                )}
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">IV. Hallazgos y Plan</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                {c.anamnesis && <Section title="Historia / Anamnesis" text={c.anamnesis} />}
+                {c.findings && <Section title="Hallazgos" text={c.findings} />}
+                {c.diagnosis && <Section title="Diagnostico / Impresion Clinica" text={c.diagnosis} highlight />}
+                {c.treatment_plan && <Section title="Plan / Tratamiento" text={c.treatment_plan} />}
+                {c.recommendations && <Section title="Recomendaciones" text={c.recommendations} />}
+                {c.notes && <Section title="Observaciones" text={c.notes} />}
               </CardContent>
             </Card>
           </div>
