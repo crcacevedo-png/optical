@@ -22,7 +22,7 @@ export default function FinancePage() {
   const [activeTab, setActiveTab] = useState('all');
 
   const [formData, setFormData] = useState({
-    type: 'income',
+    type: 'ingreso',
     category: '',
     amount: '',
     description: '',
@@ -75,7 +75,7 @@ export default function FinancePage() {
       toast.success('Entrada registrada exitosamente');
       setShowDialog(false);
       setFormData({
-        type: 'income', category: '', amount: '', description: '',
+        type: 'ingreso', category: '', amount: '', description: '',
         date: new Date().toISOString().slice(0, 10), reference: ''
       });
       fetchData();
@@ -125,9 +125,9 @@ export default function FinancePage() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setFormData({...formData, type: 'income', category: ''})}
+                    onClick={() => setFormData({...formData, type: 'ingreso', category: ''})}
                     className={`flex-1 p-3 rounded-lg border flex items-center justify-center gap-2 transition-colors ${
-                      formData.type === 'income'
+                      formData.type === 'ingreso'
                         ? 'border-green-500 bg-green-50 text-green-700'
                         : 'border-slate-200 hover:border-slate-300'
                     }`}
@@ -138,9 +138,9 @@ export default function FinancePage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFormData({...formData, type: 'expense', category: ''})}
+                    onClick={() => setFormData({...formData, type: 'egreso', category: ''})}
                     className={`flex-1 p-3 rounded-lg border flex items-center justify-center gap-2 transition-colors ${
-                      formData.type === 'expense'
+                      formData.type === 'egreso'
                         ? 'border-red-500 bg-red-50 text-red-700'
                         : 'border-slate-200 hover:border-slate-300'
                     }`}
@@ -160,7 +160,7 @@ export default function FinancePage() {
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(formData.type === 'income' ? incomeCategories : expenseCategories).map((c) => (
+                      {(formData.type === 'ingreso' ? incomeCategories : expenseCategories).map((c) => (
                         <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                       ))}
                     </SelectContent>
@@ -280,8 +280,8 @@ export default function FinancePage() {
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList>
                 <TabsTrigger value="all">Todos</TabsTrigger>
-                <TabsTrigger value="income">Ingresos</TabsTrigger>
-                <TabsTrigger value="expense">Egresos</TabsTrigger>
+                <TabsTrigger value="ingreso">Ingresos</TabsTrigger>
+                <TabsTrigger value="egreso">Egresos</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -303,20 +303,20 @@ export default function FinancePage() {
                   <TableCell>{entry.date}</TableCell>
                   <TableCell>
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                      entry.type === 'income' 
+                      entry.type === 'ingreso' 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-red-100 text-red-800'
                     }`}>
-                      {entry.type === 'income' ? <ArrowUpCircle className="w-3 h-3" /> : <ArrowDownCircle className="w-3 h-3" />}
-                      {entry.type === 'income' ? 'Ingreso' : 'Egreso'}
+                      {entry.type === 'ingreso' ? <ArrowUpCircle className="w-3 h-3" /> : <ArrowDownCircle className="w-3 h-3" />}
+                      {entry.type === 'ingreso' ? 'Ingreso' : 'Egreso'}
                     </span>
                   </TableCell>
                   <TableCell className="capitalize">{entry.category?.replace('_', ' ')}</TableCell>
                   <TableCell>{entry.description}</TableCell>
                   <TableCell className={`text-right font-medium ${
-                    entry.type === 'income' ? 'text-green-600' : 'text-red-600'
+                    entry.type === 'ingreso' ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {entry.type === 'income' ? '+' : '-'}{formatCurrency(entry.amount)}
+                    {entry.type === 'ingreso' ? '+' : '-'}{formatCurrency(entry.amount)}
                   </TableCell>
                 </TableRow>
               ))}

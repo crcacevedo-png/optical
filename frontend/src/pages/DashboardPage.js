@@ -54,20 +54,20 @@ export default function DashboardPage() {
       subtitle: 'Este mes'
     },
     {
-      title: 'Ventas',
-      value: data?.sales_count || 0,
+      title: 'Ventas Hoy',
+      value: data?.sales_count_today || 0,
       icon: ShoppingBag,
       color: 'bg-purple-50 text-purple-600',
       iconBg: 'bg-purple-100',
-      subtitle: 'Este mes'
+      subtitle: formatCurrency(data?.total_sales_today)
     },
     {
-      title: 'Recetas',
-      value: data?.prescriptions_count || 0,
-      icon: Receipt,
+      title: 'Alertas Stock',
+      value: data?.stock_alerts || 0,
+      icon: AlertTriangle,
       color: 'bg-amber-50 text-amber-600',
       iconBg: 'bg-amber-100',
-      subtitle: 'Recientes'
+      subtitle: 'Productos bajos'
     }
   ];
 

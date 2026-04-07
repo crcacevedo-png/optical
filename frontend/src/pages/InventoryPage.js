@@ -32,7 +32,7 @@ export default function InventoryPage() {
   });
 
   const [movementForm, setMovementForm] = useState({
-    product_id: '', branch_id: '', type: 'in', quantity: '', notes: ''
+    product_id: '', branch_id: '', type: 'entrada', quantity: '', notes: ''
   });
 
   const categories = [
@@ -176,8 +176,8 @@ export default function InventoryPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="in">Entrada</SelectItem>
-                        <SelectItem value="out">Salida</SelectItem>
+                        <SelectItem value="entrada">Entrada</SelectItem>
+                        <SelectItem value="salida">Salida</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

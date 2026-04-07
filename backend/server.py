@@ -59,6 +59,15 @@ def create_refresh_token(user_id: str) -> str:
     }
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
+def serialize_doc(doc):
+    """Convert all ObjectId fields in a MongoDB document to strings."""
+    if doc is None:
+        return None
+    for key, value in list(doc.items()):
+        if isinstance(value, ObjectId):
+            doc[key] = str(value)
+    return doc
+
 def calculate_age(birth_date_str: str) -> int:
     if not birth_date_str:
         return None
@@ -544,7 +553,7 @@ async def list_patients(
     patients = await db.patients.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     
     for p in patients:
-        p["_id"] = str(p["_id"])
+        serialize_doc(p)
         p["age"] = calculate_age(p.get("birth_date"))
     
     return {"patients": patients, "total": total, "limit": limit, "skip": skip}
@@ -576,49 +585,33 @@ async def get_patient(patient_id: str, user: dict = Depends(get_current_user)):
     if user["role"] != "superadmin" and str(patient["company_id"]) != user["company_id"]:
         raise HTTPException(status_code=403, detail="Acceso denegado")
     
-    patient["_id"] = str(patient["_id"])
-    patient["company_id"] = str(patient["company_id"])
+    serialize_doc(patient)
     patient["age"] = calculate_age(patient.get("birth_date"))
-    if patient.get("branch_id"):
-        patient["branch_id"] = str(patient["branch_id"])
-    if patient.get("created_by"):
-        patient["created_by"] = str(patient["created_by"])
     
     # Historial completo
     eyeglass_rx = await db.eyeglass_prescriptions.find({"patient_id": ObjectId(patient_id)}).sort("created_at", -1).to_list(20)
     for rx in eyeglass_rx:
-        rx["_id"] = str(rx["_id"])
-        rx["patient_id"] = str(rx["patient_id"])
-        rx["company_id"] = str(rx["company_id"])
+        serialize_doc(rx)
     patient["eyeglass_prescriptions"] = eyeglass_rx
     
     contact_rx = await db.contact_lens_prescriptions.find({"patient_id": ObjectId(patient_id)}).sort("created_at", -1).to_list(20)
     for rx in contact_rx:
-        rx["_id"] = str(rx["_id"])
-        rx["patient_id"] = str(rx["patient_id"])
-        rx["company_id"] = str(rx["company_id"])
+        serialize_doc(rx)
     patient["contact_prescriptions"] = contact_rx
     
     medical_rx = await db.medical_prescriptions.find({"patient_id": ObjectId(patient_id)}).sort("created_at", -1).to_list(20)
     for rx in medical_rx:
-        rx["_id"] = str(rx["_id"])
-        rx["patient_id"] = str(rx["patient_id"])
-        rx["company_id"] = str(rx["company_id"])
+        serialize_doc(rx)
     patient["medical_prescriptions"] = medical_rx
     
     appointments = await db.appointments.find({"patient_id": ObjectId(patient_id)}).sort("date", -1).to_list(30)
     for apt in appointments:
-        apt["_id"] = str(apt["_id"])
-        apt["patient_id"] = str(apt["patient_id"])
-        apt["company_id"] = str(apt["company_id"])
+        serialize_doc(apt)
     patient["appointments"] = appointments
     
     sales = await db.sales.find({"patient_id": ObjectId(patient_id)}).sort("created_at", -1).to_list(30)
     for s in sales:
-        s["_id"] = str(s["_id"])
-        if s.get("patient_id"):
-            s["patient_id"] = str(s["patient_id"])
-        s["company_id"] = str(s["company_id"])
+        serialize_doc(s)
     patient["sales"] = sales
     
     return patient
@@ -679,11 +672,7 @@ async def list_appointments(
     
     appointments = await db.appointments.find(query).sort([("date", 1), ("time", 1)]).to_list(500)
     for apt in appointments:
-        apt["_id"] = str(apt["_id"])
-        apt["patient_id"] = str(apt["patient_id"])
-        apt["company_id"] = str(apt["company_id"])
-        if apt.get("branch_id"):
-            apt["branch_id"] = str(apt["branch_id"])
+        serialize_doc(apt)
         patient = await db.patients.find_one({"_id": ObjectId(apt["patient_id"])}, {"first_name": 1, "last_name": 1, "phone": 1})
         if patient:
             apt["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
@@ -715,11 +704,7 @@ async def get_appointment(appointment_id: str, user: dict = Depends(get_current_
     apt = await db.appointments.find_one({"_id": ObjectId(appointment_id)})
     if not apt or str(apt["company_id"]) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Cita no encontrada")
-    apt["_id"] = str(apt["_id"])
-    apt["patient_id"] = str(apt["patient_id"])
-    apt["company_id"] = str(apt["company_id"])
-    if apt.get("branch_id"):
-        apt["branch_id"] = str(apt["branch_id"])
+    serialize_doc(apt)
     patient = await db.patients.find_one({"_id": ObjectId(apt["patient_id"])}, {"first_name": 1, "last_name": 1})
     if patient:
         apt["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
@@ -753,9 +738,7 @@ async def list_eyeglass_prescriptions(user: dict = Depends(get_current_user), pa
         query["patient_id"] = ObjectId(patient_id)
     prescriptions = await db.eyeglass_prescriptions.find(query).sort("created_at", -1).to_list(100)
     for rx in prescriptions:
-        rx["_id"] = str(rx["_id"])
-        rx["patient_id"] = str(rx["patient_id"])
-        rx["company_id"] = str(rx["company_id"])
+        serialize_doc(rx)
         patient = await db.patients.find_one({"_id": ObjectId(rx["patient_id"])}, {"first_name": 1, "last_name": 1})
         if patient:
             rx["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
@@ -885,9 +868,7 @@ async def list_contact_lens_prescriptions(user: dict = Depends(get_current_user)
         query["patient_id"] = ObjectId(patient_id)
     prescriptions = await db.contact_lens_prescriptions.find(query).sort("created_at", -1).to_list(100)
     for rx in prescriptions:
-        rx["_id"] = str(rx["_id"])
-        rx["patient_id"] = str(rx["patient_id"])
-        rx["company_id"] = str(rx["company_id"])
+        serialize_doc(rx)
         patient = await db.patients.find_one({"_id": ObjectId(rx["patient_id"])}, {"first_name": 1, "last_name": 1})
         if patient:
             rx["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
@@ -1016,9 +997,7 @@ async def list_medical_prescriptions(user: dict = Depends(get_current_user), pat
         query["patient_id"] = ObjectId(patient_id)
     prescriptions = await db.medical_prescriptions.find(query).sort("created_at", -1).to_list(100)
     for rx in prescriptions:
-        rx["_id"] = str(rx["_id"])
-        rx["patient_id"] = str(rx["patient_id"])
-        rx["company_id"] = str(rx["company_id"])
+        serialize_doc(rx)
         patient = await db.patients.find_one({"_id": ObjectId(rx["patient_id"])}, {"first_name": 1, "last_name": 1})
         if patient:
             rx["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
@@ -1129,8 +1108,7 @@ async def list_products(user: dict = Depends(get_current_user), category: Option
     
     products = await db.products.find(query).to_list(500)
     for p in products:
-        p["_id"] = str(p["_id"])
-        p["company_id"] = str(p["company_id"])
+        serialize_doc(p)
         # Get current stock
         branch_id = ObjectId(user["branch_id"]) if user.get("branch_id") else None
         stock_query = {"company_id": ObjectId(user["company_id"]), "product_id": ObjectId(p["_id"])}
@@ -1179,10 +1157,7 @@ async def get_stock(user: dict = Depends(get_current_user), branch_id: Optional[
     
     stock = await db.stock.find(query).to_list(1000)
     for s in stock:
-        s["_id"] = str(s["_id"])
-        s["product_id"] = str(s["product_id"])
-        s["company_id"] = str(s["company_id"])
-        s["branch_id"] = str(s["branch_id"])
+        serialize_doc(s)
         product = await db.products.find_one({"_id": ObjectId(s["product_id"])}, {"name": 1, "sku": 1, "min_stock": 1, "sale_price": 1, "cost_price": 1})
         if product:
             s["product_name"] = product["name"]
@@ -1265,10 +1240,7 @@ async def list_inventory_movements(
     
     movements = await db.inventory_movements.find(query).sort("created_at", -1).limit(limit).to_list(limit)
     for m in movements:
-        m["_id"] = str(m["_id"])
-        m["product_id"] = str(m["product_id"])
-        m["company_id"] = str(m["company_id"])
-        m["branch_id"] = str(m["branch_id"])
+        serialize_doc(m)
         product = await db.products.find_one({"_id": ObjectId(m["product_id"])}, {"name": 1})
         if product:
             m["product_name"] = product["name"]
@@ -1321,17 +1293,12 @@ async def list_sales(
     
     sales = await db.sales.find(query).sort("created_at", -1).limit(limit).to_list(limit)
     for s in sales:
-        s["_id"] = str(s["_id"])
-        s["company_id"] = str(s["company_id"])
-        if s.get("branch_id"):
-            s["branch_id"] = str(s["branch_id"])
+        serialize_doc(s)
         if s.get("patient_id"):
-            s["patient_id"] = str(s["patient_id"])
             patient = await db.patients.find_one({"_id": ObjectId(s["patient_id"])}, {"first_name": 1, "last_name": 1})
             if patient:
                 s["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
         if s.get("created_by"):
-            s["created_by"] = str(s["created_by"])
             seller = await db.users.find_one({"_id": ObjectId(s["created_by"])}, {"name": 1})
             if seller:
                 s["seller_name"] = seller["name"]
@@ -1402,12 +1369,8 @@ async def get_sale(sale_id: str, user: dict = Depends(get_current_user)):
     sale = await db.sales.find_one({"_id": ObjectId(sale_id)})
     if not sale or str(sale["company_id"]) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
-    sale["_id"] = str(sale["_id"])
-    sale["company_id"] = str(sale["company_id"])
-    if sale.get("branch_id"):
-        sale["branch_id"] = str(sale["branch_id"])
+    serialize_doc(sale)
     if sale.get("patient_id"):
-        sale["patient_id"] = str(sale["patient_id"])
         patient = await db.patients.find_one({"_id": ObjectId(sale["patient_id"])}, {"first_name": 1, "last_name": 1})
         if patient:
             sale["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
@@ -1474,10 +1437,7 @@ async def list_finance_entries(
     
     entries = await db.finance_entries.find(query).sort("date", -1).to_list(500)
     for e in entries:
-        e["_id"] = str(e["_id"])
-        e["company_id"] = str(e["company_id"])
-        if e.get("branch_id"):
-            e["branch_id"] = str(e["branch_id"])
+        serialize_doc(e)
     return entries
 
 @finance_router.post("")
@@ -1635,8 +1595,7 @@ async def get_dashboard(user: dict = Depends(get_current_user), branch_id: Optio
     }).sort([("date", 1), ("time", 1)]).limit(5).to_list(5)
     
     for apt in upcoming_apts:
-        apt["_id"] = str(apt["_id"])
-        apt["patient_id"] = str(apt["patient_id"])
+        serialize_doc(apt)
         patient = await db.patients.find_one({"_id": ObjectId(apt["patient_id"])}, {"first_name": 1, "last_name": 1})
         if patient:
             apt["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
@@ -1721,11 +1680,7 @@ async def list_users(user: dict = Depends(get_current_user)):
         users = await db.users.find({"company_id": ObjectId(user["company_id"])}, {"password_hash": 0}).to_list(100)
     
     for u in users:
-        u["_id"] = str(u["_id"])
-        if u.get("company_id"):
-            u["company_id"] = str(u["company_id"])
-        if u.get("branch_id"):
-            u["branch_id"] = str(u["branch_id"])
+        serialize_doc(u)
     return users
 
 @users_router.post("")

@@ -408,8 +408,16 @@ export default function PatientsPage() {
                               <p className="font-medium text-slate-900">{apt.type}</p>
                               <p className="text-sm text-slate-500">{apt.date} - {apt.time}</p>
                             </div>
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium status-${apt.status}`}>
-                              {apt.status === 'scheduled' ? 'Programada' : apt.status === 'completed' ? 'Completada' : 'Cancelada'}
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              apt.status === 'completada' ? 'bg-green-100 text-green-800' : 
+                              apt.status === 'cancelada' ? 'bg-red-100 text-red-800' : 
+                              apt.status === 'confirmada' ? 'bg-blue-100 text-blue-800' :
+                              'bg-amber-100 text-amber-800'
+                            }`}>
+                              {apt.status === 'pendiente' ? 'Pendiente' : 
+                               apt.status === 'confirmada' ? 'Confirmada' :
+                               apt.status === 'completada' ? 'Completada' : 
+                               apt.status === 'cancelada' ? 'Cancelada' : apt.status}
                             </span>
                           </div>
                         ))}
@@ -429,8 +437,10 @@ export default function PatientsPage() {
                                 <p className="font-medium text-slate-900">{formatCurrency(sale.total)}</p>
                                 <p className="text-sm text-slate-500">{sale.created_at?.slice(0, 10)}</p>
                               </div>
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium status-${sale.status}`}>
-                                {sale.status === 'completed' ? 'Pagado' : 'Pendiente'}
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                sale.status === 'completada' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {sale.status === 'completada' ? 'Pagado' : 'Pendiente'}
                               </span>
                             </div>
                             {sale.balance > 0 && (

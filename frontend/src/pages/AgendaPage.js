@@ -282,9 +282,10 @@ export default function AgendaPage() {
                             <div
                               key={apt._id}
                               className={`p-3 rounded-lg flex items-center justify-between ${
-                                apt.status === 'completed' ? 'bg-green-50 border border-green-200' :
-                                apt.status === 'cancelled' ? 'bg-red-50 border border-red-200' :
-                                'bg-blue-50 border border-blue-200'
+                                apt.status === 'completada' ? 'bg-green-50 border border-green-200' :
+                                apt.status === 'cancelada' ? 'bg-red-50 border border-red-200' :
+                                apt.status === 'confirmada' ? 'bg-blue-50 border border-blue-200' :
+                                'bg-amber-50 border border-amber-200'
                               }`}
                               data-testid={`appointment-${apt._id}`}
                             >
@@ -304,7 +305,10 @@ export default function AgendaPage() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => updateStatus(apt._id, 'completed')}>
+                                  <DropdownMenuItem onClick={() => updateStatus(apt._id, 'confirmada')}>
+                                    <Check className="w-4 h-4 mr-2" /> Confirmar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => updateStatus(apt._id, 'completada')}>
                                     <Check className="w-4 h-4 mr-2" /> Completar
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => cancelAppointment(apt._id)} className="text-red-600">

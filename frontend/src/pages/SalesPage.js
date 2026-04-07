@@ -372,11 +372,11 @@ export default function SalesPage() {
                   <TableCell>{formatCurrency(sale.amount_paid)}</TableCell>
                   <TableCell>
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      sale.status === 'completed' 
+                      sale.status === 'completada' 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-amber-100 text-amber-800'
                     }`}>
-                      {sale.status === 'completed' ? 'Pagado' : 'Pendiente'}
+                      {sale.status === 'completada' ? 'Pagado' : 'Pendiente'}
                     </span>
                   </TableCell>
                 </TableRow>
