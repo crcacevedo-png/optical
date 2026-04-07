@@ -13,6 +13,7 @@ import {
   Banknote, Smartphone, Receipt
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { BranchFilter } from '../components/BranchFilter';
 
 export default function SalesPage() {
   const [sales, setSales] = useState([]);
@@ -20,6 +21,7 @@ export default function SalesPage() {
   const [products, setProducts] = useState([]);
   const [stock, setStock] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [branchId, setBranchId] = useState('');
   const [showSaleDialog, setShowSaleDialog] = useState(false);
 
   const [cart, setCart] = useState([]);
@@ -39,15 +41,16 @@ export default function SalesPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [branchId]);
 
   const fetchData = async () => {
     try {
+      const params = branchId ? { branch_id: branchId } : {};
       const [salesRes, patientsRes, productsRes, stockRes] = await Promise.all([
-        api.get('/api/sales'),
+        api.get('/api/sales', { params }),
         api.get('/api/patients', { params: { limit: 200 } }),
         api.get('/api/inventory/products'),
-        api.get('/api/inventory/stock')
+        api.get('/api/inventory/stock', { params })
       ]);
       setSales(salesRes.data || []);
       setPatients(patientsRes.data.patients || []);
@@ -162,7 +165,9 @@ export default function SalesPage() {
           <h1 className="font-heading text-2xl sm:text-3xl font-semibold text-slate-900">Ventas</h1>
           <p className="text-slate-500 mt-1">Punto de venta y registro de transacciones</p>
         </div>
-        <Dialog open={showSaleDialog} onOpenChange={setShowSaleDialog}>
+        <div className="flex items-center gap-3">
+          <BranchFilter value={branchId} onChange={setBranchId} />
+          <Dialog open={showSaleDialog} onOpenChange={setShowSaleDialog}>
           <DialogTrigger asChild>
             <Button className="bg-pine-900 hover:bg-pine-700" data-testid="new-sale-btn">
               <ShoppingCart className="w-4 h-4 mr-2" /> Nueva Venta
@@ -334,6 +339,7 @@ export default function SalesPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Sales History */}

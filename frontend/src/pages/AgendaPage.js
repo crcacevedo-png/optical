@@ -10,6 +10,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Calendar } from '../components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { BranchFilter } from '../components/BranchFilter';
 import {
   Plus, CalendarIcon, ChevronLeft, ChevronRight,
   Check, X, MoreHorizontal, Clock
@@ -42,6 +43,7 @@ export default function AgendaPage() {
   const [patients, setPatients] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState('daily');
+  const [branchId, setBranchId] = useState('');
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [formData, setFormData] = useState({
@@ -69,6 +71,7 @@ export default function AgendaPage() {
       const params = viewMode === 'daily'
         ? { date: dateRange.from }
         : { date_from: dateRange.from, date_to: dateRange.to };
+      if (branchId) params.branch_id = branchId;
       const { data } = await api.get('/api/appointments', { params });
       setAppointments(data || []);
     } catch (error) {
@@ -76,7 +79,7 @@ export default function AgendaPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, viewMode]);
+  }, [dateRange, viewMode, branchId]);
 
   const fetchPatients = useCallback(async () => {
     try {
@@ -463,13 +466,16 @@ export default function AgendaPage() {
             </div>
 
             {/* View Switcher */}
-            <Tabs value={viewMode} onValueChange={setViewMode}>
+            <div className="flex items-center gap-3">
+              <BranchFilter value={branchId} onChange={setBranchId} />
+              <Tabs value={viewMode} onValueChange={setViewMode}>
               <TabsList>
                 <TabsTrigger value="daily" data-testid="view-daily">Dia</TabsTrigger>
                 <TabsTrigger value="weekly" data-testid="view-weekly">Semana</TabsTrigger>
                 <TabsTrigger value="monthly" data-testid="view-monthly">Mes</TabsTrigger>
               </TabsList>
             </Tabs>
+            </div>
           </div>
         </CardHeader>
 

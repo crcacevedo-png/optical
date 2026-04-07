@@ -5,18 +5,21 @@ import {
   Users, Calendar, Receipt, TrendingUp, TrendingDown, 
   AlertTriangle, Clock, DollarSign, ShoppingBag
 } from 'lucide-react';
+import { BranchFilter } from '../components/BranchFilter';
 
 export default function DashboardPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [branchId, setBranchId] = useState('');
 
   useEffect(() => {
     fetchDashboard();
-  }, []);
+  }, [branchId]);
 
   const fetchDashboard = async () => {
     try {
-      const { data } = await api.get('/api/reports/dashboard');
+      const params = branchId ? { branch_id: branchId } : {};
+      const { data } = await api.get('/api/reports/dashboard', { params });
       setData(data);
     } catch (error) {
       console.error('Error fetching dashboard:', error);
@@ -98,9 +101,12 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6" data-testid="dashboard-page">
       {/* Header */}
-      <div>
-        <h1 className="font-heading text-2xl sm:text-3xl font-semibold text-slate-900">Dashboard</h1>
-        <p className="text-slate-500 mt-1">Resumen de operaciones del día</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-2xl sm:text-3xl font-semibold text-slate-900">Dashboard</h1>
+          <p className="text-slate-500 mt-1">Resumen de operaciones del dia</p>
+        </div>
+        <BranchFilter value={branchId} onChange={setBranchId} />
       </div>
 
       {/* Stats Grid */}

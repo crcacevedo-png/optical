@@ -14,6 +14,7 @@ import {
   ArrowDownCircle, Glasses, Droplets, Box
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { BranchFilter } from '../components/BranchFilter';
 
 export default function InventoryPage() {
   const [products, setProducts] = useState([]);
@@ -23,6 +24,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [branchId, setBranchId] = useState('');
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [showMovementDialog, setShowMovementDialog] = useState(false);
 
@@ -44,14 +46,15 @@ export default function InventoryPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [branchId]);
 
   const fetchData = async () => {
     try {
+      const params = branchId ? { branch_id: branchId } : {};
       const [productsRes, stockRes, alertsRes, branchesRes] = await Promise.all([
         api.get('/api/inventory/products'),
-        api.get('/api/inventory/stock'),
-        api.get('/api/inventory/alerts'),
+        api.get('/api/inventory/stock', { params }),
+        api.get('/api/inventory/alerts', { params }),
         api.get('/api/branches')
       ]);
       setProducts(productsRes.data || []);
@@ -131,6 +134,7 @@ export default function InventoryPage() {
           <p className="text-slate-500 mt-1">Gestiona productos y stock</p>
         </div>
         <div className="flex gap-2">
+          <BranchFilter value={branchId} onChange={setBranchId} />
           <Dialog open={showMovementDialog} onOpenChange={setShowMovementDialog}>
             <DialogTrigger asChild>
               <Button variant="outline" data-testid="add-movement-btn">

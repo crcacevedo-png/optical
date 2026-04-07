@@ -1283,12 +1283,14 @@ async def list_inventory_movements(
     return movements
 
 @inventory_router.get("/alerts")
-async def get_stock_alerts(user: dict = Depends(get_current_user)):
+async def get_stock_alerts(user: dict = Depends(get_current_user), branch_id: Optional[str] = None):
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
     
     query = {"company_id": ObjectId(user["company_id"])}
-    if user.get("branch_id"):
+    if branch_id:
+        query["branch_id"] = ObjectId(branch_id)
+    elif user.get("branch_id"):
         query["branch_id"] = ObjectId(user["branch_id"])
     
     stock_items = await db.stock.find(query).to_list(1000)
