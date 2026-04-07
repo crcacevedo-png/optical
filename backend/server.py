@@ -440,9 +440,13 @@ async def refresh_token(request: Request, response: Response):
 async def list_companies(user: dict = Depends(get_current_user)):
     if user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
-    companies = await db.companies.find({}, {"_id": 1, "name": 1, "legal_name": 1, "email": 1, "is_active": 1, "created_at": 1}).to_list(1000)
+    companies = await db.companies.find({}).to_list(1000)
     for c in companies:
-        c["_id"] = str(c["_id"])
+        serialize_doc(c)
+        cid = ObjectId(c["_id"])
+        c["branches_count"] = await db.branches.count_documents({"company_id": cid})
+        c["users_count"] = await db.users.count_documents({"company_id": cid})
+        c["patients_count"] = await db.patients.count_documents({"company_id": cid})
     return companies
 
 @companies_router.post("")
@@ -496,25 +500,42 @@ async def delete_company(company_id: str, user: dict = Depends(get_current_user)
 
 # ==================== BRANCHES ROUTES ====================
 @branches_router.get("")
-async def list_branches(user: dict = Depends(get_current_user)):
+async def list_branches(user: dict = Depends(get_current_user), company_id: Optional[str] = None):
     if user["role"] == "superadmin":
-        raise HTTPException(status_code=403, detail="SuperAdmin no tiene sucursales")
+        if not company_id:
+            branches = await db.branches.find({}).to_list(500)
+        else:
+            branches = await db.branches.find({"company_id": ObjectId(company_id)}).to_list(100)
+        for b in branches:
+            serialize_doc(b)
+            company = await db.companies.find_one({"_id": ObjectId(str(b.get("company_id", "")))}, {"name": 1})
+            if company:
+                b["company_name"] = company["name"]
+        return branches
     query = {"company_id": ObjectId(user["company_id"])}
-    branches = await db.branches.find(query, {"_id": 1, "name": 1, "address": 1, "phone": 1, "is_active": 1}).to_list(100)
+    branches = await db.branches.find(query, {"_id": 1, "name": 1, "address": 1, "phone": 1, "email": 1, "is_active": 1}).to_list(100)
     for b in branches:
         b["_id"] = str(b["_id"])
         b["company_id"] = str(b.get("company_id", ""))
     return branches
 
 @branches_router.post("")
-async def create_branch(data: BranchCreate, user: dict = Depends(get_current_user)):
+async def create_branch(data: BranchCreate, user: dict = Depends(get_current_user), company_id: Optional[str] = None):
     if user["role"] not in ["admin", "superadmin"]:
         raise HTTPException(status_code=403, detail="Acceso denegado")
-    if not user.get("company_id"):
-        raise HTTPException(status_code=400, detail="No tiene empresa asignada")
+    
+    target_company_id = None
+    if user["role"] == "superadmin":
+        if not company_id:
+            raise HTTPException(status_code=400, detail="Debe especificar la empresa (company_id)")
+        target_company_id = ObjectId(company_id)
+    else:
+        if not user.get("company_id"):
+            raise HTTPException(status_code=400, detail="No tiene empresa asignada")
+        target_company_id = ObjectId(user["company_id"])
     
     branch_doc = {
-        "company_id": ObjectId(user["company_id"]), "name": data.name, "address": data.address,
+        "company_id": target_company_id, "name": data.name, "address": data.address,
         "phone": data.phone, "email": data.email.lower() if data.email else None,
         "is_active": True, "created_at": datetime.now(timezone.utc).isoformat()
     }
@@ -2005,17 +2026,25 @@ async def list_users(user: dict = Depends(get_current_user)):
     return users
 
 @users_router.post("")
-async def create_user(data: UserCreate, user: dict = Depends(get_current_user)):
-    if user["role"] not in ["admin"]:
+async def create_user(data: UserCreate, user: dict = Depends(get_current_user), company_id: Optional[str] = None):
+    if user["role"] not in ["admin", "superadmin"]:
         raise HTTPException(status_code=403, detail="Acceso denegado")
     
     existing = await db.users.find_one({"email": data.email.lower()})
     if existing:
         raise HTTPException(status_code=400, detail="El email ya está registrado")
     
+    target_company_id = None
+    if user["role"] == "superadmin":
+        if not company_id:
+            raise HTTPException(status_code=400, detail="Debe especificar la empresa (company_id)")
+        target_company_id = ObjectId(company_id)
+    else:
+        target_company_id = ObjectId(user["company_id"])
+    
     user_doc = {
         "email": data.email.lower(), "password_hash": hash_password(data.password),
-        "name": data.name, "role": data.role, "company_id": ObjectId(user["company_id"]),
+        "name": data.name, "role": data.role, "company_id": target_company_id,
         "branch_id": ObjectId(data.branch_id) if data.branch_id else None,
         "is_active": True, "created_at": datetime.now(timezone.utc).isoformat()
     }
@@ -2024,11 +2053,13 @@ async def create_user(data: UserCreate, user: dict = Depends(get_current_user)):
 
 @users_router.put("/{user_id}")
 async def update_user(user_id: str, data: dict, user: dict = Depends(get_current_user)):
-    if user["role"] not in ["admin"]:
+    if user["role"] not in ["admin", "superadmin"]:
         raise HTTPException(status_code=403, detail="Acceso denegado")
     
     target_user = await db.users.find_one({"_id": ObjectId(user_id)})
-    if not target_user or str(target_user.get("company_id")) != user["company_id"]:
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user["role"] == "admin" and str(target_user.get("company_id")) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
     update_data = {}
@@ -2049,11 +2080,13 @@ async def update_user(user_id: str, data: dict, user: dict = Depends(get_current
 
 @users_router.delete("/{user_id}")
 async def deactivate_user(user_id: str, user: dict = Depends(get_current_user)):
-    if user["role"] not in ["admin"]:
+    if user["role"] not in ["admin", "superadmin"]:
         raise HTTPException(status_code=403, detail="Acceso denegado")
     
     target_user = await db.users.find_one({"_id": ObjectId(user_id)})
-    if not target_user or str(target_user.get("company_id")) != user["company_id"]:
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user["role"] == "admin" and str(target_user.get("company_id")) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
     await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"is_active": False}})

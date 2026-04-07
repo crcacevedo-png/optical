@@ -22,8 +22,12 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login(email, password);
-      navigate('/dashboard');
+      const userData = await login(email, password);
+      if (userData?.role === 'superadmin') {
+        navigate('/admin/opticas');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setError(formatApiErrorDetail(err.response?.data?.detail) || 'Error al iniciar sesión');
     } finally {

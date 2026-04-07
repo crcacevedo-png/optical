@@ -6,7 +6,7 @@ import { ScrollArea } from '../components/ui/scroll-area';
 import { 
   LayoutDashboard, Users, Calendar, FileText, Package, 
   ShoppingCart, DollarSign, Building2, UserCog, BarChart3,
-  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList
+  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -27,7 +27,12 @@ export default function MainLayout() {
     navigate('/login');
   };
 
-  const navItems = [
+  const isSuperAdmin = user?.role === 'superadmin';
+
+  const navItems = isSuperAdmin ? [
+    { path: '/admin/opticas', icon: Store, label: 'Opticas' },
+    { path: '/users', icon: UserCog, label: 'Usuarios' },
+  ] : [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/patients', icon: Users, label: 'Pacientes' },
     { path: '/agenda', icon: Calendar, label: 'Agenda' },
@@ -52,7 +57,7 @@ export default function MainLayout() {
             ? 'bg-pine-900 text-white'
             : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
         }`}
-        data-testid={`nav-${item.path.replace('/', '')}`}
+        data-testid={`nav-${item.path.replace(/\//g, '').replace('admin', 'admin-')}`}
       >
         <item.icon className="w-5 h-5" />
         <span>{item.label}</span>
