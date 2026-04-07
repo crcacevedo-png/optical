@@ -117,11 +117,14 @@ class UserLogin(BaseModel):
 
 class CompanyCreate(BaseModel):
     name: str
-    legal_name: str
-    tax_id: str
-    address: str
+    legal_name: str = ""
+    tax_id: str = ""
+    address: str = ""
     phone: str
     email: EmailStr
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
     admin_name: str
     admin_email: EmailStr
     admin_password: str
@@ -133,6 +136,9 @@ class CompanyUpdate(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
     is_active: Optional[bool] = None
 
 class BranchCreate(BaseModel):
@@ -457,6 +463,8 @@ async def create_company(data: CompanyCreate, user: dict = Depends(get_current_u
     company_doc = {
         "name": data.name, "legal_name": data.legal_name, "tax_id": data.tax_id,
         "address": data.address, "phone": data.phone, "email": data.email.lower(),
+        "contact_name": data.contact_name, "contact_phone": data.contact_phone,
+        "contact_email": data.contact_email,
         "is_active": True, "created_at": datetime.now(timezone.utc).isoformat()
     }
     result = await db.companies.insert_one(company_doc)

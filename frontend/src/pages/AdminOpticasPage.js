@@ -28,6 +28,7 @@ export default function AdminOpticasPage() {
 
   const [companyForm, setCompanyForm] = useState({
     name: '', legal_name: '', tax_id: '', address: '', phone: '', email: '',
+    contact_name: '', contact_phone: '', contact_email: '',
     admin_name: '', admin_email: '', admin_password: ''
   });
   const [branchForm, setBranchForm] = useState({ name: '', address: '', phone: '', email: '' });
@@ -71,7 +72,7 @@ export default function AdminOpticasPage() {
       toast.success('Optica creada exitosamente');
       setShowCreateCompany(false);
       setShowCompanyPassword(false);
-      setCompanyForm({ name: '', legal_name: '', tax_id: '', address: '', phone: '', email: '', admin_name: '', admin_email: '', admin_password: '' });
+      setCompanyForm({ name: '', legal_name: '', tax_id: '', address: '', phone: '', email: '', contact_name: '', contact_phone: '', contact_email: '', admin_name: '', admin_email: '', admin_password: '' });
       loadCompanies();
     } catch (err) {
       toast.error(formatApiErrorDetail(err?.response?.data?.detail));
@@ -149,7 +150,7 @@ export default function AdminOpticasPage() {
           <p className="text-slate-500 text-sm mt-1">Gestiona empresas, sucursales y usuarios de la plataforma</p>
         </div>
         <Button
-          onClick={() => { setCompanyForm({ name: '', legal_name: '', tax_id: '', address: '', phone: '', email: '', admin_name: '', admin_email: '', admin_password: '' }); setShowCreateCompany(true); }}
+          onClick={() => { setCompanyForm({ name: '', legal_name: '', tax_id: '', address: '', phone: '', email: '', contact_name: '', contact_phone: '', contact_email: '', admin_name: '', admin_email: '', admin_password: '' }); setShowCreateCompany(true); }}
           className="bg-pine-700 hover:bg-pine-800"
           data-testid="new-company-btn"
         >
@@ -255,6 +256,17 @@ export default function AdminOpticasPage() {
                       <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-slate-400" /> {selectedCompany.address || '-'}</div>
                       <div><span className="text-slate-400">Pacientes:</span> <span className="font-medium ml-2">{selectedCompany.patients_count || 0}</span></div>
                       <div><span className="text-slate-400">Creada:</span> <span className="font-medium ml-2">{selectedCompany.created_at?.slice(0, 10)}</span></div>
+                    </div>
+                    {(selectedCompany.contact_name || selectedCompany.contact_phone || selectedCompany.contact_email) && (
+                      <div className="mt-4 pt-3 border-t">
+                        <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Persona de Contacto</p>
+                        <div className="grid grid-cols-3 gap-2 text-sm">
+                          <div>{selectedCompany.contact_name || '-'}</div>
+                          <div className="flex items-center gap-1"><Phone className="w-3.5 h-3.5 text-slate-400" /> {selectedCompany.contact_phone || '-'}</div>
+                          <div className="flex items-center gap-1"><Mail className="w-3.5 h-3.5 text-slate-400" /> {selectedCompany.contact_email || '-'}</div>
+                        </div>
+                      </div>
+                    )}
                     </div>
                   </TabsContent>
 
@@ -382,6 +394,26 @@ export default function AdminOpticasPage() {
                 <div className="space-y-1.5">
                   <Label className="text-xs">Direccion</Label>
                   <Input value={companyForm.address} onChange={(e) => setCompanyForm({...companyForm, address: e.target.value})} data-testid="company-address" />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-amber-50/60 rounded-lg">
+              <p className="text-xs font-semibold text-amber-700 uppercase mb-3 flex items-center gap-1">
+                <Phone className="w-3.5 h-3.5" /> Persona de Contacto
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Nombre</Label>
+                  <Input value={companyForm.contact_name} onChange={(e) => setCompanyForm({...companyForm, contact_name: e.target.value})} data-testid="company-contact-name" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Telefono</Label>
+                  <Input value={companyForm.contact_phone} onChange={(e) => setCompanyForm({...companyForm, contact_phone: e.target.value})} data-testid="company-contact-phone" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Email</Label>
+                  <Input type="email" value={companyForm.contact_email} onChange={(e) => setCompanyForm({...companyForm, contact_email: e.target.value})} data-testid="company-contact-email" />
                 </div>
               </div>
             </div>
