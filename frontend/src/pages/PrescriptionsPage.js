@@ -166,8 +166,15 @@ export default function PrescriptionsPage() {
     setMedicalForm({ ...medicalForm, medications: newMeds });
   };
 
-  const downloadPdf = (type, id) => {
-    window.open(`${process.env.REACT_APP_BACKEND_URL}/api/prescriptions/${type}/${id}/pdf`, '_blank');
+  const downloadPdf = async (type, id) => {
+    try {
+      const response = await api.get(`/api/prescriptions/${type}/${id}/pdf`, { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err) {
+      toast.error('Error al generar PDF');
+    }
   };
 
   if (loading) {

@@ -267,6 +267,17 @@ export default function PatientsPage() {
     setMedicalForm(f => ({ ...f, medications: f.medications.filter((_, i) => i !== idx) }));
   };
 
+  const downloadPdf = async (type, id) => {
+    try {
+      const response = await api.get(`/api/prescriptions/${type}/${id}/pdf`, { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err) {
+      toast.error('Error al generar PDF');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -585,7 +596,7 @@ export default function PatientsPage() {
                           <div key={rx._id} className="p-4 rounded-lg bg-slate-50 border border-slate-100">
                             <div className="flex justify-between items-start mb-3">
                               <span className="text-sm text-slate-500">{rx.created_at?.slice(0, 10)}</span>
-                              <Button size="sm" variant="outline" onClick={() => window.open(`${process.env.REACT_APP_BACKEND_URL}/api/prescriptions/eyeglass/${rx._id}/pdf`, '_blank')}>
+                              <Button size="sm" variant="outline" onClick={() => downloadPdf('eyeglass', rx._id)}>
                                 Imprimir PDF
                               </Button>
                             </div>
@@ -630,7 +641,7 @@ export default function PatientsPage() {
                           <div key={rx._id} className="p-4 rounded-lg bg-slate-50 border border-slate-100">
                             <div className="flex justify-between items-start mb-3">
                               <span className="text-sm text-slate-500">{rx.created_at?.slice(0, 10)}</span>
-                              <Button size="sm" variant="outline" onClick={() => window.open(`${process.env.REACT_APP_BACKEND_URL}/api/prescriptions/medical/${rx._id}/pdf`, '_blank')}>
+                              <Button size="sm" variant="outline" onClick={() => downloadPdf('medical', rx._id)}>
                                 Imprimir PDF
                               </Button>
                             </div>
