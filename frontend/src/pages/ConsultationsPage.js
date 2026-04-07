@@ -864,9 +864,9 @@ export default function ConsultationsPage() {
 
   return (
     <div data-testid="consultations-page">
-      {view === 'list' && <ListView />}
-      {view === 'form' && <FormView />}
-      {view === 'detail' && <DetailView />}
+      {view === 'list' && ListView()}
+      {view === 'form' && FormView()}
+      {view === 'detail' && DetailView()}
 
       {/* ===== EYEGLASS RX DIALOG ===== */}
       <Dialog open={showEyeglassRx} onOpenChange={setShowEyeglassRx}>
