@@ -11,7 +11,7 @@ import { ScrollArea } from '../components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   Search, Plus, User, Phone, Mail, Calendar, 
-  FileText, Eye, ShoppingBag, ChevronRight, Stethoscope,
+  FileText, Eye, ShoppingBag, ChevronRight,
   ChevronLeft, Save
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -375,7 +375,7 @@ export default function PatientsPage() {
                     </CardTitle>
                     <Button size="sm" className="bg-pine-700 hover:bg-pine-800" data-testid="header-new-consultation-btn"
                       onClick={() => { resetConsultationForm(); setShowConsultationDialog(true); }}>
-                      <Stethoscope className="w-4 h-4 mr-1" /> Nueva Consulta
+                      <Eye className="w-4 h-4 mr-1" /> Nueva Consulta
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-4 mt-2 text-sm text-slate-500">
@@ -407,7 +407,7 @@ export default function PatientsPage() {
               <Tabs defaultValue="prescriptions" className="h-full">
                 <TabsList className="w-full justify-start rounded-none border-b border-slate-100 h-12 p-0 bg-transparent">
                   <TabsTrigger value="consultations" className="rounded-none border-b-2 border-transparent data-[state=active]:border-pine-700 data-[state=active]:bg-transparent">
-                    <Stethoscope className="w-4 h-4 mr-2" /> Consultas
+                    <Eye className="w-4 h-4 mr-2" /> Consultas
                   </TabsTrigger>
                   <TabsTrigger value="prescriptions" className="rounded-none border-b-2 border-transparent data-[state=active]:border-pine-700 data-[state=active]:bg-transparent">
                     <Eye className="w-4 h-4 mr-2" /> Recetas
@@ -633,7 +633,7 @@ export default function PatientsPage() {
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-heading">
-              <Stethoscope className="w-5 h-5 text-pine-700" />
+              <Eye className="w-5 h-5 text-pine-700" />
               Nueva Consulta - {selectedPatient?.first_name} {selectedPatient?.last_name}
             </DialogTitle>
           </DialogHeader>
