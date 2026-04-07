@@ -160,3 +160,112 @@ input:focus, select:focus, textarea:focus, button:focus {
         display: contents !important;
     }
 }
+
+/* ═══════ Login Page Animations ═══════ */
+@keyframes login-fade-up {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes login-float {
+    0%, 100% { transform: translate(0, 0); }
+    25% { transform: translate(2px, -8px); }
+    50% { transform: translate(-3px, -14px); }
+    75% { transform: translate(4px, -6px); }
+}
+
+@keyframes login-glow-pulse {
+    0%, 100% { opacity: 0.35; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.08); }
+}
+
+@keyframes login-line-reveal {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes login-shimmer {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+}
+
+.login-stagger-1 { animation: login-fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both; }
+.login-stagger-2 { animation: login-fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both; }
+.login-stagger-3 { animation: login-fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both; }
+.login-stagger-4 { animation: login-fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.5s both; }
+
+.login-glass-card {
+    animation: login-fade-up 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
+}
+
+.login-node {
+    animation: login-float 7s ease-in-out infinite;
+}
+
+.login-line {
+    animation: login-line-reveal 1.5s ease-out both;
+}
+
+.login-orb {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.login-orb-purple {
+    top: 10%;
+    left: 25%;
+    width: 340px;
+    height: 340px;
+    background: radial-gradient(circle, rgba(90, 45, 130, 0.45) 0%, transparent 70%);
+    filter: blur(70px);
+    animation: login-glow-pulse 8s ease-in-out infinite;
+}
+
+.login-orb-teal {
+    bottom: 15%;
+    right: 15%;
+    width: 280px;
+    height: 280px;
+    background: radial-gradient(circle, rgba(26, 188, 156, 0.35) 0%, transparent 70%);
+    filter: blur(60px);
+    animation: login-glow-pulse 6s ease-in-out infinite reverse;
+}
+
+.login-orb-purple-secondary {
+    bottom: 35%;
+    left: 5%;
+    width: 220px;
+    height: 220px;
+    background: radial-gradient(circle, rgba(90, 45, 130, 0.25) 0%, transparent 70%);
+    filter: blur(50px);
+    animation: login-glow-pulse 10s ease-in-out infinite;
+    animation-delay: 3s;
+}
+
+.login-btn-gradient {
+    background: linear-gradient(135deg, #5A2D82 0%, #2D3A5C 50%, #1ABC9C 100%);
+    background-size: 200% 200%;
+    transition: all 0.4s ease;
+}
+
+.login-btn-gradient:hover {
+    background-position: 100% 0;
+    box-shadow: 0 12px 28px -4px rgba(90, 45, 130, 0.3);
+}
+
+.login-btn-gradient:active {
+    transform: scale(0.98);
+}
+
+.login-feature-tag {
+    background: rgba(26, 188, 156, 0.08);
+    border: 1px solid rgba(26, 188, 156, 0.18);
+    color: rgba(26, 188, 156, 0.85);
+    transition: all 0.3s ease;
+}
+
+.login-feature-tag:hover {
+    background: rgba(26, 188, 156, 0.15);
+    border-color: rgba(26, 188, 156, 0.35);
+}
