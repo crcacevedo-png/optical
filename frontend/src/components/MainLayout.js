@@ -30,6 +30,8 @@ export default function MainLayout() {
 
   const isSuperAdmin = user?.role === 'superadmin';
 
+  const isAdmin = user?.role === 'admin';
+
   const navItems = isSuperAdmin ? [
     { path: '/admin/opticas', icon: Store, label: 'Opticas' },
     { path: '/users', icon: UserCog, label: 'Usuarios' },
@@ -43,9 +45,11 @@ export default function MainLayout() {
     { path: '/inventory', icon: Package, label: 'Inventario' },
     { path: '/sales', icon: ShoppingCart, label: 'Ventas' },
     { path: '/finance', icon: DollarSign, label: 'Finanzas' },
-    { path: '/branches', icon: Building2, label: 'Sucursales' },
-    { path: '/users', icon: UserCog, label: 'Usuarios' },
-    { path: '/reports', icon: BarChart3, label: 'Reportes' },
+    ...(isAdmin ? [
+      { path: '/branches', icon: Building2, label: 'Sucursales' },
+      { path: '/users', icon: UserCog, label: 'Usuarios' },
+      { path: '/reports', icon: BarChart3, label: 'Reportes' },
+    ] : []),
   ];
 
   const NavLink = ({ item, mobile = false }) => {
