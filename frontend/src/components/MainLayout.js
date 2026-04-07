@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { GlobalSearch } from './GlobalSearch';
 import { Button } from '../components/ui/button';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { 
@@ -177,6 +178,9 @@ export default function MainLayout() {
       {/* Main Content */}
       <main className="flex-1 lg:p-8 p-4 pt-[85px] lg:pt-8 min-h-screen">
         <div className="max-w-7xl mx-auto">
+          <div className="flex justify-end mb-4">
+            <GlobalSearch />
+          </div>
           <Outlet />
         </div>
       </main>

@@ -2436,6 +2436,36 @@ api_router.include_router(finance_router)
 api_router.include_router(reports_router)
 api_router.include_router(users_router)
 
+@api_router.get("/search")
+async def global_search(q: str = Query(..., min_length=2), user: dict = Depends(get_current_user)):
+    company_id = ObjectId(user["company_id"])
+    regex = {"$regex": q, "$options": "i"}
+    results = []
+    # Search patients
+    patients = await db.patients.find(
+        {"company_id": company_id, "$or": [{"first_name": regex}, {"last_name": regex}, {"phone": regex}, {"dpi": regex}]},
+        {"_id": 1, "first_name": 1, "last_name": 1, "phone": 1}
+    ).limit(5).to_list(5)
+    for p in patients:
+        results.append({"type": "patient", "id": str(p["_id"]), "title": f"{p.get('first_name','')} {p.get('last_name','')}", "subtitle": p.get("phone", "")})
+    # Search products
+    products = await db.products.find(
+        {"company_id": company_id, "$or": [{"name": regex}, {"sku": regex}]},
+        {"_id": 1, "name": 1, "sku": 1, "price": 1}
+    ).limit(5).to_list(5)
+    for p in products:
+        results.append({"type": "product", "id": str(p["_id"]), "title": p["name"], "subtitle": f"SKU: {p.get('sku','')} | Q{p.get('price',0):.2f}"})
+    # Search consultations
+    cons = await db.optical_consultations.find(
+        {"company_id": company_id, "$or": [{"chief_complaint": regex}, {"diagnosis": regex}]},
+        {"_id": 1, "chief_complaint": 1, "consultation_date": 1, "patient_id": 1}
+    ).limit(5).to_list(5)
+    for c in cons:
+        patient = await db.patients.find_one({"_id": c.get("patient_id")}, {"first_name": 1, "last_name": 1})
+        pname = f"{patient['first_name']} {patient['last_name']}" if patient else ""
+        results.append({"type": "consultation", "id": str(c["_id"]), "title": c.get("chief_complaint", "")[:60], "subtitle": f"{pname} | {c.get('consultation_date','')}"})
+    return results
+
 app.include_router(api_router)
 
 # CORS

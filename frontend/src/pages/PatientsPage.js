@@ -13,7 +13,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { 
   Search, Plus, User, Phone, Mail, Calendar, 
   FileText, Eye, ShoppingBag, ChevronRight,
-  ChevronLeft, Save, Pill, Glasses
+  ChevronLeft, Save, Pill, Glasses, Pencil, Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -106,6 +106,8 @@ export default function PatientsPage() {
   const [medicalForm, setMedicalForm] = useState({
     diagnosis: '', medications: [{ name: '', dosage: '', frequency: '', duration: '' }], instructions: ''
   });
+  const [showEditPatient, setShowEditPatient] = useState(false);
+  const [editForm, setEditForm] = useState({});
 
   useEffect(() => {
     fetchPatients();
@@ -275,6 +277,35 @@ export default function PatientsPage() {
       window.open(url, '_blank');
     } catch (err) {
       toast.error('Error al generar PDF');
+    }
+  };
+
+  const openEditPatient = () => {
+    setEditForm({
+      first_name: selectedPatient.first_name || '',
+      last_name: selectedPatient.last_name || '',
+      dpi: selectedPatient.dpi || '',
+      birth_date: selectedPatient.birth_date || '',
+      gender: selectedPatient.gender || '',
+      phone: selectedPatient.phone || '',
+      email: selectedPatient.email || '',
+      address: selectedPatient.address || '',
+      emergency_contact: selectedPatient.emergency_contact || '',
+      emergency_phone: selectedPatient.emergency_phone || '',
+      notes: selectedPatient.notes || ''
+    });
+    setShowEditPatient(true);
+  };
+
+  const handleUpdatePatient = async () => {
+    try {
+      await api.put(`/api/patients/${selectedPatient._id}`, editForm);
+      toast.success('Paciente actualizado');
+      setShowEditPatient(false);
+      fetchPatientDetails(selectedPatient._id);
+      fetchPatients(search);
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err?.response?.data?.detail));
     }
   };
 
@@ -719,17 +750,23 @@ export default function PatientsPage() {
                   </TabsContent>
 
                   <TabsContent value="info" className="p-4 m-0">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-medium text-slate-900">Informacion del Paciente</h3>
+                      <Button size="sm" variant="outline" onClick={openEditPatient} data-testid="edit-patient-btn">
+                        <Pencil className="w-3.5 h-3.5 mr-1" /> Editar
+                      </Button>
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label className="text-slate-500">DPI</Label>
                         <p className="font-medium">{selectedPatient.dpi || '-'}</p>
                       </div>
                       <div>
-                        <Label className="text-slate-500">Género</Label>
+                        <Label className="text-slate-500">Genero</Label>
                         <p className="font-medium">{selectedPatient.gender === 'M' ? 'Masculino' : selectedPatient.gender === 'F' ? 'Femenino' : '-'}</p>
                       </div>
                       <div className="col-span-2">
-                        <Label className="text-slate-500">Dirección</Label>
+                        <Label className="text-slate-500">Direccion</Label>
                         <p className="font-medium">{selectedPatient.address || '-'}</p>
                       </div>
                       <div>
@@ -737,7 +774,7 @@ export default function PatientsPage() {
                         <p className="font-medium">{selectedPatient.emergency_contact || '-'}</p>
                       </div>
                       <div>
-                        <Label className="text-slate-500">Teléfono de Emergencia</Label>
+                        <Label className="text-slate-500">Telefono de Emergencia</Label>
                         <p className="font-medium">{selectedPatient.emergency_phone || '-'}</p>
                       </div>
                       {selectedPatient.notes && (
@@ -1203,21 +1240,39 @@ export default function PatientsPage() {
                   <div className="pt-3 border-t">
                     <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Recetas Vinculadas</p>
                     {(viewConsultation.eyeglass_prescriptions || []).map((rx) => (
-                      <div key={rx._id} className="flex items-center gap-2 text-sm py-1">
-                        <Glasses className="w-3.5 h-3.5 text-blue-500" />
-                        <span>Receta de Anteojos ({rx.created_at?.slice(0, 10)})</span>
+                      <div key={rx._id} className="flex items-center justify-between py-1.5">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Glasses className="w-3.5 h-3.5 text-blue-500" />
+                          <span>Receta de Anteojos ({rx.created_at?.slice(0, 10)})</span>
+                        </div>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-600 hover:text-blue-800"
+                          onClick={() => downloadPdf('eyeglass', rx._id)} data-testid={`view-rx-pdf-${rx._id}`}>
+                          <Download className="w-3 h-3 mr-1" /> PDF
+                        </Button>
                       </div>
                     ))}
                     {(viewConsultation.contact_prescriptions || []).map((rx) => (
-                      <div key={rx._id} className="flex items-center gap-2 text-sm py-1">
-                        <Eye className="w-3.5 h-3.5 text-teal-500" />
-                        <span>Lentes de Contacto ({rx.created_at?.slice(0, 10)})</span>
+                      <div key={rx._id} className="flex items-center justify-between py-1.5">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Eye className="w-3.5 h-3.5 text-teal-500" />
+                          <span>Lentes de Contacto ({rx.created_at?.slice(0, 10)})</span>
+                        </div>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:text-teal-800"
+                          onClick={() => downloadPdf('contact-lens', rx._id)}>
+                          <Download className="w-3 h-3 mr-1" /> PDF
+                        </Button>
                       </div>
                     ))}
                     {(viewConsultation.medical_prescriptions || []).map((rx) => (
-                      <div key={rx._id} className="flex items-center gap-2 text-sm py-1">
-                        <Pill className="w-3.5 h-3.5 text-purple-500" />
-                        <span>Receta Medica ({rx.created_at?.slice(0, 10)})</span>
+                      <div key={rx._id} className="flex items-center justify-between py-1.5">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Pill className="w-3.5 h-3.5 text-purple-500" />
+                          <span>Receta Medica ({rx.created_at?.slice(0, 10)})</span>
+                        </div>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs text-purple-600 hover:text-purple-800"
+                          onClick={() => downloadPdf('medical', rx._id)}>
+                          <Download className="w-3 h-3 mr-1" /> PDF
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -1399,6 +1454,83 @@ export default function PatientsPage() {
               <Button variant="outline" onClick={() => setShowMedicalRx(false)}>Cancelar</Button>
               <Button className="bg-purple-600 hover:bg-purple-700" onClick={handleCreateMedicalRx} data-testid="p-save-medical-rx-btn">
                 <Save className="w-4 h-4 mr-2" /> Guardar Receta
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== EDIT PATIENT DIALOG ===== */}
+      <Dialog open={showEditPatient} onOpenChange={setShowEditPatient}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" data-testid="edit-patient-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Pencil className="w-5 h-5 text-pine-700" /> Editar Paciente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Nombre *</Label>
+                <Input value={editForm.first_name} onChange={(e) => setEditForm(f => ({ ...f, first_name: e.target.value }))} data-testid="edit-first-name" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Apellido *</Label>
+                <Input value={editForm.last_name} onChange={(e) => setEditForm(f => ({ ...f, last_name: e.target.value }))} data-testid="edit-last-name" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">DPI</Label>
+                <Input value={editForm.dpi} onChange={(e) => setEditForm(f => ({ ...f, dpi: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Genero</Label>
+                <Select value={editForm.gender || 'none'} onValueChange={(v) => setEditForm(f => ({ ...f, gender: v === 'none' ? '' : v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin especificar</SelectItem>
+                    <SelectItem value="M">Masculino</SelectItem>
+                    <SelectItem value="F">Femenino</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Fecha de Nacimiento</Label>
+                <Input type="date" value={editForm.birth_date} onChange={(e) => setEditForm(f => ({ ...f, birth_date: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Telefono</Label>
+                <Input value={editForm.phone} onChange={(e) => setEditForm(f => ({ ...f, phone: e.target.value }))} data-testid="edit-phone" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Email</Label>
+              <Input type="email" value={editForm.email} onChange={(e) => setEditForm(f => ({ ...f, email: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Direccion</Label>
+              <Input value={editForm.address} onChange={(e) => setEditForm(f => ({ ...f, address: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Contacto Emergencia</Label>
+                <Input value={editForm.emergency_contact} onChange={(e) => setEditForm(f => ({ ...f, emergency_contact: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Tel. Emergencia</Label>
+                <Input value={editForm.emergency_phone} onChange={(e) => setEditForm(f => ({ ...f, emergency_phone: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Notas</Label>
+              <Textarea value={editForm.notes} onChange={(e) => setEditForm(f => ({ ...f, notes: e.target.value }))} rows={2} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setShowEditPatient(false)}>Cancelar</Button>
+              <Button className="bg-pine-700 hover:bg-pine-800" onClick={handleUpdatePatient}
+                disabled={!editForm.first_name || !editForm.last_name} data-testid="save-edit-patient-btn">
+                <Save className="w-4 h-4 mr-2" /> Guardar Cambios
               </Button>
             </div>
           </div>
