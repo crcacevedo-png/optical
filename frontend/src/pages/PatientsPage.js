@@ -369,9 +369,15 @@ export default function PatientsPage() {
                   {selectedPatient.first_name?.[0]}{selectedPatient.last_name?.[0]}
                 </div>
                 <div className="flex-1">
-                  <CardTitle className="font-heading text-xl">
-                    {selectedPatient.first_name} {selectedPatient.last_name}
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="font-heading text-xl">
+                      {selectedPatient.first_name} {selectedPatient.last_name}
+                    </CardTitle>
+                    <Button size="sm" className="bg-pine-700 hover:bg-pine-800" data-testid="header-new-consultation-btn"
+                      onClick={() => { resetConsultationForm(); setShowConsultationDialog(true); }}>
+                      <Stethoscope className="w-4 h-4 mr-1" /> Nueva Consulta
+                    </Button>
+                  </div>
                   <div className="flex flex-wrap gap-4 mt-2 text-sm text-slate-500">
                     {selectedPatient.phone && (
                       <span className="flex items-center gap-1">
@@ -384,8 +390,13 @@ export default function PatientsPage() {
                       </span>
                     )}
                     {selectedPatient.birth_date && (
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1" data-testid="patient-age-display">
                         <Calendar className="w-4 h-4" /> {selectedPatient.birth_date}
+                        {selectedPatient.age != null && (
+                          <span className="ml-1 px-1.5 py-0.5 bg-pine-50 text-pine-700 rounded text-xs font-medium">
+                            {selectedPatient.age} anios
+                          </span>
+                        )}
                       </span>
                     )}
                   </div>
