@@ -11,7 +11,7 @@ import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   Plus, Building2, MapPin, Phone, Mail, Users, GitBranch,
-  Shield, UserCheck, UserX, Eye, EyeOff, ChevronRight, Store, UserCog
+  Shield, UserCheck, UserX, Eye, EyeOff, ChevronRight, Store, UserCog, Upload, Image
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -35,6 +35,27 @@ export default function AdminOpticasPage() {
   const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'user', branch_id: '' });
   const [showCompanyPassword, setShowCompanyPassword] = useState(false);
   const [showUserPassword, setShowUserPassword] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !selectedCompany) return;
+    setUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      await api.post(`/api/companies/${selectedCompany._id}/logo`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      toast.success('Logo actualizado');
+      setSelectedCompany(prev => ({ ...prev, logo_filename: `${selectedCompany._id}.${file.name.split('.').pop()}` }));
+      loadCompanies();
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err?.response?.data?.detail));
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   const loadCompanies = useCallback(async () => {
     try {
@@ -267,6 +288,37 @@ export default function AdminOpticasPage() {
                         </div>
                       </div>
                     )}
+                    {/* Logo */}
+                    <div className="mt-4 pt-3 border-t">
+                      <p className="text-xs font-semibold text-slate-400 uppercase mb-3">Logo de la Optica</p>
+                      <div className="flex items-center gap-4">
+                        {selectedCompany.logo_filename ? (
+                          <div className="w-24 h-24 rounded-lg border-2 border-slate-200 overflow-hidden bg-white flex items-center justify-center" data-testid="company-logo-preview">
+                            <img
+                              src={`${process.env.REACT_APP_BACKEND_URL}/api/companies/${selectedCompany._id}/logo?t=${Date.now()}`}
+                              alt="Logo"
+                              className="max-w-full max-h-full object-contain"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-24 h-24 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400" data-testid="company-logo-placeholder">
+                            <Image className="w-8 h-8 mb-1 opacity-40" />
+                            <span className="text-[10px]">Sin logo</span>
+                          </div>
+                        )}
+                        <div className="space-y-2">
+                          <label className="cursor-pointer">
+                            <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+                              onChange={handleLogoUpload} data-testid="logo-upload-input" />
+                            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-pine-700 text-white hover:bg-pine-800 transition-colors">
+                              <Upload className="w-4 h-4" />
+                              {uploadingLogo ? 'Subiendo...' : selectedCompany.logo_filename ? 'Cambiar Logo' : 'Subir Logo'}
+                            </div>
+                          </label>
+                          <p className="text-[10px] text-slate-400">PNG, JPG o WEBP. Se usara en recetas y documentos.</p>
+                        </div>
+                      </div>
+                    </div>
                   </TabsContent>
 
                   {/* BRANCHES TAB */}

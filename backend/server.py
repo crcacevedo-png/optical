@@ -4,8 +4,9 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, Query
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, Query, UploadFile, File
+from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
@@ -17,10 +18,16 @@ from datetime import datetime, timezone, timedelta, date
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
 import io
+import shutil
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from reportlab.lib import colors
+from reportlab.lib.utils import ImageReader
+
+# Uploads directory
+UPLOADS_DIR = ROOT_DIR / "uploads" / "logos"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -598,6 +605,36 @@ async def delete_company(company_id: str, user: dict = Depends(get_current_user)
     await db.companies.update_one({"_id": ObjectId(company_id)}, {"$set": {"is_active": False}})
     return {"message": "Empresa desactivada"}
 
+@companies_router.post("/{company_id}/logo")
+async def upload_company_logo(company_id: str, file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    if user["role"] != "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    company = await db.companies.find_one({"_id": ObjectId(company_id)})
+    if not company:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "png"
+    if ext not in ("png", "jpg", "jpeg", "webp", "gif"):
+        raise HTTPException(status_code=400, detail="Formato no soportado. Use PNG, JPG o WEBP")
+    filename = f"{company_id}.{ext}"
+    filepath = UPLOADS_DIR / filename
+    with open(filepath, "wb") as f:
+        content = await file.read()
+        f.write(content)
+    await db.companies.update_one({"_id": ObjectId(company_id)}, {"$set": {"logo_filename": filename}})
+    return {"message": "Logo actualizado", "logo_url": f"/api/companies/{company_id}/logo"}
+
+@companies_router.get("/{company_id}/logo")
+async def get_company_logo(company_id: str):
+    company = await db.companies.find_one({"_id": ObjectId(company_id)}, {"logo_filename": 1})
+    if not company or not company.get("logo_filename"):
+        raise HTTPException(status_code=404, detail="Sin logo")
+    filepath = UPLOADS_DIR / company["logo_filename"]
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    ext = company["logo_filename"].rsplit(".", 1)[-1].lower()
+    media_types = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}
+    return FileResponse(str(filepath), media_type=media_types.get(ext, "image/png"))
+
 # ==================== BRANCHES ROUTES ====================
 @branches_router.get("")
 async def list_branches(user: dict = Depends(get_current_user), company_id: Optional[str] = None):
@@ -908,6 +945,44 @@ async def create_eyeglass_prescription(data: EyeglassPrescriptionCreate, user: d
     result = await db.eyeglass_prescriptions.insert_one(rx_doc)
     return {"_id": str(result.inserted_id), "message": "Receta creada"}
 
+def draw_pdf_header(c, width, height, company, title):
+    """Draw PDF header with company logo if available."""
+    c.setFillColor(colors.HexColor("#0F4C3A"))
+    c.rect(0, height - 1.2*inch, width, 1.2*inch, fill=True, stroke=False)
+    logo_path = None
+    if company and company.get("logo_filename"):
+        candidate = UPLOADS_DIR / company["logo_filename"]
+        if candidate.exists():
+            logo_path = str(candidate)
+    if logo_path:
+        try:
+            img = ImageReader(logo_path)
+            iw, ih = img.getSize()
+            aspect = iw / ih
+            logo_h = 0.8 * inch
+            logo_w = logo_h * aspect
+            if logo_w > 1.5 * inch:
+                logo_w = 1.5 * inch
+                logo_h = logo_w / aspect
+            c.drawImage(logo_path, 0.5*inch, height - 1.05*inch, width=logo_w, height=logo_h, preserveAspectRatio=True, mask='auto')
+            text_x = 0.5*inch + logo_w + 0.2*inch
+        except Exception:
+            text_x = 1*inch
+    else:
+        text_x = 1*inch
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 20)
+    c.drawString(text_x, height - 0.75*inch, company["name"] if company else "Cortexia Optical")
+    c.setFont("Helvetica", 9)
+    c.drawString(text_x, height - 0.95*inch, company.get("address", "") if company else "")
+    phone = company.get("phone", "") if company else ""
+    email = company.get("email", "") if company else ""
+    if phone or email:
+        c.drawString(text_x, height - 1.1*inch, f"Tel: {phone}  |  {email}")
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(width/2, height - 1.55*inch, title)
+
 @prescriptions_router.get("/eyeglass/{rx_id}/pdf")
 async def get_eyeglass_prescription_pdf(rx_id: str, user: dict = Depends(get_current_user)):
     rx = await db.eyeglass_prescriptions.find_one({"_id": ObjectId(rx_id)})
@@ -921,20 +996,7 @@ async def get_eyeglass_prescription_pdf(rx_id: str, user: dict = Depends(get_cur
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
     
-    # Header con logo placeholder
-    c.setFillColor(colors.HexColor("#0F4C3A"))
-    c.rect(0, height - 1.2*inch, width, 1.2*inch, fill=True, stroke=False)
-    c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 22)
-    c.drawString(1*inch, height - 0.8*inch, company["name"] if company else "Cortexia Optical")
-    c.setFont("Helvetica", 10)
-    c.drawString(1*inch, height - 1*inch, company.get("address", "") if company else "")
-    c.drawString(5*inch, height - 0.8*inch, f"Tel: {company.get('phone', '')}" if company else "")
-    
-    # Título
-    c.setFillColor(colors.black)
-    c.setFont("Helvetica-Bold", 16)
-    c.drawCentredString(width/2, height - 1.7*inch, "RECETA DE ANTEOJOS")
+    draw_pdf_header(c, width, height, company, "RECETA DE ANTEOJOS")
     
     # Info paciente
     c.setFont("Helvetica", 11)
@@ -1178,18 +1240,7 @@ async def get_medical_prescription_pdf(rx_id: str, user: dict = Depends(get_curr
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
     
-    # Header
-    c.setFillColor(colors.HexColor("#0F4C3A"))
-    c.rect(0, height - 1.2*inch, width, 1.2*inch, fill=True, stroke=False)
-    c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 22)
-    c.drawString(1*inch, height - 0.8*inch, company["name"] if company else "Cortexia Optical")
-    c.setFont("Helvetica", 10)
-    c.drawString(1*inch, height - 1*inch, company.get("address", "") if company else "")
-    
-    c.setFillColor(colors.black)
-    c.setFont("Helvetica-Bold", 16)
-    c.drawCentredString(width/2, height - 1.7*inch, "RECETA MÉDICA")
+    draw_pdf_header(c, width, height, company, "RECETA MEDICA")
     
     c.setFont("Helvetica", 11)
     y = height - 2.2*inch
@@ -1750,20 +1801,7 @@ async def get_quotation_pdf(quotation_id: str, user: dict = Depends(get_current_
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
     
-    # Header
-    c.setFillColor(colors.HexColor("#0F4C3A"))
-    c.rect(0, height - 1.2*inch, width, 1.2*inch, fill=True, stroke=False)
-    c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 22)
-    c.drawString(1*inch, height - 0.8*inch, company["name"] if company else "Cortexia Optical")
-    c.setFont("Helvetica", 10)
-    c.drawString(1*inch, height - 1*inch, company.get("address", "") if company else "")
-    c.drawString(5*inch, height - 0.8*inch, f"Tel: {company.get('phone', '')}" if company else "")
-    
-    # Title
-    c.setFillColor(colors.black)
-    c.setFont("Helvetica-Bold", 18)
-    c.drawCentredString(width/2, height - 1.6*inch, "COTIZACION")
+    draw_pdf_header(c, width, height, company, "COTIZACION")
     
     # Quotation info
     c.setFont("Helvetica-Bold", 11)
