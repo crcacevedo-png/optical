@@ -15,7 +15,7 @@ import logging
 import bcrypt
 import jwt
 from datetime import datetime, timezone, timedelta, date
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, validator
 from typing import List, Optional
 import io
 from reportlab.lib.pagesizes import letter
@@ -226,6 +226,12 @@ class EyeglassPrescriptionCreate(BaseModel):
     lens_type: Optional[str] = None
     frame_type: Optional[str] = None
 
+    @validator('*', pre=True)
+    def empty_str_to_none(cls, v):
+        if isinstance(v, str) and v.strip() == '':
+            return None
+        return v
+
 class MedicalPrescriptionCreate(BaseModel):
     patient_id: str
     consultation_id: Optional[str] = None
@@ -254,6 +260,12 @@ class ContactLensPrescriptionCreate(BaseModel):
     lens_type: Optional[str] = None
     replacement: Optional[str] = None
     observations: Optional[str] = None
+
+    @validator('*', pre=True)
+    def empty_str_to_none(cls, v):
+        if isinstance(v, str) and v.strip() == '':
+            return None
+        return v
 
 class ProductCreate(BaseModel):
     name: str
