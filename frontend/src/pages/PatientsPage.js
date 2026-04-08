@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Textarea } from '../components/ui/textarea';
 import { ScrollArea } from '../components/ui/scroll-area';
@@ -13,7 +13,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { 
   Search, Plus, User, Phone, Mail, Calendar, 
   FileText, Eye, ShoppingBag, ChevronRight,
-  ChevronLeft, Save, Pill, Glasses, Pencil, Download
+  ChevronLeft, Save, Pill, Glasses, Pencil, Download, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -108,6 +108,7 @@ export default function PatientsPage() {
   });
   const [showEditPatient, setShowEditPatient] = useState(false);
   const [editForm, setEditForm] = useState({});
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const fetchPatients = useCallback(async (searchTerm = '') => {
     try {
@@ -322,6 +323,18 @@ export default function PatientsPage() {
       fetchPatients();
     } catch (error) {
       toast.error(formatApiErrorDetail(error.response?.data?.detail));
+    }
+  };
+
+  const handleDeletePatient = async () => {
+    try {
+      await api.delete(`/api/patients/${selectedPatient._id}`);
+      toast.success('Paciente eliminado');
+      setShowDeleteConfirm(false);
+      setSelectedPatient(null);
+      fetchPatients();
+    } catch (error) {
+      toast.error(formatApiErrorDetail(error.response?.data?.detail) || 'Error al eliminar paciente');
     }
   };
 
@@ -752,9 +765,16 @@ export default function PatientsPage() {
                   <TabsContent value="info" className="p-4 m-0">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-medium text-slate-900">Informacion del Paciente</h3>
-                      <Button size="sm" variant="outline" onClick={openEditPatient} data-testid="edit-patient-btn">
-                        <Pencil className="w-3.5 h-3.5 mr-1" /> Editar
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={openEditPatient} data-testid="edit-patient-btn">
+                          <Pencil className="w-3.5 h-3.5 mr-1" /> Editar
+                        </Button>
+                        {user?.role === 'admin' && (
+                          <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700" onClick={() => setShowDeleteConfirm(true)} data-testid="delete-patient-btn">
+                            <Trash2 className="w-3.5 h-3.5 mr-1" /> Eliminar
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -1534,6 +1554,23 @@ export default function PatientsPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="max-w-sm" data-testid="delete-patient-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5" /> Eliminar Paciente
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 pt-2">
+              Esta accion eliminara a <span className="font-semibold text-slate-700">{selectedPatient?.first_name} {selectedPatient?.last_name}</span> y no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} data-testid="cancel-delete-btn">Cancelar</Button>
+            <Button variant="destructive" onClick={handleDeletePatient} data-testid="confirm-delete-btn">Eliminar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
