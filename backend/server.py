@@ -15,7 +15,7 @@ import logging
 import bcrypt
 import jwt
 from datetime import datetime, timezone, timedelta, date
-from pydantic import BaseModel, Field, EmailStr, validator
+from pydantic import BaseModel, Field, EmailStr, model_validator
 from typing import List, Optional
 import io
 from reportlab.lib.pagesizes import letter
@@ -226,11 +226,14 @@ class EyeglassPrescriptionCreate(BaseModel):
     lens_type: Optional[str] = None
     frame_type: Optional[str] = None
 
-    @validator('*', pre=True)
-    def empty_str_to_none(cls, v):
-        if isinstance(v, str) and v.strip() == '':
-            return None
-        return v
+    @model_validator(mode='before')
+    @classmethod
+    def empty_str_to_none(cls, data):
+        if isinstance(data, dict):
+            for k, v in data.items():
+                if isinstance(v, str) and v.strip() == '':
+                    data[k] = None
+        return data
 
 class MedicalPrescriptionCreate(BaseModel):
     patient_id: str
@@ -261,11 +264,14 @@ class ContactLensPrescriptionCreate(BaseModel):
     replacement: Optional[str] = None
     observations: Optional[str] = None
 
-    @validator('*', pre=True)
-    def empty_str_to_none(cls, v):
-        if isinstance(v, str) and v.strip() == '':
-            return None
-        return v
+    @model_validator(mode='before')
+    @classmethod
+    def empty_str_to_none(cls, data):
+        if isinstance(data, dict):
+            for k, v in data.items():
+                if isinstance(v, str) and v.strip() == '':
+                    data[k] = None
+        return data
 
 class ProductCreate(BaseModel):
     name: str
