@@ -228,11 +228,15 @@ class EyeglassPrescriptionCreate(BaseModel):
 
     @model_validator(mode='before')
     @classmethod
-    def empty_str_to_none(cls, data):
+    def clean_optical_values(cls, data):
         if isinstance(data, dict):
             for k, v in data.items():
-                if isinstance(v, str) and v.strip() == '':
-                    data[k] = None
+                if isinstance(v, str):
+                    stripped = v.strip().lower()
+                    if stripped == '':
+                        data[k] = None
+                    elif stripped in ('plano', 'pl', 'piano', 'neutro', 'n'):
+                        data[k] = 0.0
         return data
 
 class MedicalPrescriptionCreate(BaseModel):
@@ -266,11 +270,15 @@ class ContactLensPrescriptionCreate(BaseModel):
 
     @model_validator(mode='before')
     @classmethod
-    def empty_str_to_none(cls, data):
+    def clean_optical_values(cls, data):
         if isinstance(data, dict):
             for k, v in data.items():
-                if isinstance(v, str) and v.strip() == '':
-                    data[k] = None
+                if isinstance(v, str):
+                    stripped = v.strip().lower()
+                    if stripped == '':
+                        data[k] = None
+                    elif stripped in ('plano', 'pl', 'piano', 'neutro', 'n'):
+                        data[k] = 0.0
         return data
 
 class ProductCreate(BaseModel):
