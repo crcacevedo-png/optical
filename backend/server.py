@@ -2506,6 +2506,15 @@ async def global_search(q: str = Query(..., min_length=2), user: dict = Depends(
 
 app.include_router(api_router)
 
+# No-cache middleware for API responses
+@app.middleware("http")
+async def add_no_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+    return response
+
 # CORS
 app.add_middleware(
     CORSMiddleware,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api, formatApiErrorDetail, useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -109,11 +109,7 @@ export default function PatientsPage() {
   const [showEditPatient, setShowEditPatient] = useState(false);
   const [editForm, setEditForm] = useState({});
 
-  useEffect(() => {
-    fetchPatients();
-  }, [page]);
-
-  const fetchPatients = async (searchTerm = '') => {
+  const fetchPatients = useCallback(async (searchTerm = '') => {
     try {
       setLoading(true);
       const params = { limit: PAGE_SIZE, skip: page * PAGE_SIZE };
@@ -126,7 +122,11 @@ export default function PatientsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page]);
+
+  useEffect(() => {
+    fetchPatients(search);
+  }, [fetchPatients]);
 
   const fetchPatientDetails = async (patientId) => {
     try {
