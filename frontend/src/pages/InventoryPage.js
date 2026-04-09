@@ -26,6 +26,9 @@ export default function InventoryPage() {
   const [branchId, setBranchId] = useState('');
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [showMovementDialog, setShowMovementDialog] = useState(false);
+  const [showAddStockDialog, setShowAddStockDialog] = useState(false);
+  const [addStockForm, setAddStockForm] = useState({ quantity: '', notes: '' });
+  const [addStockProduct, setAddStockProduct] = useState(null);
 
   const [productForm, setProductForm] = useState({
     name: '', sku: '', category: '', brand: '', description: '',
@@ -99,6 +102,30 @@ export default function InventoryPage() {
       fetchData();
     } catch (error) {
       toast.error(formatApiErrorDetail(error.response?.data?.detail));
+    }
+  };
+
+  const openAddStock = (product) => {
+    setAddStockProduct(product);
+    setAddStockForm({ quantity: '', notes: '' });
+    setShowAddStockDialog(true);
+  };
+
+  const handleAddStock = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/api/inventory/movement', {
+        product_id: addStockProduct._id,
+        branch_id: branchId || '',
+        type: 'entrada',
+        quantity: parseInt(addStockForm.quantity),
+        notes: addStockForm.notes || `Ingreso de ${addStockForm.quantity} unidades`
+      });
+      toast.success(`${addStockForm.quantity} unidades agregadas a ${addStockProduct.name}`);
+      setShowAddStockDialog(false);
+      fetchData();
+    } catch (error) {
+      toast.error(formatApiErrorDetail(error.response?.data?.detail) || 'Error al agregar stock');
     }
   };
 
@@ -389,6 +416,7 @@ export default function InventoryPage() {
                 <TableHead>Costo</TableHead>
                 <TableHead>Precio</TableHead>
                 <TableHead className="text-center">Stock</TableHead>
+                <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -418,12 +446,17 @@ export default function InventoryPage() {
                         {currentStock}
                       </span>
                     </TableCell>
+                    <TableCell className="text-center">
+                      <Button size="sm" variant="outline" className="text-pine-700 border-pine-200 hover:bg-pine-50" onClick={() => openAddStock(product)} data-testid={`add-stock-${product._id}`}>
+                        <Plus className="w-3.5 h-3.5 mr-1" /> Agregar
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 );
               })}
               {filteredProducts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                     <Package className="w-12 h-12 mx-auto mb-2 opacity-30" />
                     <p>No se encontraron productos</p>
                   </TableCell>
@@ -433,6 +466,53 @@ export default function InventoryPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Add Stock Dialog */}
+      <Dialog open={showAddStockDialog} onOpenChange={setShowAddStockDialog}>
+        <DialogContent className="max-w-sm" data-testid="add-stock-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowUpCircle className="w-5 h-5 text-green-600" /> Agregar Producto
+            </DialogTitle>
+          </DialogHeader>
+          {addStockProduct && (
+            <form onSubmit={handleAddStock} className="space-y-4">
+              <div className="p-3 bg-slate-50 rounded-lg">
+                <p className="font-medium text-slate-900">{addStockProduct.name}</p>
+                <p className="text-sm text-slate-500">{addStockProduct.sku} — Stock actual: {getStockForProduct(addStockProduct._id)}</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Cantidad a agregar *</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={addStockForm.quantity}
+                  onChange={(e) => setAddStockForm({...addStockForm, quantity: e.target.value})}
+                  required
+                  autoFocus
+                  placeholder="Ej: 10"
+                  data-testid="add-stock-quantity"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Nota (opcional)</Label>
+                <Input
+                  value={addStockForm.notes}
+                  onChange={(e) => setAddStockForm({...addStockForm, notes: e.target.value})}
+                  placeholder="Ej: Compra proveedor"
+                  data-testid="add-stock-notes"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setShowAddStockDialog(false)}>Cancelar</Button>
+                <Button type="submit" className="bg-pine-900 hover:bg-pine-700" disabled={!addStockForm.quantity} data-testid="save-add-stock">
+                  <Plus className="w-4 h-4 mr-1" /> Agregar
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
