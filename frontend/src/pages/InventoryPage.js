@@ -29,7 +29,7 @@ export default function InventoryPage() {
 
   const [productForm, setProductForm] = useState({
     name: '', sku: '', category: '', brand: '', description: '',
-    cost_price: '', sale_price: '', min_stock: 5
+    cost_price: '', sale_price: '', min_stock: 5, initial_stock: 0
   });
 
   const [movementForm, setMovementForm] = useState({
@@ -74,7 +74,8 @@ export default function InventoryPage() {
         ...productForm,
         cost_price: parseFloat(productForm.cost_price),
         sale_price: parseFloat(productForm.sale_price),
-        min_stock: parseInt(productForm.min_stock)
+        min_stock: parseInt(productForm.min_stock),
+        initial_stock: parseInt(productForm.initial_stock) || 0
       });
       toast.success('Producto creado exitosamente');
       setShowProductDialog(false);
@@ -266,7 +267,7 @@ export default function InventoryPage() {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label>Costo *</Label>
                     <Input
@@ -290,7 +291,17 @@ export default function InventoryPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Stock Mín</Label>
+                    <Label>Cantidad Inicial</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={productForm.initial_stock}
+                      onChange={(e) => setProductForm({...productForm, initial_stock: e.target.value})}
+                      data-testid="product-initial-stock"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Stock Min</Label>
                     <Input
                       type="number"
                       value={productForm.min_stock}

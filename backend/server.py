@@ -290,6 +290,7 @@ class ProductCreate(BaseModel):
     cost_price: float
     sale_price: float
     min_stock: int = 5
+    initial_stock: int = 0
     branch_id: Optional[str] = None
 
 class ProductUpdate(BaseModel):
@@ -1389,7 +1390,26 @@ async def create_product(data: ProductCreate, user: dict = Depends(get_current_u
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     result = await db.products.insert_one(product_doc)
-    return {"_id": str(result.inserted_id), "message": "Producto creado"}
+    product_id = result.inserted_id
+    
+    # Create initial stock record
+    if data.initial_stock > 0:
+        branch_id = ObjectId(data.branch_id) if data.branch_id else (ObjectId(user["branch_id"]) if user.get("branch_id") else None)
+        if branch_id:
+            await db.stock.update_one(
+                {"company_id": ObjectId(user["company_id"]), "branch_id": branch_id, "product_id": product_id},
+                {"$set": {"quantity": data.initial_stock}},
+                upsert=True
+            )
+            await db.inventory_movements.insert_one({
+                "company_id": ObjectId(user["company_id"]), "branch_id": branch_id,
+                "product_id": product_id, "type": "entrada",
+                "quantity": data.initial_stock, "notes": "Stock inicial",
+                "created_by": ObjectId(user["_id"]),
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+    
+    return {"_id": str(product_id), "message": "Producto creado"}
 
 @inventory_router.put("/products/{product_id}")
 async def update_product(product_id: str, data: ProductUpdate, user: dict = Depends(get_current_user)):
