@@ -748,7 +748,7 @@ async def list_patients(
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="SuperAdmin no puede ver pacientes")
     
-    query = {"company_id": ObjectId(user["company_id"])}
+    query = {"company_id": ObjectId(user["company_id"]), "is_deleted": {"$ne": True}}
     if search:
         query["$or"] = [
             {"first_name": {"$regex": search, "$options": "i"}},
