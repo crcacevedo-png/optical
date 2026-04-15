@@ -6,7 +6,7 @@ import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
-import { Settings, Building2, Upload, FileText, Save, ImageIcon } from 'lucide-react';
+import { Settings, Building2, Upload, FileText, Save, ImageIcon, Glasses, Pill } from 'lucide-react';
 
 const PRESCRIPTION_FONTS = [
   { value: 'Helvetica', label: 'Helvetica (Moderno)' },
@@ -30,12 +30,11 @@ export default function SettingsPage() {
     name: '', legal_name: '', tax_id: '', address: '', phone: '', email: '',
     contact_name: '', contact_phone: '', contact_email: '',
   });
-  const [rxStyle, setRxStyle] = useState({
-    font: 'Helvetica',
-    size: 'standard',
-    show_logo: true,
-    header_text: '',
-    footer_text: '',
+  const [rxStyleOptica, setRxStyleOptica] = useState({
+    font: 'Helvetica', size: 'standard', show_logo: true, header_text: '', footer_text: '',
+  });
+  const [rxStyleMedica, setRxStyleMedica] = useState({
+    font: 'Helvetica', size: 'standard', show_logo: true, header_text: '', footer_text: '',
   });
   const [logoTimestamp, setLogoTimestamp] = useState(Date.now());
 
@@ -57,12 +56,15 @@ export default function SettingsPage() {
         contact_email: data.contact_email || '',
       });
       const style = data.prescription_style || {};
-      setRxStyle({
-        font: style.font || 'Helvetica',
-        size: style.size || 'standard',
-        show_logo: style.show_logo !== false,
-        header_text: style.header_text || '',
-        footer_text: style.footer_text || '',
+      const optica = style.optica || style;
+      const medica = style.medica || {};
+      setRxStyleOptica({
+        font: optica.font || 'Helvetica', size: optica.size || 'standard',
+        show_logo: optica.show_logo !== false, header_text: optica.header_text || '', footer_text: optica.footer_text || '',
+      });
+      setRxStyleMedica({
+        font: medica.font || 'Helvetica', size: medica.size || 'standard',
+        show_logo: medica.show_logo !== false, header_text: medica.header_text || '', footer_text: medica.footer_text || '',
       });
     } catch (error) {
       toast.error('Error al cargar configuracion');
@@ -89,7 +91,9 @@ export default function SettingsPage() {
   const handleSaveRxStyle = async () => {
     setSaving(true);
     try {
-      await api.put('/api/settings/company', { prescription_style: rxStyle });
+      await api.put('/api/settings/company', {
+        prescription_style: { optica: rxStyleOptica, medica: rxStyleMedica }
+      });
       toast.success('Estilo de recetas actualizado');
     } catch (error) {
       toast.error(formatApiErrorDetail(error.response?.data?.detail) || 'Error al guardar');
@@ -262,41 +266,36 @@ export default function SettingsPage() {
               <FileText className="w-5 h-5 text-pine-700" /> Estilo de Recetas
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
+            {/* Anteojos / Lentes de Contacto */}
             <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <Glasses className="w-4 h-4 text-slate-600" />
+                <h3 className="text-sm font-semibold text-slate-700">Recetas de Anteojos / Lentes de Contacto</h3>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-slate-500 uppercase">Tipografia</Label>
-                  <Select value={rxStyle.font} onValueChange={(v) => setRxStyle({...rxStyle, font: v})}>
-                    <SelectTrigger data-testid="settings-rx-font">
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={rxStyleOptica.font} onValueChange={(v) => setRxStyleOptica({...rxStyleOptica, font: v})}>
+                    <SelectTrigger data-testid="settings-rx-optica-font"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {PRESCRIPTION_FONTS.map(f => (
-                        <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
-                      ))}
+                      {PRESCRIPTION_FONTS.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-slate-500 uppercase">Tamano</Label>
-                  <Select value={rxStyle.size} onValueChange={(v) => setRxStyle({...rxStyle, size: v})}>
-                    <SelectTrigger data-testid="settings-rx-size">
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={rxStyleOptica.size} onValueChange={(v) => setRxStyleOptica({...rxStyleOptica, size: v})}>
+                    <SelectTrigger data-testid="settings-rx-optica-size"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {PRESCRIPTION_SIZES.map(s => (
-                        <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                      ))}
+                      {PRESCRIPTION_SIZES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-slate-500 uppercase">Mostrar Logo</Label>
-                  <Select value={rxStyle.show_logo ? 'si' : 'no'} onValueChange={(v) => setRxStyle({...rxStyle, show_logo: v === 'si'})}>
-                    <SelectTrigger data-testid="settings-rx-show-logo">
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={rxStyleOptica.show_logo ? 'si' : 'no'} onValueChange={(v) => setRxStyleOptica({...rxStyleOptica, show_logo: v === 'si'})}>
+                    <SelectTrigger data-testid="settings-rx-optica-logo"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="si">Si, mostrar logo</SelectItem>
                       <SelectItem value="no">No mostrar logo</SelectItem>
@@ -307,28 +306,67 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-slate-500 uppercase">Texto de Encabezado</Label>
-                  <Input
-                    value={rxStyle.header_text}
-                    onChange={(e) => setRxStyle({...rxStyle, header_text: e.target.value})}
-                    placeholder="Ej: Optica Altavista - Su Vision es Nuestra Prioridad"
-                    data-testid="settings-rx-header"
-                  />
+                  <Input value={rxStyleOptica.header_text} onChange={(e) => setRxStyleOptica({...rxStyleOptica, header_text: e.target.value})} placeholder="Ej: Optica Altavista - Su Vision es Nuestra Prioridad" data-testid="settings-rx-optica-header" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-slate-500 uppercase">Texto de Pie de Pagina</Label>
-                  <Input
-                    value={rxStyle.footer_text}
-                    onChange={(e) => setRxStyle({...rxStyle, footer_text: e.target.value})}
-                    placeholder="Ej: Valida por 6 meses a partir de la fecha"
-                    data-testid="settings-rx-footer"
-                  />
+                  <Input value={rxStyleOptica.footer_text} onChange={(e) => setRxStyleOptica({...rxStyleOptica, footer_text: e.target.value})} placeholder="Ej: Valida por 6 meses a partir de la fecha" data-testid="settings-rx-optica-footer" />
                 </div>
               </div>
-              <div className="flex justify-end pt-2">
-                <Button onClick={handleSaveRxStyle} className="bg-pine-900 hover:bg-pine-700" disabled={saving} data-testid="save-rx-style-btn">
-                  <Save className="w-4 h-4 mr-1.5" /> {saving ? 'Guardando...' : 'Guardar Estilo'}
-                </Button>
+            </div>
+
+            {/* Recetas Medicas */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <Pill className="w-4 h-4 text-slate-600" />
+                <h3 className="text-sm font-semibold text-slate-700">Recetas de Medicamentos</h3>
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-500 uppercase">Tipografia</Label>
+                  <Select value={rxStyleMedica.font} onValueChange={(v) => setRxStyleMedica({...rxStyleMedica, font: v})}>
+                    <SelectTrigger data-testid="settings-rx-medica-font"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PRESCRIPTION_FONTS.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-500 uppercase">Tamano</Label>
+                  <Select value={rxStyleMedica.size} onValueChange={(v) => setRxStyleMedica({...rxStyleMedica, size: v})}>
+                    <SelectTrigger data-testid="settings-rx-medica-size"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PRESCRIPTION_SIZES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-500 uppercase">Mostrar Logo</Label>
+                  <Select value={rxStyleMedica.show_logo ? 'si' : 'no'} onValueChange={(v) => setRxStyleMedica({...rxStyleMedica, show_logo: v === 'si'})}>
+                    <SelectTrigger data-testid="settings-rx-medica-logo"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="si">Si, mostrar logo</SelectItem>
+                      <SelectItem value="no">No mostrar logo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-500 uppercase">Texto de Encabezado</Label>
+                  <Input value={rxStyleMedica.header_text} onChange={(e) => setRxStyleMedica({...rxStyleMedica, header_text: e.target.value})} placeholder="Ej: Recetario Medico - Dr. Nombre" data-testid="settings-rx-medica-header" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-500 uppercase">Texto de Pie de Pagina</Label>
+                  <Input value={rxStyleMedica.footer_text} onChange={(e) => setRxStyleMedica({...rxStyleMedica, footer_text: e.target.value})} placeholder="Ej: Receta valida por 30 dias" data-testid="settings-rx-medica-footer" />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button onClick={handleSaveRxStyle} className="bg-pine-900 hover:bg-pine-700" disabled={saving} data-testid="save-rx-style-btn">
+                <Save className="w-4 h-4 mr-1.5" /> {saving ? 'Guardando...' : 'Guardar Estilos'}
+              </Button>
             </div>
           </CardContent>
         </Card>
