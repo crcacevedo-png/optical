@@ -1622,23 +1622,28 @@ async def create_sale(data: SaleCreate, user: dict = Depends(get_current_user)):
     
     # Update stock for each item
     for item in data.items:
-        if item.get("product_id") and branch_id:
-            await db.stock.update_one(
-                {"product_id": ObjectId(item["product_id"]), "branch_id": branch_id},
-                {"$inc": {"quantity": -item.get("quantity", 1)}}
-            )
-            # Record movement
-            await db.inventory_movements.insert_one({
-                "company_id": ObjectId(user["company_id"]),
-                "branch_id": branch_id,
-                "product_id": ObjectId(item["product_id"]),
-                "type": "salida",
-                "quantity": item.get("quantity", 1),
-                "notes": f"Venta #{str(result.inserted_id)[-6:]}",
-                "reference": str(result.inserted_id),
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "created_by": ObjectId(user["_id"])
-            })
+        if item.get("product_id"):
+            stock_query = {"product_id": ObjectId(item["product_id"]), "company_id": ObjectId(user["company_id"])}
+            if branch_id:
+                stock_query["branch_id"] = branch_id
+            stock_record = await db.stock.find_one(stock_query)
+            if stock_record:
+                actual_branch = stock_record["branch_id"]
+                await db.stock.update_one(
+                    {"_id": stock_record["_id"]},
+                    {"$inc": {"quantity": -item.get("quantity", 1)}}
+                )
+                await db.inventory_movements.insert_one({
+                    "company_id": ObjectId(user["company_id"]),
+                    "branch_id": actual_branch,
+                    "product_id": ObjectId(item["product_id"]),
+                    "type": "salida",
+                    "quantity": item.get("quantity", 1),
+                    "notes": f"Venta #{str(result.inserted_id)[-6:]}",
+                    "reference": str(result.inserted_id),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "created_by": ObjectId(user["_id"])
+                })
     
     # Create finance entry for income
     finance_doc = {
