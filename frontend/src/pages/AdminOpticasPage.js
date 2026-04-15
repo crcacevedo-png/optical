@@ -36,6 +36,36 @@ export default function AdminOpticasPage() {
   const [showCompanyPassword, setShowCompanyPassword] = useState(false);
   const [showUserPassword, setShowUserPassword] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [showEditCompany, setShowEditCompany] = useState(false);
+  const [editCompanyForm, setEditCompanyForm] = useState({});
+
+  const openEditCompany = () => {
+    setEditCompanyForm({
+      name: selectedCompany.name || '',
+      legal_name: selectedCompany.legal_name || '',
+      tax_id: selectedCompany.tax_id || '',
+      address: selectedCompany.address || '',
+      phone: selectedCompany.phone || '',
+      email: selectedCompany.email || '',
+      contact_name: selectedCompany.contact_name || '',
+      contact_phone: selectedCompany.contact_phone || '',
+      contact_email: selectedCompany.contact_email || '',
+    });
+    setShowEditCompany(true);
+  };
+
+  const handleSaveEditCompany = async (e) => {
+    e.preventDefault();
+    try {
+      await api.put(`/api/companies/${selectedCompany._id}`, editCompanyForm);
+      toast.success('Optica actualizada');
+      setShowEditCompany(false);
+      setSelectedCompany(prev => ({ ...prev, ...editCompanyForm }));
+      loadCompanies();
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err?.response?.data?.detail) || 'Error al actualizar');
+    }
+  };
 
   const handleLogoUpload = async (e) => {
     const file = e.target.files[0];
@@ -256,19 +286,24 @@ export default function AdminOpticasPage() {
           ) : (
             <Card>
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between">
                   <div>
                     <CardTitle className="text-lg">{selectedCompany.name}</CardTitle>
                     <p className="text-sm text-slate-400">{selectedCompany.legal_name}</p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => toggleCompanyStatus(selectedCompany._id, selectedCompany.is_active !== false)}
-                    className={selectedCompany.is_active !== false ? 'text-red-600 border-red-200' : 'text-green-600 border-green-200'}
-                  >
-                    {selectedCompany.is_active !== false ? 'Desactivar' : 'Activar'}
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleCompanyStatus(selectedCompany._id, selectedCompany.is_active !== false)}
+                      className={selectedCompany.is_active !== false ? 'text-red-600 border-red-200' : 'text-green-600 border-green-200'}
+                    >
+                      {selectedCompany.is_active !== false ? 'Desactivar' : 'Activar'}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={openEditCompany} data-testid="edit-company-btn">
+                      Modificar
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -609,6 +644,64 @@ export default function AdminOpticasPage() {
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setShowCreateUser(false)}>Cancelar</Button>
               <Button type="submit" className="bg-pine-700 hover:bg-pine-800" data-testid="save-user-btn">Crear Usuario</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Company Dialog */}
+      <Dialog open={showEditCompany} onOpenChange={setShowEditCompany}>
+        <DialogContent className="max-w-lg" data-testid="edit-company-dialog">
+          <DialogHeader>
+            <DialogTitle>Modificar Optica</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSaveEditCompany} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Nombre Comercial</Label>
+                <Input value={editCompanyForm.name || ''} onChange={(e) => setEditCompanyForm({...editCompanyForm, name: e.target.value})} data-testid="edit-company-name" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Razon Social</Label>
+                <Input value={editCompanyForm.legal_name || ''} onChange={(e) => setEditCompanyForm({...editCompanyForm, legal_name: e.target.value})} data-testid="edit-company-legal" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-500 uppercase">NIT</Label>
+                <Input value={editCompanyForm.tax_id || ''} onChange={(e) => setEditCompanyForm({...editCompanyForm, tax_id: e.target.value})} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Telefono</Label>
+                <Input value={editCompanyForm.phone || ''} onChange={(e) => setEditCompanyForm({...editCompanyForm, phone: e.target.value})} />
+              </div>
+              <div className="space-y-1.5 col-span-2">
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Direccion</Label>
+                <Input value={editCompanyForm.address || ''} onChange={(e) => setEditCompanyForm({...editCompanyForm, address: e.target.value})} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Email</Label>
+                <Input value={editCompanyForm.email || ''} onChange={(e) => setEditCompanyForm({...editCompanyForm, email: e.target.value})} />
+              </div>
+            </div>
+            <div className="border-t pt-3">
+              <p className="text-xs font-semibold text-slate-400 uppercase mb-3">Persona de Contacto</p>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-500 uppercase">Nombre</Label>
+                  <Input value={editCompanyForm.contact_name || ''} onChange={(e) => setEditCompanyForm({...editCompanyForm, contact_name: e.target.value})} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-500 uppercase">Telefono</Label>
+                  <Input value={editCompanyForm.contact_phone || ''} onChange={(e) => setEditCompanyForm({...editCompanyForm, contact_phone: e.target.value})} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-500 uppercase">Email</Label>
+                  <Input value={editCompanyForm.contact_email || ''} onChange={(e) => setEditCompanyForm({...editCompanyForm, contact_email: e.target.value})} />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setShowEditCompany(false)}>Cancelar</Button>
+              <Button type="submit" className="bg-pine-700 hover:bg-pine-800" data-testid="save-edit-company-btn">Guardar Cambios</Button>
             </div>
           </form>
         </DialogContent>
