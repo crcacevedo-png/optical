@@ -18,6 +18,7 @@ import FinancePage from './pages/FinancePage';
 import BranchesPage from './pages/BranchesPage';
 import UsersPage from './pages/UsersPage';
 import ReportsPage from './pages/ReportsPage';
+import SettingsPage from './pages/SettingsPage';
 import './App.css';
 
 function App() {
@@ -48,6 +49,7 @@ function App() {
             <Route path="branches" element={<BranchesPage />} />
             <Route path="users" element={<UsersPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
