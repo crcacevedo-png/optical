@@ -20,6 +20,12 @@ const PRESCRIPTION_SIZES = [
   { value: 'large', label: 'Grande' },
 ];
 
+const PRESCRIPTION_TEMPLATES = [
+  { value: 'clasico', label: 'Clasico', desc: 'Header verde oscuro, lineas limpias' },
+  { value: 'moderno', label: 'Moderno', desc: 'Barra lateral teal, titulo en pastilla' },
+  { value: 'elegante', label: 'Elegante', desc: 'Marco doble purpura, logo centrado' },
+];
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -31,10 +37,10 @@ export default function SettingsPage() {
     contact_name: '', contact_phone: '', contact_email: '',
   });
   const [rxStyleOptica, setRxStyleOptica] = useState({
-    font: 'Helvetica', size: 'standard', show_logo: true, header_text: '', footer_text: '',
+    font: 'Helvetica', size: 'standard', show_logo: true, header_text: '', footer_text: '', template: 'clasico',
   });
   const [rxStyleMedica, setRxStyleMedica] = useState({
-    font: 'Helvetica', size: 'standard', show_logo: true, header_text: '', footer_text: '',
+    font: 'Helvetica', size: 'standard', show_logo: true, header_text: '', footer_text: '', template: 'clasico',
   });
   const [logoTimestamp, setLogoTimestamp] = useState(Date.now());
 
@@ -61,10 +67,12 @@ export default function SettingsPage() {
       setRxStyleOptica({
         font: optica.font || 'Helvetica', size: optica.size || 'standard',
         show_logo: optica.show_logo !== false, header_text: optica.header_text || '', footer_text: optica.footer_text || '',
+        template: optica.template || 'clasico',
       });
       setRxStyleMedica({
         font: medica.font || 'Helvetica', size: medica.size || 'standard',
         show_logo: medica.show_logo !== false, header_text: medica.header_text || '', footer_text: medica.footer_text || '',
+        template: medica.template || 'clasico',
       });
     } catch (error) {
       toast.error('Error al cargar configuracion');
@@ -273,6 +281,19 @@ export default function SettingsPage() {
                 <Glasses className="w-4 h-4 text-slate-600" />
                 <h3 className="text-sm font-semibold text-slate-700">Recetas de Anteojos / Lentes de Contacto</h3>
               </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase mb-2 block">Plantilla Visual</Label>
+                <div className="grid grid-cols-3 gap-3">
+                  {PRESCRIPTION_TEMPLATES.map(t => (
+                    <button key={t.value} type="button" onClick={() => setRxStyleOptica({...rxStyleOptica, template: t.value})}
+                      className={`p-3 rounded-lg border-2 text-left transition-all ${rxStyleOptica.template === t.value ? 'border-pine-600 bg-pine-50' : 'border-slate-200 hover:border-slate-300'}`}
+                      data-testid={`rx-optica-template-${t.value}`}>
+                      <span className="text-sm font-semibold text-slate-800 block">{t.label}</span>
+                      <span className="text-xs text-slate-500">{t.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-slate-500 uppercase">Tipografia</Label>
@@ -320,6 +341,19 @@ export default function SettingsPage() {
               <div className="flex items-center gap-2 pb-2 border-b">
                 <Pill className="w-4 h-4 text-slate-600" />
                 <h3 className="text-sm font-semibold text-slate-700">Recetas de Medicamentos</h3>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase mb-2 block">Plantilla Visual</Label>
+                <div className="grid grid-cols-3 gap-3">
+                  {PRESCRIPTION_TEMPLATES.map(t => (
+                    <button key={t.value} type="button" onClick={() => setRxStyleMedica({...rxStyleMedica, template: t.value})}
+                      className={`p-3 rounded-lg border-2 text-left transition-all ${rxStyleMedica.template === t.value ? 'border-pine-600 bg-pine-50' : 'border-slate-200 hover:border-slate-300'}`}
+                      data-testid={`rx-medica-template-${t.value}`}>
+                      <span className="text-sm font-semibold text-slate-800 block">{t.label}</span>
+                      <span className="text-xs text-slate-500">{t.desc}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">

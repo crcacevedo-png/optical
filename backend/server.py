@@ -1047,31 +1047,216 @@ async def create_eyeglass_prescription(data: EyeglassPrescriptionCreate, user: d
     result = await db.eyeglass_prescriptions.insert_one(rx_doc)
     return {"_id": str(result.inserted_id), "message": "Receta creada"}
 
-def draw_pdf_header(c, width, height, company, title):
-    """Draw PDF header with company logo if available."""
+# ==================== PDF STYLES ====================
+HALF_LETTER = (5.5*inch, 8.5*inch)
+
+def get_rx_style(company, rx_type="optica"):
+    """Get prescription style from company settings. rx_type: 'optica' or 'medica'"""
+    ps = (company or {}).get("prescription_style", {})
+    style = ps.get(rx_type, ps)  # fallback to root level for old format
+    return {
+        "font": style.get("font", "Helvetica"),
+        "size": style.get("size", "standard"),
+        "show_logo": style.get("show_logo", True),
+        "header_text": style.get("header_text", ""),
+        "footer_text": style.get("footer_text", ""),
+        "template": style.get("template", "clasico"),
+    }
+
+def draw_rx_clasico(c, w, h, company, title, style, logo_path):
+    """Estilo Clasico: Header verde oscuro, lineas limpias, profesional"""
+    # Header bar
     c.setFillColor(colors.HexColor("#0F4C3A"))
-    c.rect(0, height - 1.2*inch, width, 1.2*inch, fill=True, stroke=False)
-    logo_path = None
+    c.rect(0, h - 0.9*inch, w, 0.9*inch, fill=True, stroke=False)
+    # Logo
+    text_x = 0.4*inch
+    if style["show_logo"] and logo_path:
+        try:
+            img = ImageReader(logo_path)
+            iw, ih = img.getSize()
+            aspect = iw / ih
+            lh = 0.55*inch
+            lw = min(lh * aspect, 1.2*inch)
+            lh = lw / aspect
+            c.drawImage(logo_path, 0.3*inch, h - 0.78*inch, width=lw, height=lh, preserveAspectRatio=True, mask='auto')
+            text_x = 0.35*inch + lw + 0.15*inch
+        except Exception:
+            pass
+    c.setFillColor(colors.white)
+    font = style["font"]
+    c.setFont(f"{font}-Bold" if font != "Courier" else font, 13)
+    c.drawString(text_x, h - 0.45*inch, (company or {}).get("name", "Cortexia Optical"))
+    c.setFont(font, 7)
+    c.drawString(text_x, h - 0.6*inch, (company or {}).get("address", ""))
+    phone = (company or {}).get("phone", "")
+    email = (company or {}).get("email", "")
+    if phone or email:
+        c.drawString(text_x, h - 0.72*inch, f"Tel: {phone}  |  {email}" if email else f"Tel: {phone}")
+    c.setFillColor(colors.black)
+    # Header text
+    if style["header_text"]:
+        c.setFont(font, 6)
+        c.setFillColor(colors.HexColor("#666666"))
+        c.drawCentredString(w/2, h - 1.02*inch, style["header_text"])
+        c.setFillColor(colors.black)
+    # Title
+    c.setFont(f"{font}-Bold" if font != "Courier" else font, 10)
+    c.drawCentredString(w/2, h - 1.18*inch, title)
+    c.setStrokeColor(colors.HexColor("#0F4C3A"))
+    c.setLineWidth(0.5)
+    c.line(0.3*inch, h - 1.25*inch, w - 0.3*inch, h - 1.25*inch)
+    c.setStrokeColor(colors.black)
+    return h - 1.4*inch
+
+def draw_rx_moderno(c, w, h, company, title, style, logo_path):
+    """Estilo Moderno: Gradiente lateral teal, tipografia limpia, bordes redondeados"""
+    # Left accent bar
+    c.setFillColor(colors.HexColor("#1ABC9C"))
+    c.rect(0, 0, 0.18*inch, h, fill=True, stroke=False)
+    # Top section
+    c.setFillColor(colors.HexColor("#F8FAFB"))
+    c.rect(0.18*inch, h - 1.1*inch, w - 0.18*inch, 1.1*inch, fill=True, stroke=False)
+    # Logo
+    text_x = 0.45*inch
+    if style["show_logo"] and logo_path:
+        try:
+            img = ImageReader(logo_path)
+            iw, ih = img.getSize()
+            aspect = iw / ih
+            lh = 0.6*inch
+            lw = min(lh * aspect, 1.2*inch)
+            lh = lw / aspect
+            c.drawImage(logo_path, 0.4*inch, h - 0.85*inch, width=lw, height=lh, preserveAspectRatio=True, mask='auto')
+            text_x = 0.45*inch + lw + 0.15*inch
+        except Exception:
+            pass
+    font = style["font"]
+    c.setFillColor(colors.HexColor("#1B2A49"))
+    c.setFont(f"{font}-Bold" if font != "Courier" else font, 14)
+    c.drawString(text_x, h - 0.45*inch, (company or {}).get("name", "Cortexia Optical"))
+    c.setFont(font, 7)
+    c.setFillColor(colors.HexColor("#5A6A7A"))
+    c.drawString(text_x, h - 0.6*inch, (company or {}).get("address", ""))
+    phone = (company or {}).get("phone", "")
+    email = (company or {}).get("email", "")
+    if phone or email:
+        c.drawString(text_x, h - 0.72*inch, f"Tel: {phone}  |  {email}" if email else f"Tel: {phone}")
+    # Title pill
+    title_w = c.stringWidth(title, f"{font}-Bold" if font != "Courier" else font, 9) + 0.5*inch
+    title_x = w/2 - title_w/2
+    c.setFillColor(colors.HexColor("#1ABC9C"))
+    c.roundRect(title_x, h - 1.25*inch, title_w, 0.28*inch, 0.1*inch, fill=True, stroke=False)
+    c.setFillColor(colors.white)
+    c.setFont(f"{font}-Bold" if font != "Courier" else font, 9)
+    c.drawCentredString(w/2, h - 1.19*inch, title)
+    if style["header_text"]:
+        c.setFillColor(colors.HexColor("#888888"))
+        c.setFont(font, 6)
+        c.drawCentredString(w/2, h - 1.4*inch, style["header_text"])
+    c.setFillColor(colors.black)
+    return h - 1.55*inch
+
+def draw_rx_elegante(c, w, h, company, title, style, logo_path):
+    """Estilo Elegante: Borde doble, serif feel, marco decorativo"""
+    # Outer border
+    c.setStrokeColor(colors.HexColor("#5A2D82"))
+    c.setLineWidth(1.5)
+    c.rect(0.2*inch, 0.2*inch, w - 0.4*inch, h - 0.4*inch, fill=False, stroke=True)
+    c.setLineWidth(0.5)
+    c.rect(0.28*inch, 0.28*inch, w - 0.56*inch, h - 0.56*inch, fill=False, stroke=True)
+    c.setStrokeColor(colors.black)
+    # Logo centered at top
+    if style["show_logo"] and logo_path:
+        try:
+            img = ImageReader(logo_path)
+            iw, ih = img.getSize()
+            aspect = iw / ih
+            lh = 0.55*inch
+            lw = min(lh * aspect, 1.2*inch)
+            lh = lw / aspect
+            c.drawImage(logo_path, w/2 - lw/2, h - 0.4*inch - lh, width=lw, height=lh, preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+    font = style["font"]
+    y_top = h - 1.05*inch
+    c.setFillColor(colors.HexColor("#5A2D82"))
+    c.setFont(f"{font}-Bold" if font != "Courier" else font, 14)
+    c.drawCentredString(w/2, y_top, (company or {}).get("name", "Cortexia Optical"))
+    c.setFont(font, 7)
+    c.setFillColor(colors.HexColor("#666666"))
+    c.drawCentredString(w/2, y_top - 0.16*inch, (company or {}).get("address", ""))
+    phone = (company or {}).get("phone", "")
+    email = (company or {}).get("email", "")
+    if phone or email:
+        c.drawCentredString(w/2, y_top - 0.3*inch, f"Tel: {phone}  |  {email}" if email else f"Tel: {phone}")
+    # Decorative line
+    c.setStrokeColor(colors.HexColor("#5A2D82"))
+    c.setLineWidth(0.8)
+    c.line(0.6*inch, y_top - 0.45*inch, w - 0.6*inch, y_top - 0.45*inch)
+    c.setLineWidth(0.3)
+    c.line(0.6*inch, y_top - 0.5*inch, w - 0.6*inch, y_top - 0.5*inch)
+    c.setStrokeColor(colors.black)
+    # Title
+    c.setFillColor(colors.HexColor("#5A2D82"))
+    c.setFont(f"{font}-Bold" if font != "Courier" else font, 11)
+    c.drawCentredString(w/2, y_top - 0.68*inch, title)
+    if style["header_text"]:
+        c.setFillColor(colors.HexColor("#888888"))
+        c.setFont(font, 6)
+        c.drawCentredString(w/2, y_top - 0.82*inch, style["header_text"])
+    c.setFillColor(colors.black)
+    return y_top - 0.95*inch
+
+STYLE_RENDERERS = {
+    "clasico": draw_rx_clasico,
+    "moderno": draw_rx_moderno,
+    "elegante": draw_rx_elegante,
+}
+
+def draw_rx_header(c, w, h, company, title, style, logo_path):
+    template = style.get("template", "clasico")
+    renderer = STYLE_RENDERERS.get(template, draw_rx_clasico)
+    return renderer(c, w, h, company, title, style, logo_path)
+
+def draw_rx_footer(c, w, style, professional_name):
+    font = style["font"]
+    y = 0.9*inch
+    c.line(0.4*inch, y, 2.2*inch, y)
+    c.setFont(font, 8)
+    c.drawString(0.4*inch, y - 0.15*inch, professional_name or "")
+    c.setFont(font, 7)
+    c.drawString(0.4*inch, y - 0.3*inch, "Profesional de la Salud Visual")
+    if style.get("footer_text"):
+        c.setFillColor(colors.HexColor("#888888"))
+        c.setFont(font, 6)
+        c.drawCentredString(w/2, 0.35*inch, style["footer_text"])
+        c.setFillColor(colors.black)
+
+def get_logo_path(company):
     if company and company.get("logo_filename"):
         candidate = UPLOADS_DIR / company["logo_filename"]
         if candidate.exists():
-            logo_path = str(candidate)
+            return str(candidate)
+    return None
+
+def draw_pdf_header(c, width, height, company, title):
+    """Legacy header for quotations (full letter size)."""
+    c.setFillColor(colors.HexColor("#0F4C3A"))
+    c.rect(0, height - 1.2*inch, width, 1.2*inch, fill=True, stroke=False)
+    logo_path = get_logo_path(company)
+    text_x = 1*inch
     if logo_path:
         try:
             img = ImageReader(logo_path)
             iw, ih = img.getSize()
             aspect = iw / ih
             logo_h = 0.8 * inch
-            logo_w = logo_h * aspect
-            if logo_w > 1.5 * inch:
-                logo_w = 1.5 * inch
-                logo_h = logo_w / aspect
+            logo_w = min(logo_h * aspect, 1.5 * inch)
+            logo_h = logo_w / aspect
             c.drawImage(logo_path, 0.5*inch, height - 1.05*inch, width=logo_w, height=logo_h, preserveAspectRatio=True, mask='auto')
             text_x = 0.5*inch + logo_w + 0.2*inch
         except Exception:
-            text_x = 1*inch
-    else:
-        text_x = 1*inch
+            pass
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 20)
     c.drawString(text_x, height - 0.75*inch, company["name"] if company else "Cortexia Optical")
@@ -1093,78 +1278,72 @@ async def get_eyeglass_prescription_pdf(rx_id: str, user: dict = Depends(get_cur
     
     patient = await db.patients.find_one({"_id": rx["patient_id"]})
     company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
+    style = get_rx_style(company, "optica")
+    logo_path = get_logo_path(company)
+    font = style["font"]
     
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
+    c = canvas.Canvas(buffer, pagesize=HALF_LETTER)
+    w, h = HALF_LETTER
     
-    draw_pdf_header(c, width, height, company, "RECETA DE ANTEOJOS")
+    y = draw_rx_header(c, w, h, company, "RECETA DE ANTEOJOS", style, logo_path)
     
-    # Info paciente
-    c.setFont("Helvetica", 11)
-    y = height - 2.2*inch
-    c.drawString(1*inch, y, f"Paciente: {patient['first_name']} {patient['last_name']}" if patient else "")
-    c.drawString(4.5*inch, y, f"Fecha: {rx['created_at'][:10]}")
-    y -= 0.25*inch
+    # Patient info
+    c.setFont(font, 8)
+    c.drawString(0.4*inch, y, f"Paciente: {patient['first_name']} {patient['last_name']}" if patient else "")
+    c.drawString(3.2*inch, y, f"Fecha: {rx['created_at'][:10]}")
+    y -= 0.2*inch
     if patient and patient.get("birth_date"):
         age = calculate_age(patient["birth_date"])
-        c.drawString(1*inch, y, f"Edad: {age} años" if age else "")
-    c.drawString(4.5*inch, y, f"Profesional: {rx.get('professional_name', '')}")
+        if age:
+            c.drawString(0.4*inch, y, f"Edad: {age} anos")
+    c.drawString(3.2*inch, y, f"Dr(a): {rx.get('professional_name', '')}")
     
-    # Tabla de receta
-    y -= 0.5*inch
+    # Table
+    y -= 0.35*inch
     c.setFillColor(colors.HexColor("#F1F5F9"))
-    c.rect(0.8*inch, y - 0.8*inch, 6.4*inch, 1*inch, fill=True, stroke=False)
+    c.rect(0.3*inch, y - 0.65*inch, w - 0.6*inch, 0.85*inch, fill=True, stroke=False)
     c.setFillColor(colors.black)
     
-    c.setFont("Helvetica-Bold", 10)
-    headers = ["", "ESFERA", "CILINDRO", "EJE", "ADICIÓN", "D.P."]
-    x_positions = [1*inch, 1.8*inch, 2.8*inch, 3.8*inch, 4.7*inch, 5.6*inch]
-    for i, header in enumerate(headers):
-        c.drawString(x_positions[i], y, header)
+    c.setFont(f"{font}-Bold" if font != "Courier" else font, 8)
+    headers = ["", "ESFERA", "CIL", "EJE", "ADD", "D.P."]
+    xp = [0.4*inch, 1.1*inch, 1.9*inch, 2.7*inch, 3.4*inch, 4.2*inch]
+    for i, hdr in enumerate(headers):
+        c.drawString(xp[i], y, hdr)
     
-    y -= 0.35*inch
-    c.setFont("Helvetica", 11)
-    c.drawString(x_positions[0], y, "OD")
-    c.drawString(x_positions[1], y, str(rx.get("od_sphere") or "-"))
-    c.drawString(x_positions[2], y, str(rx.get("od_cylinder") or "-"))
-    c.drawString(x_positions[3], y, str(rx.get("od_axis") or "-") + "°" if rx.get("od_axis") else "-")
-    c.drawString(x_positions[4], y, str(rx.get("od_addition") or "-"))
-    c.drawString(x_positions[5], y, str(rx.get("od_dp") or "-"))
+    y -= 0.28*inch
+    c.setFont(font, 9)
+    c.drawString(xp[0], y, "OD")
+    c.drawString(xp[1], y, str(rx.get("od_sphere") or "-"))
+    c.drawString(xp[2], y, str(rx.get("od_cylinder") or "-"))
+    c.drawString(xp[3], y, (str(rx.get("od_axis")) + "°") if rx.get("od_axis") else "-")
+    c.drawString(xp[4], y, str(rx.get("od_addition") or "-"))
+    c.drawString(xp[5], y, str(rx.get("od_dp") or "-"))
     
-    y -= 0.35*inch
-    c.drawString(x_positions[0], y, "OI")
-    c.drawString(x_positions[1], y, str(rx.get("oi_sphere") or "-"))
-    c.drawString(x_positions[2], y, str(rx.get("oi_cylinder") or "-"))
-    c.drawString(x_positions[3], y, str(rx.get("oi_axis") or "-") + "°" if rx.get("oi_axis") else "-")
-    c.drawString(x_positions[4], y, str(rx.get("oi_addition") or "-"))
-    c.drawString(x_positions[5], y, str(rx.get("oi_dp") or "-"))
+    y -= 0.28*inch
+    c.drawString(xp[0], y, "OI")
+    c.drawString(xp[1], y, str(rx.get("oi_sphere") or "-"))
+    c.drawString(xp[2], y, str(rx.get("oi_cylinder") or "-"))
+    c.drawString(xp[3], y, (str(rx.get("oi_axis")) + "°") if rx.get("oi_axis") else "-")
+    c.drawString(xp[4], y, str(rx.get("oi_addition") or "-"))
+    c.drawString(xp[5], y, str(rx.get("oi_dp") or "-"))
     
-    # Detalles adicionales
-    y -= 0.6*inch
+    y -= 0.45*inch
     if rx.get("lens_type"):
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(1*inch, y, "Tipo de Lente:")
-        c.setFont("Helvetica", 10)
-        c.drawString(2.2*inch, y, rx["lens_type"])
-        y -= 0.25*inch
-    
+        c.setFont(f"{font}-Bold" if font != "Courier" else font, 8)
+        c.drawString(0.4*inch, y, "Tipo de Lente:")
+        c.setFont(font, 8)
+        c.drawString(1.5*inch, y, rx["lens_type"])
+        y -= 0.2*inch
     if rx.get("observations"):
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(1*inch, y, "Observaciones:")
-        c.setFont("Helvetica", 10)
-        c.drawString(2.4*inch, y, rx["observations"][:80])
+        c.setFont(f"{font}-Bold" if font != "Courier" else font, 8)
+        c.drawString(0.4*inch, y, "Observaciones:")
+        c.setFont(font, 8)
+        c.drawString(1.6*inch, y, rx["observations"][:60])
     
-    # Firma
-    y = 2*inch
-    c.line(1*inch, y, 3*inch, y)
-    c.setFont("Helvetica", 9)
-    c.drawString(1*inch, y - 0.2*inch, rx.get("professional_name", ""))
-    c.drawString(1*inch, y - 0.4*inch, "Profesional de la Salud Visual")
-    
+    draw_rx_footer(c, w, style, rx.get("professional_name", ""))
     c.save()
     buffer.seek(0)
-    
     return StreamingResponse(buffer, media_type="application/pdf", 
                            headers={"Content-Disposition": f"attachment; filename=receta_anteojos_{rx_id}.pdf"})
 
@@ -1217,89 +1396,76 @@ async def get_contact_lens_prescription_pdf(rx_id: str, user: dict = Depends(get
     
     patient = await db.patients.find_one({"_id": rx["patient_id"]})
     company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
+    style = get_rx_style(company, "optica")
+    logo_path = get_logo_path(company)
+    font = style["font"]
     
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
+    c = canvas.Canvas(buffer, pagesize=HALF_LETTER)
+    w, h = HALF_LETTER
     
-    # Header
-    c.setFillColor(colors.HexColor("#0F4C3A"))
-    c.rect(0, height - 1.2*inch, width, 1.2*inch, fill=True, stroke=False)
-    c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 22)
-    c.drawString(1*inch, height - 0.8*inch, company["name"] if company else "Cortexia Optical")
-    c.setFont("Helvetica", 10)
-    c.drawString(1*inch, height - 1*inch, company.get("address", "") if company else "")
+    y = draw_rx_header(c, w, h, company, "RECETA LENTES DE CONTACTO", style, logo_path)
     
-    c.setFillColor(colors.black)
-    c.setFont("Helvetica-Bold", 16)
-    c.drawCentredString(width/2, height - 1.7*inch, "RECETA DE LENTES DE CONTACTO")
+    # Patient info
+    c.setFont(font, 8)
+    c.drawString(0.4*inch, y, f"Paciente: {patient['first_name']} {patient['last_name']}" if patient else "")
+    c.drawString(3.2*inch, y, f"Fecha: {rx['created_at'][:10]}")
+    y -= 0.2*inch
+    c.drawString(3.2*inch, y, f"Dr(a): {rx.get('professional_name', '')}")
     
-    c.setFont("Helvetica", 11)
-    y = height - 2.2*inch
-    c.drawString(1*inch, y, f"Paciente: {patient['first_name']} {patient['last_name']}" if patient else "")
-    c.drawString(4.5*inch, y, f"Fecha: {rx['created_at'][:10]}")
-    y -= 0.25*inch
-    c.drawString(4.5*inch, y, f"Profesional: {rx.get('professional_name', '')}")
-    
-    # Tabla
-    y -= 0.5*inch
+    # Table
+    y -= 0.35*inch
     c.setFillColor(colors.HexColor("#F1F5F9"))
-    c.rect(0.8*inch, y - 0.8*inch, 6.4*inch, 1*inch, fill=True, stroke=False)
+    c.rect(0.3*inch, y - 0.65*inch, w - 0.6*inch, 0.85*inch, fill=True, stroke=False)
     c.setFillColor(colors.black)
     
-    c.setFont("Helvetica-Bold", 9)
-    headers = ["", "ESFERA", "CIL", "EJE", "ADD", "DIA", "B.C."]
-    x_pos = [1*inch, 1.7*inch, 2.5*inch, 3.3*inch, 4.1*inch, 4.9*inch, 5.7*inch]
-    for i, h in enumerate(headers):
-        c.drawString(x_pos[i], y, h)
+    c.setFont(f"{font}-Bold" if font != "Courier" else font, 7)
+    headers = ["", "ESF", "CIL", "EJE", "ADD", "DIA", "B.C."]
+    xp = [0.4*inch, 1*inch, 1.6*inch, 2.2*inch, 2.8*inch, 3.5*inch, 4.2*inch]
+    for i, hdr in enumerate(headers):
+        c.drawString(xp[i], y, hdr)
     
-    y -= 0.35*inch
-    c.setFont("Helvetica", 10)
-    c.drawString(x_pos[0], y, "OD")
-    c.drawString(x_pos[1], y, str(rx.get("od_power") or "-"))
-    c.drawString(x_pos[2], y, str(rx.get("od_cylinder") or "-"))
-    c.drawString(x_pos[3], y, str(rx.get("od_axis") or "-"))
-    c.drawString(x_pos[4], y, str(rx.get("od_addition") or "-"))
-    c.drawString(x_pos[5], y, str(rx.get("od_dia") or "-"))
-    c.drawString(x_pos[6], y, str(rx.get("od_bc") or "-"))
+    y -= 0.28*inch
+    c.setFont(font, 8)
+    c.drawString(xp[0], y, "OD")
+    c.drawString(xp[1], y, str(rx.get("od_power") or "-"))
+    c.drawString(xp[2], y, str(rx.get("od_cylinder") or "-"))
+    c.drawString(xp[3], y, str(rx.get("od_axis") or "-"))
+    c.drawString(xp[4], y, str(rx.get("od_addition") or "-"))
+    c.drawString(xp[5], y, str(rx.get("od_dia") or "-"))
+    c.drawString(xp[6], y, str(rx.get("od_bc") or "-"))
     
-    y -= 0.35*inch
-    c.drawString(x_pos[0], y, "OI")
-    c.drawString(x_pos[1], y, str(rx.get("oi_power") or "-"))
-    c.drawString(x_pos[2], y, str(rx.get("oi_cylinder") or "-"))
-    c.drawString(x_pos[3], y, str(rx.get("oi_axis") or "-"))
-    c.drawString(x_pos[4], y, str(rx.get("oi_addition") or "-"))
-    c.drawString(x_pos[5], y, str(rx.get("oi_dia") or "-"))
-    c.drawString(x_pos[6], y, str(rx.get("oi_bc") or "-"))
+    y -= 0.28*inch
+    c.drawString(xp[0], y, "OI")
+    c.drawString(xp[1], y, str(rx.get("oi_power") or "-"))
+    c.drawString(xp[2], y, str(rx.get("oi_cylinder") or "-"))
+    c.drawString(xp[3], y, str(rx.get("oi_axis") or "-"))
+    c.drawString(xp[4], y, str(rx.get("oi_addition") or "-"))
+    c.drawString(xp[5], y, str(rx.get("oi_dia") or "-"))
+    c.drawString(xp[6], y, str(rx.get("oi_bc") or "-"))
     
-    y -= 0.6*inch
+    y -= 0.45*inch
+    c.setFont(font, 8)
     if rx.get("brand"):
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(1*inch, y, "Marca:")
-        c.setFont("Helvetica", 10)
-        c.drawString(1.8*inch, y, rx["brand"])
+        c.setFont(f"{font}-Bold" if font != "Courier" else font, 8)
+        c.drawString(0.4*inch, y, "Marca:")
+        c.setFont(font, 8)
+        c.drawString(1.1*inch, y, rx["brand"])
     if rx.get("lens_type"):
-        c.drawString(3.5*inch, y, f"Tipo: {rx['lens_type']}")
-    y -= 0.25*inch
+        c.drawString(2.8*inch, y, f"Tipo: {rx['lens_type']}")
+    y -= 0.2*inch
     if rx.get("replacement"):
-        c.drawString(1*inch, y, f"Reemplazo: {rx['replacement']}")
-    
+        c.drawString(0.4*inch, y, f"Reemplazo: {rx['replacement']}")
     if rx.get("observations"):
-        y -= 0.4*inch
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(1*inch, y, "Observaciones:")
-        c.setFont("Helvetica", 10)
-        c.drawString(2.4*inch, y, rx["observations"][:80])
+        y -= 0.25*inch
+        c.setFont(f"{font}-Bold" if font != "Courier" else font, 8)
+        c.drawString(0.4*inch, y, "Obs:")
+        c.setFont(font, 8)
+        c.drawString(0.9*inch, y, rx["observations"][:55])
     
-    y = 2*inch
-    c.line(1*inch, y, 3*inch, y)
-    c.setFont("Helvetica", 9)
-    c.drawString(1*inch, y - 0.2*inch, rx.get("professional_name", ""))
-    
+    draw_rx_footer(c, w, style, rx.get("professional_name", ""))
     c.save()
     buffer.seek(0)
-    
     return StreamingResponse(buffer, media_type="application/pdf",
                            headers={"Content-Disposition": f"attachment; filename=receta_contacto_{rx_id}.pdf"})
 
@@ -1347,57 +1513,62 @@ async def get_medical_prescription_pdf(rx_id: str, user: dict = Depends(get_curr
     
     patient = await db.patients.find_one({"_id": rx["patient_id"]})
     company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
+    style = get_rx_style(company, "medica")
+    logo_path = get_logo_path(company)
+    font = style["font"]
     
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
+    c = canvas.Canvas(buffer, pagesize=HALF_LETTER)
+    w, h = HALF_LETTER
     
-    draw_pdf_header(c, width, height, company, "RECETA MEDICA")
+    y = draw_rx_header(c, w, h, company, "RECETA MEDICA", style, logo_path)
     
-    c.setFont("Helvetica", 11)
-    y = height - 2.2*inch
-    c.drawString(1*inch, y, f"Paciente: {patient['first_name']} {patient['last_name']}" if patient else "")
-    c.drawString(4.5*inch, y, f"Fecha: {rx['created_at'][:10]}")
-    y -= 0.25*inch
-    c.drawString(4.5*inch, y, f"Profesional: {rx.get('professional_name', '')}")
+    # Patient info
+    c.setFont(font, 8)
+    c.drawString(0.4*inch, y, f"Paciente: {patient['first_name']} {patient['last_name']}" if patient else "")
+    c.drawString(3.2*inch, y, f"Fecha: {rx['created_at'][:10]}")
+    y -= 0.2*inch
+    c.drawString(3.2*inch, y, f"Dr(a): {rx.get('professional_name', '')}")
     
     if rx.get("diagnosis"):
-        y -= 0.5*inch
-        c.setFont("Helvetica-Bold", 11)
-        c.drawString(1*inch, y, "Diagnóstico:")
-        c.setFont("Helvetica", 11)
-        c.drawString(2.2*inch, y, rx["diagnosis"][:70])
+        y -= 0.35*inch
+        c.setFont(f"{font}-Bold" if font != "Courier" else font, 8)
+        c.drawString(0.4*inch, y, "Diagnostico:")
+        c.setFont(font, 8)
+        c.drawString(1.4*inch, y, rx["diagnosis"][:50])
     
-    y -= 0.5*inch
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(1*inch, y, "Medicamentos:")
-    y -= 0.3*inch
-    c.setFont("Helvetica", 10)
+    y -= 0.35*inch
+    c.setFont(f"{font}-Bold" if font != "Courier" else font, 9)
+    c.drawString(0.4*inch, y, "Medicamentos:")
+    y -= 0.22*inch
+    c.setFont(font, 8)
     for med in rx.get("medications", []):
-        c.drawString(1.2*inch, y, f"• {med.get('name', '')}")
-        c.drawString(3.5*inch, y, f"Dosis: {med.get('dosage', '')}")
-        c.drawString(5*inch, y, f"Duración: {med.get('duration', '')}")
-        y -= 0.25*inch
+        c.drawString(0.5*inch, y, f"Rx  {med.get('name', '')}")
+        y -= 0.18*inch
+        if med.get("dosage"):
+            c.drawString(0.7*inch, y, f"Dosis: {med['dosage']}")
+            y -= 0.16*inch
         if med.get("frequency"):
-            c.drawString(1.4*inch, y, f"Frecuencia: {med['frequency']}")
-            y -= 0.25*inch
+            c.drawString(0.7*inch, y, f"Frecuencia: {med['frequency']}")
+            y -= 0.16*inch
+        if med.get("duration"):
+            c.drawString(0.7*inch, y, f"Duracion: {med['duration']}")
+            y -= 0.16*inch
+        y -= 0.08*inch
+        if y < 1.5*inch:
+            break
     
     if rx.get("instructions"):
-        y -= 0.3*inch
-        c.setFont("Helvetica-Bold", 11)
-        c.drawString(1*inch, y, "Indicaciones:")
-        c.setFont("Helvetica", 10)
-        y -= 0.25*inch
-        c.drawString(1.2*inch, y, rx["instructions"][:100])
+        y -= 0.15*inch
+        c.setFont(f"{font}-Bold" if font != "Courier" else font, 8)
+        c.drawString(0.4*inch, y, "Indicaciones:")
+        c.setFont(font, 8)
+        y -= 0.18*inch
+        c.drawString(0.5*inch, y, rx["instructions"][:70])
     
-    y = 2*inch
-    c.line(1*inch, y, 3*inch, y)
-    c.setFont("Helvetica", 9)
-    c.drawString(1*inch, y - 0.2*inch, rx.get("professional_name", ""))
-    
+    draw_rx_footer(c, w, style, rx.get("professional_name", ""))
     c.save()
     buffer.seek(0)
-    
     return StreamingResponse(buffer, media_type="application/pdf",
                            headers={"Content-Disposition": f"attachment; filename=receta_medica_{rx_id}.pdf"})
 
