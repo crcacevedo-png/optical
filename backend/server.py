@@ -1048,7 +1048,7 @@ async def create_eyeglass_prescription(data: EyeglassPrescriptionCreate, user: d
     return {"_id": str(result.inserted_id), "message": "Receta creada"}
 
 # ==================== PDF STYLES ====================
-HALF_LETTER = (5.5*inch, 8.5*inch)
+HALF_LETTER = (8.5*inch, 5.5*inch)
 
 def get_rx_style(company, rx_type="optica"):
     """Get prescription style from company settings. rx_type: 'optica' or 'medica'"""
