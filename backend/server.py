@@ -2487,7 +2487,10 @@ async def get_finance_summary(
     
     query = {"company_id": ObjectId(user["company_id"])}
     if branch_id:
-        query["branch_id"] = ObjectId(branch_id)
+        try:
+            query["branch_id"] = ObjectId(branch_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="branch_id inválido")
     elif user.get("branch_id"):
         query["branch_id"] = ObjectId(user["branch_id"])
     
@@ -2567,7 +2570,10 @@ async def get_dashboard(user: dict = Depends(get_current_user), branch_id: Optio
     company_id = ObjectId(user["company_id"])
     branch_filter = {}
     if branch_id:
-        branch_filter["branch_id"] = ObjectId(branch_id)
+        try:
+            branch_filter["branch_id"] = ObjectId(branch_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="branch_id inválido")
     elif user.get("branch_id"):
         branch_filter["branch_id"] = ObjectId(user["branch_id"])
     
@@ -2654,7 +2660,10 @@ async def get_sales_report(
     
     query = {"company_id": ObjectId(user["company_id"])}
     if branch_id:
-        query["branch_id"] = ObjectId(branch_id)
+        try:
+            query["branch_id"] = ObjectId(branch_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="branch_id inválido")
     elif user.get("branch_id"):
         query["branch_id"] = ObjectId(user["branch_id"])
     
