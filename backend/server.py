@@ -433,6 +433,30 @@ class ConsultationUpdate(BaseModel):
     va_pinhole_oi: Optional[str] = None
     visual_acuity_method: Optional[str] = None
 
+class SupplierCreate(BaseModel):
+    name: str
+    contact_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = "Guatemala"
+    tax_id: Optional[str] = None
+    categories: Optional[List[str]] = []
+    notes: Optional[str] = None
+
+class SupplierUpdate(BaseModel):
+    name: Optional[str] = None
+    contact_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    tax_id: Optional[str] = None
+    categories: Optional[List[str]] = None
+    notes: Optional[str] = None
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
@@ -457,6 +481,7 @@ consultations_router = APIRouter(prefix="/consultations", tags=["Consultas"])
 finance_router = APIRouter(prefix="/finance", tags=["Finanzas"])
 reports_router = APIRouter(prefix="/reports", tags=["Reportes"])
 users_router = APIRouter(prefix="/users", tags=["Usuarios"])
+suppliers_router = APIRouter(prefix="/suppliers", tags=["Proveedores"])
 
 # ==================== AUTH ROUTES ====================
 @auth_router.post("/register")
@@ -2737,6 +2762,73 @@ async def deactivate_user(user_id: str, user: dict = Depends(get_current_user)):
     await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"is_active": False}})
     return {"message": "Usuario desactivado"}
 
+# ==================== SUPPLIERS ROUTES ====================
+@suppliers_router.get("")
+async def list_suppliers(user: dict = Depends(get_current_user), search: Optional[str] = None):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    query = {"company_id": ObjectId(user["company_id"]), "is_active": {"$ne": False}}
+    if search:
+        regex = {"$regex": search, "$options": "i"}
+        query["$or"] = [{"name": regex}, {"contact_name": regex}, {"phone": regex}]
+    
+    suppliers = await db.suppliers.find(query).sort("name", 1).to_list(500)
+    for s in suppliers:
+        serialize_doc(s)
+    return suppliers
+
+@suppliers_router.post("")
+async def create_supplier(data: SupplierCreate, user: dict = Depends(get_current_user)):
+    if user["role"] not in ["admin", "optometrista", "vendedor"]:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    supplier_doc = {
+        **data.model_dump(),
+        "company_id": ObjectId(user["company_id"]),
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": user["_id"]
+    }
+    result = await db.suppliers.insert_one(supplier_doc)
+    return {"_id": str(result.inserted_id), "message": "Proveedor creado"}
+
+@suppliers_router.get("/{supplier_id}")
+async def get_supplier(supplier_id: str, user: dict = Depends(get_current_user)):
+    supplier = await db.suppliers.find_one({"_id": ObjectId(supplier_id)})
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    if user["role"] != "superadmin" and str(supplier["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    serialize_doc(supplier)
+    return supplier
+
+@suppliers_router.put("/{supplier_id}")
+async def update_supplier(supplier_id: str, data: SupplierUpdate, user: dict = Depends(get_current_user)):
+    if user["role"] not in ["admin", "optometrista", "vendedor"]:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    supplier = await db.suppliers.find_one({"_id": ObjectId(supplier_id)})
+    if not supplier or str(supplier["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    
+    update_data = data.model_dump(exclude_unset=True)
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.suppliers.update_one({"_id": ObjectId(supplier_id)}, {"$set": update_data})
+    return {"message": "Proveedor actualizado"}
+
+@suppliers_router.delete("/{supplier_id}")
+async def delete_supplier(supplier_id: str, user: dict = Depends(get_current_user)):
+    if user["role"] not in ["admin"]:
+        raise HTTPException(status_code=403, detail="Solo Admin puede eliminar proveedores")
+    
+    supplier = await db.suppliers.find_one({"_id": ObjectId(supplier_id)})
+    if not supplier or str(supplier["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    
+    await db.suppliers.update_one({"_id": ObjectId(supplier_id)}, {"$set": {"is_active": False}})
+    return {"message": "Proveedor eliminado"}
+
 # ==================== INCLUDE ROUTERS ====================
 api_router.include_router(auth_router)
 api_router.include_router(companies_router)
@@ -2751,6 +2843,7 @@ api_router.include_router(consultations_router)
 api_router.include_router(finance_router)
 api_router.include_router(reports_router)
 api_router.include_router(users_router)
+api_router.include_router(suppliers_router)
 api_router.include_router(settings_router)
 
 @api_router.get("/search")

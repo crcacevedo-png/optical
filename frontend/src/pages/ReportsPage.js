@@ -1,32 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../context/AuthContext';
+import { api, useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { 
   BarChart3, TrendingUp, Users, ShoppingBag, 
-  Calendar, FileText, DollarSign, Package
+  Calendar, FileText, DollarSign, Package, Building2
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 export default function ReportsPage() {
+  const { user } = useAuth();
   const [salesReport, setSalesReport] = useState(null);
   const [financeSummary, setFinanceSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [branches, setBranches] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState('all');
   const [dateRange, setDateRange] = useState({
     from: new Date().toISOString().slice(0, 8) + '01',
     to: new Date().toISOString().slice(0, 10)
   });
 
+  const isAdmin = user?.role === 'admin';
+
+  useEffect(() => {
+    if (isAdmin) {
+      api.get('/api/branches').then(res => setBranches(res.data)).catch(() => {});
+    }
+  }, [isAdmin]);
+
   useEffect(() => {
     fetchReports();
-  }, [dateRange]);
+  }, [dateRange, selectedBranch]);
 
   const fetchReports = async () => {
     try {
+      const params = { date_from: dateRange.from, date_to: dateRange.to };
+      if (selectedBranch && selectedBranch !== 'all') {
+        params.branch_id = selectedBranch;
+      }
       const [salesRes, financeRes] = await Promise.all([
-        api.get('/api/reports/sales', { params: { date_from: dateRange.from, date_to: dateRange.to } }),
-        api.get('/api/finance/summary', { params: { date_from: dateRange.from, date_to: dateRange.to } })
+        api.get('/api/reports/sales', { params }),
+        api.get('/api/finance/summary', { params })
       ]);
       setSalesReport(salesRes.data);
       setFinanceSummary(financeRes.data);
@@ -70,9 +86,33 @@ export default function ReportsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="font-heading text-2xl sm:text-3xl font-semibold text-slate-900">Reportes</h1>
-          <p className="text-slate-500 mt-1">Análisis y estadísticas del negocio</p>
+          <p className="text-slate-500 mt-1">
+            Análisis y estadísticas del negocio
+            {selectedBranch !== 'all' && branches.length > 0 && (
+              <span className="ml-2 inline-flex items-center gap-1 text-pine-700 font-medium">
+                <Building2 className="w-3.5 h-3.5" />
+                {branches.find(b => b._id === selectedBranch)?.name}
+              </span>
+            )}
+          </p>
         </div>
-        <div className="flex gap-2 items-end">
+        <div className="flex flex-wrap gap-2 items-end">
+          {isAdmin && branches.length > 0 && (
+            <div className="space-y-1">
+              <Label className="text-xs">Sucursal</Label>
+              <Select value={selectedBranch} onValueChange={setSelectedBranch} data-testid="report-branch-select">
+                <SelectTrigger className="w-44" data-testid="report-branch-trigger">
+                  <SelectValue placeholder="Todas las sucursales" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" data-testid="report-branch-all">Todas las sucursales</SelectItem>
+                  {branches.map(b => (
+                    <SelectItem key={b._id} value={b._id} data-testid={`report-branch-${b._id}`}>{b.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-1">
             <Label className="text-xs">Desde</Label>
             <Input
