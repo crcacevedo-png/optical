@@ -4,33 +4,39 @@
 Plataforma web SaaS multi-tenant para administracion integral de opticas en Latinoamerica.
 
 ## Arquitectura
-- Frontend: React 19 + Tailwind CSS + Shadcn UI
-- Backend: FastAPI + Motor (MongoDB async) - Modular (19 archivos de rutas)
+- Frontend: React 19 + Tailwind CSS + Shadcn UI + Recharts
+- Backend: FastAPI + Motor (MongoDB async) - Modular (20 archivos de rutas)
 - Auth: JWT con cookies httpOnly
 - Moneda: Quetzal (GTQ) | Idioma: Espanol
 
 ## Lo Implementado
 
-### Sistema de Planes (Abril 2026)
+### Dashboard SuperAdmin (Abril 2026)
+- 4 KPIs: opticas activas (+nuevas este mes), pacientes totales, usuarios activos, revenue mensual estimado
+- Grafica pie: opticas por plan
+- Grafica barras: crecimiento de pacientes ultimos 6 meses
+- Grafica barras horizontal: revenue estimado por plan
+- Alertas: opticas cerca del limite con porcentajes (pacientes/sucursales)
+- Timeline: cambios de plan recientes
+- Redireccion automatica /dashboard -> /admin/dashboard para superadmin
+
+### Sistema de Planes
 - 3 planes: Free (Q0, 1 suc, 50 pac), Basic (Q299, 3 suc, 500 pac), Enterprise (Q799, ilimitado)
 - Modulos opcionales: inventario, ventas, proveedores, finanzas
-- CRUD planes, asignacion, sidebar filtrado, alertas limite, validacion al crear
-- Historial de cambios de plan por empresa con timeline visual
+- CRUD planes, asignacion, sidebar filtrado, alertas limite, validacion
+- Historial de cambios de plan con timeline visual
 
-### Exportacion Excel (Abril 2026)
-- Boton "Excel" en pagina de Reportes
-- Genera .xlsx con 3 hojas: Resumen, Ventas detalladas, Finanzas
-- Respeta filtro de sucursal y rango de fechas
-- Incluye nombres de pacientes, sucursales, metodos de pago
+### Exportacion Excel
+- Boton "Excel" en Reportes con 3 hojas: Resumen, Ventas, Finanzas
 
 ### Modulos Funcionales
 - Auth, Login Premium, Panel SuperAdmin, Dashboard con alertas
-- Pacientes, Consultas Opticas, Recetas (3 tipos, 3 estilos PDF)
+- Pacientes, Consultas, Recetas (3 tipos, 3 estilos PDF)
 - Busqueda Global (Ctrl+K), Agenda, Cotizaciones
-- Inventario, Ventas, Proveedores, Finanzas (modulos opcionales por plan)
-- Reportes por Sucursal, Configuracion
+- Inventario, Ventas, Proveedores, Finanzas (opcionales por plan)
+- Reportes por Sucursal, Configuracion, Gestion de Proveedores
 
-## Backlog Priorizado
+## Backlog
 
 ### P1 - Alta
 - [ ] Facturacion formal (IVA Guatemala)
