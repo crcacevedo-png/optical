@@ -115,6 +115,41 @@ export default function DashboardPage() {
         <BranchFilter value={branchId} onChange={setBranchId} />
       </div>
 
+      {/* Plan Limit Warnings */}
+      {(user?.patients_warning || user?.branches_warning) && (
+        <Card className="border-amber-200 bg-amber-50/50" data-testid="plan-warning-card">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-amber-100">
+                <CreditCard className="w-5 h-5 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-amber-900 text-sm">Limites del Plan {user?.plan_name}</h3>
+                <div className="mt-1 space-y-1">
+                  {user?.patients_warning && (
+                    <p className="text-sm text-amber-700 flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      {user.patients_limit_reached
+                        ? `Limite de pacientes alcanzado (${user.patients_count}/${user.max_patients})`
+                        : `Cerca del limite de pacientes (${user.patients_count}/${user.max_patients})`}
+                    </p>
+                  )}
+                  {user?.branches_warning && (
+                    <p className="text-sm text-amber-700 flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      {user.branches_limit_reached
+                        ? `Limite de sucursales alcanzado (${user.branches_count}/${user.max_branches})`
+                        : `Cerca del limite de sucursales (${user.branches_count}/${user.max_branches})`}
+                    </p>
+                  )}
+                </div>
+                <p className="text-xs text-amber-600 mt-2">Contacte al administrador para actualizar su plan.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (

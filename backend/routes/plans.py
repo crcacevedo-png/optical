@@ -30,7 +30,10 @@ async def create_plan(data: PlanCreate, user: dict = Depends(get_current_user)):
 async def update_plan(plan_id: str, data: PlanUpdate, user: dict = Depends(get_current_user)):
     if user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
-    plan = await db.plans.find_one({"_id": ObjectId(plan_id)})
+    try:
+        plan = await db.plans.find_one({"_id": ObjectId(plan_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="plan_id invalido")
     if not plan:
         raise HTTPException(status_code=404, detail="Plan no encontrado")
     update_data = data.model_dump(exclude_unset=True)
@@ -42,25 +45,38 @@ async def update_plan(plan_id: str, data: PlanUpdate, user: dict = Depends(get_c
 async def delete_plan(plan_id: str, user: dict = Depends(get_current_user)):
     if user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
-    companies_using = await db.companies.count_documents({"plan_id": ObjectId(plan_id)})
+    try:
+        oid = ObjectId(plan_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="plan_id invalido")
+    companies_using = await db.companies.count_documents({"plan_id": oid})
     if companies_using > 0:
         raise HTTPException(status_code=400, detail=f"No se puede eliminar: {companies_using} empresa(s) usan este plan")
-    await db.plans.delete_one({"_id": ObjectId(plan_id)})
+    await db.plans.delete_one({"_id": oid})
     return {"message": "Plan eliminado"}
 
 @router.put("/assign/{company_id}")
 async def assign_plan(company_id: str, plan_id: str, user: dict = Depends(get_current_user)):
     if user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
-    plan = await db.plans.find_one({"_id": ObjectId(plan_id)})
+    try:
+        plan = await db.plans.find_one({"_id": ObjectId(plan_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="plan_id invalido")
     if not plan:
         raise HTTPException(status_code=404, detail="Plan no encontrado")
-    await db.companies.update_one({"_id": ObjectId(company_id)}, {"$set": {"plan_id": ObjectId(plan_id)}})
+    try:
+        await db.companies.update_one({"_id": ObjectId(company_id)}, {"$set": {"plan_id": ObjectId(plan_id)}})
+    except Exception:
+        raise HTTPException(status_code=400, detail="company_id invalido")
     return {"message": "Plan asignado"}
 
 @router.get("/usage/{company_id}")
 async def get_plan_usage(company_id: str, user: dict = Depends(get_current_user)):
-    cid = ObjectId(company_id)
+    try:
+        cid = ObjectId(company_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="company_id invalido")
     company = await db.companies.find_one({"_id": cid})
     if not company:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
