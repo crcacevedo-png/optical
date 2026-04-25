@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   Plus, Building2, MapPin, Phone, Mail, Users, GitBranch,
   Shield, UserCheck, UserX, Eye, EyeOff, ChevronRight, Store, UserCog, Upload, Image, Trash2,
-  AlertTriangle, CreditCard
+  AlertTriangle, CreditCard, History, ArrowRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -27,6 +27,7 @@ export default function AdminOpticasPage() {
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [detailTab, setDetailTab] = useState('info');
   const [plans, setPlans] = useState([]);
+  const [planHistory, setPlanHistory] = useState([]);
 
   const [companyForm, setCompanyForm] = useState({
     name: '', legal_name: '', tax_id: '', address: '', phone: '', email: '',
@@ -122,12 +123,14 @@ export default function AdminOpticasPage() {
     setSelectedCompany(company);
     setDetailTab('info');
     try {
-      const [brRes, usRes] = await Promise.all([
+      const [brRes, usRes, histRes] = await Promise.all([
         api.get(`/api/branches?company_id=${company._id}`),
         api.get('/api/users'),
+        api.get(`/api/plans/history/${company._id}`).catch(() => ({ data: [] }))
       ]);
       setCompanyBranches(brRes.data || []);
       setCompanyUsers((usRes.data || []).filter(u => u.company_id === company._id));
+      setPlanHistory(histRes.data || []);
     } catch (err) {
       console.error(err);
     }
@@ -340,6 +343,7 @@ export default function AdminOpticasPage() {
                     <TabsTrigger value="info" data-testid="tab-info">Info</TabsTrigger>
                     <TabsTrigger value="branches" data-testid="tab-branches">Sucursales ({companyBranches.length})</TabsTrigger>
                     <TabsTrigger value="users" data-testid="tab-users">Usuarios ({companyUsers.length})</TabsTrigger>
+                    <TabsTrigger value="plan-history" data-testid="tab-plan-history">Historial Plan</TabsTrigger>
                   </TabsList>
 
                   {/* INFO TAB */}
@@ -511,6 +515,37 @@ export default function AdminOpticasPage() {
                           ))}
                         </TableBody>
                       </Table>
+                    )}
+                  </TabsContent>
+
+                  {/* PLAN HISTORY TAB */}
+                  <TabsContent value="plan-history">
+                    {planHistory.length === 0 ? (
+                      <div className="py-8 text-center text-slate-400">
+                        <History className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                        <p>Sin cambios de plan registrados</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {planHistory.map((h, idx) => (
+                          <div key={h._id || idx} className="flex items-start gap-3 p-3 rounded-lg border border-slate-100 hover:bg-slate-50/50 transition-colors" data-testid={`plan-history-${idx}`}>
+                            <div className="mt-0.5 w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                              <CreditCard className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge className="bg-slate-100 text-slate-600 text-xs">{h.old_plan_name || 'Sin plan'}</Badge>
+                                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                                <Badge className="bg-pine-100 text-pine-700 text-xs">{h.new_plan_name}</Badge>
+                              </div>
+                              <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
+                                <span>{h.changed_at?.slice(0, 10)} {h.changed_at?.slice(11, 16)}</span>
+                                <span>por {h.changed_by_name || 'Sistema'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </TabsContent>
                 </Tabs>

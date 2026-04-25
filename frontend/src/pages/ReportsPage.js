@@ -3,18 +3,21 @@ import { api, useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { 
   BarChart3, TrendingUp, Users, ShoppingBag, 
-  Calendar, FileText, DollarSign, Package, Building2
+  Calendar, FileText, DollarSign, Package, Building2, Download
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { toast } from 'sonner';
 
 export default function ReportsPage() {
   const { user } = useAuth();
   const [salesReport, setSalesReport] = useState(null);
   const [financeSummary, setFinanceSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [dateRange, setDateRange] = useState({
@@ -55,6 +58,33 @@ export default function ReportsPage() {
 
   const formatCurrency = (amount) => {
     return `Q ${(amount || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`;
+  };
+
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      const params = { date_from: dateRange.from, date_to: dateRange.to };
+      if (selectedBranch && selectedBranch !== 'all') {
+        params.branch_id = selectedBranch;
+      }
+      const response = await api.get('/api/reports/export/excel', {
+        params,
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `reporte_${dateRange.from}_${dateRange.to}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Reporte exportado exitosamente');
+    } catch (error) {
+      toast.error('Error al exportar reporte');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const COLORS = ['#0F4C3A', '#D97706', '#3B82F6', '#10B981'];
@@ -133,6 +163,16 @@ export default function ReportsPage() {
               data-testid="report-date-to"
             />
           </div>
+          <Button
+            onClick={handleExportExcel}
+            disabled={exporting}
+            variant="outline"
+            className="border-pine-200 text-pine-700 hover:bg-pine-50"
+            data-testid="export-excel-btn"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            {exporting ? 'Exportando...' : 'Excel'}
+          </Button>
         </div>
       </div>
 

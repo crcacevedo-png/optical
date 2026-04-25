@@ -60,15 +60,39 @@ async def assign_plan(company_id: str, plan_id: str, user: dict = Depends(get_cu
     if user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
     try:
-        plan = await db.plans.find_one({"_id": ObjectId(plan_id)})
+        new_plan = await db.plans.find_one({"_id": ObjectId(plan_id)})
     except Exception:
         raise HTTPException(status_code=400, detail="plan_id invalido")
-    if not plan:
+    if not new_plan:
         raise HTTPException(status_code=404, detail="Plan no encontrado")
     try:
-        await db.companies.update_one({"_id": ObjectId(company_id)}, {"$set": {"plan_id": ObjectId(plan_id)}})
+        cid = ObjectId(company_id)
     except Exception:
         raise HTTPException(status_code=400, detail="company_id invalido")
+    
+    # Get current plan for history
+    company = await db.companies.find_one({"_id": cid}, {"plan_id": 1, "name": 1})
+    old_plan_name = None
+    if company and company.get("plan_id"):
+        old_plan = await db.plans.find_one({"_id": company["plan_id"]}, {"name": 1})
+        if old_plan:
+            old_plan_name = old_plan["name"]
+    
+    await db.companies.update_one({"_id": cid}, {"$set": {"plan_id": ObjectId(plan_id)}})
+    
+    # Record plan change history
+    await db.plan_history.insert_one({
+        "company_id": cid,
+        "company_name": company["name"] if company else "",
+        "old_plan_name": old_plan_name,
+        "new_plan_name": new_plan["name"],
+        "old_plan_id": company.get("plan_id") if company else None,
+        "new_plan_id": ObjectId(plan_id),
+        "changed_by": user["_id"],
+        "changed_by_name": user.get("name", ""),
+        "changed_at": datetime.now(timezone.utc).isoformat()
+    })
+    
     return {"message": "Plan asignado"}
 
 @router.get("/usage/{company_id}")
@@ -106,3 +130,18 @@ async def get_plan_usage(company_id: str, user: dict = Depends(get_current_user)
         "patients_limit_reached": max_patients > 0 and patients_count >= max_patients,
         "branches_limit_reached": max_branches > 0 and branches_count >= max_branches,
     }
+
+
+@router.get("/history/{company_id}")
+async def get_plan_history(company_id: str, user: dict = Depends(get_current_user)):
+    if user["role"] != "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    try:
+        cid = ObjectId(company_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="company_id invalido")
+    
+    history = await db.plan_history.find({"company_id": cid}).sort("changed_at", -1).to_list(100)
+    for h in history:
+        serialize_doc(h)
+    return history
