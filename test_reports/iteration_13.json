@@ -1,0 +1,79 @@
+{
+  "summary": "Iteration 13: Tested Subscription Plans system (SuperAdmin CRUD, plan assignment, sidebar filtering by modules, limit enforcement). 13/13 backend tests PASSED + 1 skipped (limit not at edge). Frontend: SuperAdmin /admin/planes renders 3 default plan cards correctly, /admin/opticas shows plan badges + 'Cerca del limite' warnings, sidebar filtering works perfectly for both Free (hides Inventario/Ventas/Proveedores/Finanzas) and Enterprise (shows all modules). Patient/Branch limit enforcement works (POST /api/branches returns 403 with proper message when at limit). Login + /auth/me return plan_name, plan_modules, max_patients, patients_count, *_warning, *_limit_reached fields correctly. Only gap: DashboardPage.js does not implement a plan-limit warning card despite the request listing it.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "PUT /api/plans/{id} & DELETE /api/plans/{id}",
+        "issue": "ObjectId(plan_id) called without try/except. Malformed plan_id will produce 500 instead of 400/422. Same applies to /api/plans/assign/{company_id}?plan_id=... and /api/plans/usage/{company_id}."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Dashboard plan-limit warning",
+        "issue": "Demo company is on Free plan with 1/1 branches (at limit, branches_limit_reached=true) but the dashboard does not display any plan-limit warning card. /api/auth/me returns the warning flags correctly; UI does not consume them on /dashboard. Review request lists 'Frontend /app/frontend/src/pages/DashboardPage.js: Plan limit warning card' which appears unimplemented (no references to plan/limit/warning in DashboardPage.js).",
+        "affected_selectors": []
+      }
+    ],
+    "design_issues": []
+  },
+  "passed_tests": {
+    "backend": [
+      "TestPlansList::test_list_plans_superadmin (3 default plans returned)",
+      "TestPlansList::test_default_plan_attributes (Free Q0/1/50/[], Basic Q299/3/500/inventario+ventas, Enterprise Q799/0/0/all 4)",
+      "TestPlansCRUD::test_create_plan_superadmin",
+      "TestPlansCRUD::test_update_plan_superadmin (price+max_patients persisted)",
+      "TestPlansCRUD::test_create_plan_non_superadmin_forbidden (admin gets 403)",
+      "TestPlansCRUD::test_delete_plan_superadmin",
+      "TestAuthPlanInfo::test_login_returns_plan_info_for_demo (plan_modules/max_patients/patients_count present)",
+      "TestAuthPlanInfo::test_me_returns_plan_info",
+      "TestAuthPlanInfo::test_superadmin_me_no_plan_required",
+      "TestPlanAssignment::test_get_companies_with_plan_badges (plan_name on /api/companies)",
+      "TestPlanAssignment::test_assign_plan_and_usage (PUT /api/plans/assign + GET /api/plans/usage with warnings)",
+      "TestLimitEnforcement::test_patient_create_works_under_limit",
+      "TestLimitEnforcement::test_branch_creation_blocked_when_at_limit (POST /api/branches -> 403 'Limite de sucursales alcanzado (1)')"
+    ],
+    "frontend": [
+      "SuperAdmin login -> /admin/planes shows 3 plan cards (Free Q0, Basic Q299, Enterprise Q799) with correct limits and module chips highlighted",
+      "/admin/opticas: plan badges (Free, Enterprise) and 'Cerca del limite' warning badge visible on company cards",
+      "Demo admin (Free plan) sidebar HIDES Inventario, Ventas, Proveedores, Finanzas",
+      "Demo admin sidebar SHOWS Dashboard, Pacientes, Consultas, Agenda, Recetas, Cotizaciones, Sucursales, Usuarios, Reportes",
+      "Altavista admin (Enterprise plan) sidebar SHOWS all modules including Inventario, Ventas, Proveedores, Finanzas",
+      "Login as analuhs@gmail.com / Alta2026$ works (Altavista admin)"
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_plans.py",
+    "/app/test_reports/pytest/plans_results.xml"
+  ],
+  "action_items": [
+    "[FEATURE GAP - MEDIUM] Implement plan-limit warning card in /app/frontend/src/pages/DashboardPage.js. /api/auth/me already returns patients_warning/branches_warning/patients_limit_reached/branches_limit_reached/plan_name/patients_count/max_patients - just need a card consuming these.",
+    "[MINOR] Wrap ObjectId() conversions in /app/backend/routes/plans.py (update/delete/assign/usage) in try/except to return 400 on invalid IDs instead of 500.",
+    "[INFO] Free plan modules array is empty as expected; sidebar filter logic in MainLayout.js (line 35) correctly hides module-gated items based on user.plan_modules."
+  ],
+  "critical_code_review_comments": [
+    "/app/backend/routes/plans.py: assign_plan stores plan_id as ObjectId in companies but list_plans returns _id as string. Consistent serialization needed - companies.py join should handle both shapes.",
+    "auth.py login() and get_me() duplicate ~20 lines of plan-info attachment logic. Extract to a helper async def attach_plan_info(user_dict, company_id) for DRY.",
+    "DashboardPage.js missing plan-limit warning UI even though backend exposes all required flags - feature listed in review_request but not implemented."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_plans.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13 passed, 1 skipped because demo not at patient limit)",
+    "frontend": "~92% (all sidebar filtering, plan management, badges working; plan-limit warning card on dashboard not implemented)"
+  },
+  "test_credentials": {
+    "superadmin": "superadmin@cortexia.com / Admin123! (worked)",
+    "demo_admin_free_plan": "admin@cortexia.gt / Demo123! (worked, on Free plan)",
+    "altavista_admin_enterprise": "analuhs@gmail.com / Alta2026$ (worked, on Enterprise plan)"
+  },
+  "seed_data_creation": "Created and deleted TEST_Plan_<timestamp> via POST /api/plans -> DELETE /api/plans/{id}. No persistent test data left.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Plans system is fully functional. Backend routes at /api/plans (CRUD), /api/plans/assign/{company_id}?plan_id=, /api/plans/usage/{company_id}. Auth endpoints (/api/auth/login, /api/auth/me) attach plan_name, plan_modules (array of 'inventario'|'ventas'|'proveedores'|'finanzas'), max_patients, max_branches, patients_count, branches_count, *_warning (>=80%), *_limit_reached. Default plans seeded: Free (Q0, 1 branch, 50 patients, []), Basic (Q299, 3 branches, 500 patients, [inventario,ventas]), Enterprise (Q799, 0=unlimited branches, 0=unlimited patients, all 4 modules). Sidebar filter is in MainLayout.js using user.plan_modules. Demo company is on Free plan and at branch limit (1/1) - good for testing limit warnings. Altavista (analuhs@gmail.com) is on Enterprise plan. Limit enforcement happens in /api/patients POST and /api/branches POST returning 403 with detail message in Spanish.",
+  "rca_of_minor_issue": "DashboardPage.js does not import or render plan_warning data. To fix, read user from AuthContext (already populated with plan_name, *_warning, *_limit_reached, *_count, max_*) and render a yellow/red warning card when patients_warning || branches_warning is true."
+}

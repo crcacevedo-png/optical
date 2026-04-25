@@ -11,7 +11,8 @@ import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   Plus, Building2, MapPin, Phone, Mail, Users, GitBranch,
-  Shield, UserCheck, UserX, Eye, EyeOff, ChevronRight, Store, UserCog, Upload, Image, Trash2
+  Shield, UserCheck, UserX, Eye, EyeOff, ChevronRight, Store, UserCog, Upload, Image, Trash2,
+  AlertTriangle, CreditCard
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -25,6 +26,7 @@ export default function AdminOpticasPage() {
   const [showCreateBranch, setShowCreateBranch] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [detailTab, setDetailTab] = useState('info');
+  const [plans, setPlans] = useState([]);
 
   const [companyForm, setCompanyForm] = useState({
     name: '', legal_name: '', tax_id: '', address: '', phone: '', email: '',
@@ -101,8 +103,12 @@ export default function AdminOpticasPage() {
   const loadCompanies = useCallback(async () => {
     try {
       setLoading(true);
-      const { data } = await api.get('/api/companies');
-      setCompanies(data || []);
+      const [compRes, planRes] = await Promise.all([
+        api.get('/api/companies'),
+        api.get('/api/plans')
+      ]);
+      setCompanies(compRes.data || []);
+      setPlans(planRes.data || []);
     } catch (err) {
       toast.error(formatApiErrorDetail(err?.response?.data?.detail));
     } finally {
@@ -203,6 +209,20 @@ export default function AdminOpticasPage() {
     return <Badge className={cfg[role] || cfg.user}>{lbl[role] || role}</Badge>;
   };
 
+  const handlePlanChange = async (companyId, planId) => {
+    try {
+      await api.put(`/api/plans/assign/${companyId}?plan_id=${planId}`);
+      toast.success('Plan actualizado');
+      loadCompanies();
+      if (selectedCompany?._id === companyId) {
+        const plan = plans.find(p => p._id === planId);
+        setSelectedCompany(prev => ({ ...prev, plan_id: planId, plan_name: plan?.name }));
+      }
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err?.response?.data?.detail));
+    }
+  };
+
   return (
     <div className="space-y-6" data-testid="admin-opticas-page">
       {/* Header */}
@@ -260,12 +280,20 @@ export default function AdminOpticasPage() {
                     <span className="flex items-center gap-1"><GitBranch className="w-3 h-3" /> {c.branches_count || 0} sucursales</span>
                     <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {c.users_count || 0} usuarios</span>
                   </div>
-                  <div className="mt-2">
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${
                       c.is_active !== false ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                     }`}>
                       {c.is_active !== false ? 'Activa' : 'Inactiva'}
                     </span>
+                    <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700">
+                      <CreditCard className="w-2.5 h-2.5 mr-1" /> {c.plan_name || 'Sin plan'}
+                    </span>
+                    {(c.patients_warning || c.branches_warning) && (
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">
+                        <AlertTriangle className="w-2.5 h-2.5 mr-1" /> Cerca del limite
+                      </span>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -321,8 +349,36 @@ export default function AdminOpticasPage() {
                       <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-slate-400" /> {selectedCompany.phone || '-'}</div>
                       <div className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-slate-400" /> {selectedCompany.email || '-'}</div>
                       <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-slate-400" /> {selectedCompany.address || '-'}</div>
-                      <div><span className="text-slate-400">Pacientes:</span> <span className="font-medium ml-2">{selectedCompany.patients_count || 0}</span></div>
+                      <div><span className="text-slate-400">Pacientes:</span> <span className="font-medium ml-2">{selectedCompany.patients_count || 0}{selectedCompany.max_patients > 0 ? ` / ${selectedCompany.max_patients}` : ''}</span></div>
                       <div><span className="text-slate-400">Creada:</span> <span className="font-medium ml-2">{selectedCompany.created_at?.slice(0, 10)}</span></div>
+                    </div>
+                    {/* Plan Selector */}
+                    <div className="mt-4 pt-3 border-t">
+                      <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Plan de Suscripcion</p>
+                      <div className="flex items-center gap-3">
+                        <Select value={selectedCompany.plan_id || ''} onValueChange={(v) => handlePlanChange(selectedCompany._id, v)}>
+                          <SelectTrigger className="w-48" data-testid="company-plan-select">
+                            <SelectValue placeholder="Seleccionar plan" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {plans.map(p => (
+                              <SelectItem key={p._id} value={p._id} data-testid={`plan-option-${p._id}`}>
+                                {p.name} - Q{p.price}/mes
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {selectedCompany.patients_warning && (
+                          <Badge className="bg-amber-100 text-amber-800 text-xs">
+                            <AlertTriangle className="w-3 h-3 mr-1" /> {selectedCompany.patients_count}/{selectedCompany.max_patients} pacientes
+                          </Badge>
+                        )}
+                        {selectedCompany.branches_warning && (
+                          <Badge className="bg-amber-100 text-amber-800 text-xs">
+                            <AlertTriangle className="w-3 h-3 mr-1" /> {selectedCompany.branches_count}/{selectedCompany.max_branches} sucursales
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     {(selectedCompany.contact_name || selectedCompany.contact_phone || selectedCompany.contact_email) && (
                       <div className="mt-4 pt-3 border-t">

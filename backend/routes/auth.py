@@ -71,10 +71,31 @@ async def login(data: UserLogin, response: Response, request: Request):
     response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="none", max_age=86400, path="/")
     response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="none", max_age=604800, path="/")
     
-    return {
+    result = {
         "_id": user_id, "email": user["email"], "name": user["name"], "role": user["role"],
         "company_id": company_id, "branch_id": str(user["branch_id"]) if user.get("branch_id") else None
     }
+    # Attach plan info
+    if company_id and user["role"] != "superadmin":
+        company = await db.companies.find_one({"_id": ObjectId(company_id)}, {"plan_id": 1})
+        if company and company.get("plan_id"):
+            plan = await db.plans.find_one({"_id": company["plan_id"]})
+            if plan:
+                result["plan_name"] = plan["name"]
+                result["plan_modules"] = plan.get("modules", [])
+                result["max_patients"] = plan.get("max_patients", 0)
+                result["max_branches"] = plan.get("max_branches", 0)
+                patients_count = await db.patients.count_documents({"company_id": ObjectId(company_id), "is_deleted": {"$ne": True}})
+                branches_count = await db.branches.count_documents({"company_id": ObjectId(company_id)})
+                result["patients_count"] = patients_count
+                result["branches_count"] = branches_count
+                max_p = plan.get("max_patients", 0)
+                max_b = plan.get("max_branches", 0)
+                result["patients_warning"] = max_p > 0 and patients_count >= max_p * 0.8
+                result["branches_warning"] = max_b > 0 and branches_count >= max_b * 0.8
+                result["patients_limit_reached"] = max_p > 0 and patients_count >= max_p
+                result["branches_limit_reached"] = max_b > 0 and branches_count >= max_b
+    return result
 
 async def increment_login_attempts(identifier: str):
     attempt = await db.login_attempts.find_one({"identifier": identifier})
@@ -95,6 +116,26 @@ async def logout(response: Response):
 
 @router.get("/me")
 async def get_me(user: dict = Depends(get_current_user)):
+    # Attach plan info for non-superadmin users
+    if user.get("company_id") and user["role"] != "superadmin":
+        company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"plan_id": 1})
+        if company and company.get("plan_id"):
+            plan = await db.plans.find_one({"_id": company["plan_id"]})
+            if plan:
+                user["plan_name"] = plan["name"]
+                user["plan_modules"] = plan.get("modules", [])
+                user["max_patients"] = plan.get("max_patients", 0)
+                user["max_branches"] = plan.get("max_branches", 0)
+                patients_count = await db.patients.count_documents({"company_id": ObjectId(user["company_id"]), "is_deleted": {"$ne": True}})
+                branches_count = await db.branches.count_documents({"company_id": ObjectId(user["company_id"])})
+                user["patients_count"] = patients_count
+                user["branches_count"] = branches_count
+                max_p = plan.get("max_patients", 0)
+                max_b = plan.get("max_branches", 0)
+                user["patients_warning"] = max_p > 0 and patients_count >= max_p * 0.8
+                user["branches_warning"] = max_b > 0 and branches_count >= max_b * 0.8
+                user["patients_limit_reached"] = max_p > 0 and patients_count >= max_p
+                user["branches_limit_reached"] = max_b > 0 and branches_count >= max_b
     return user
 
 @router.post("/refresh")

@@ -43,6 +43,15 @@ async def create_patient(data: PatientCreate, user: dict = Depends(get_current_u
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="SuperAdmin no puede crear pacientes")
     
+    # Check plan patient limit
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
+    if company and company.get("plan_id"):
+        plan = await db.plans.find_one({"_id": company["plan_id"]})
+        if plan and plan.get("max_patients", 0) > 0:
+            current_count = await db.patients.count_documents({"company_id": ObjectId(user["company_id"]), "is_deleted": {"$ne": True}})
+            if current_count >= plan["max_patients"]:
+                raise HTTPException(status_code=403, detail=f"Limite de pacientes alcanzado ({plan['max_patients']}). Actualice su plan para agregar mas.")
+    
     patient_doc = {
         "company_id": ObjectId(user["company_id"]),
         "branch_id": ObjectId(data.branch_id) if data.branch_id else (ObjectId(user["branch_id"]) if user.get("branch_id") else None),

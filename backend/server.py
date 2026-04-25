@@ -12,7 +12,7 @@ from auth_utils import get_current_user, hash_password
 from routes import (
     auth, companies, settings, branches, patients, appointments,
     prescriptions, inventory, sales, quotations, consultations,
-    finance, reports, users, suppliers
+    finance, reports, users, suppliers, plans
 )
 
 app = FastAPI(title="Cortexia Optical API")
@@ -35,6 +35,7 @@ api_router.include_router(reports.router)
 api_router.include_router(users.router)
 api_router.include_router(suppliers.router)
 api_router.include_router(settings.router)
+api_router.include_router(plans.router)
 
 # Global search
 @api_router.get("/search")
@@ -200,6 +201,48 @@ async def startup():
             "created_at": datetime.now(timezone.utc).isoformat()
         })
         logger.info("Demo data seeded successfully")
+
+    # Seed default plans
+    existing_plans = await db.plans.count_documents({})
+    if existing_plans == 0:
+        default_plans = [
+            {
+                "name": "Free",
+                "price": 0,
+                "max_branches": 1,
+                "max_patients": 50,
+                "modules": [],
+                "is_active": True,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            },
+            {
+                "name": "Basic",
+                "price": 299,
+                "max_branches": 3,
+                "max_patients": 500,
+                "modules": ["inventario", "ventas"],
+                "is_active": True,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            },
+            {
+                "name": "Enterprise",
+                "price": 799,
+                "max_branches": 0,
+                "max_patients": 0,
+                "modules": ["inventario", "ventas", "proveedores", "finanzas"],
+                "is_active": True,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+        ]
+        await db.plans.insert_many(default_plans)
+        # Assign Free plan to all existing companies without a plan
+        free_plan = await db.plans.find_one({"name": "Free"})
+        if free_plan:
+            await db.companies.update_many(
+                {"plan_id": {"$exists": False}},
+                {"$set": {"plan_id": free_plan["_id"]}}
+            )
+        logger.info("Default plans seeded")
 
 @app.on_event("shutdown")
 async def shutdown():

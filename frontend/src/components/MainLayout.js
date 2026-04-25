@@ -7,7 +7,7 @@ import { ScrollArea } from '../components/ui/scroll-area';
 import { 
   LayoutDashboard, Users, Calendar, FileText, Package, 
   ShoppingCart, DollarSign, Building2, UserCog, BarChart3,
-  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck
+  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -32,8 +32,12 @@ export default function MainLayout() {
 
   const isAdmin = user?.role === 'admin';
 
+  const planModules = user?.plan_modules || [];
+  const hasModule = (mod) => planModules.includes(mod);
+
   const navItems = isSuperAdmin ? [
     { path: '/admin/opticas', icon: Store, label: 'Opticas' },
+    { path: '/admin/planes', icon: CreditCard, label: 'Planes' },
     { path: '/users', icon: UserCog, label: 'Usuarios' },
     { path: '/settings', icon: Settings, label: 'Configuracion' },
   ] : [
@@ -43,10 +47,10 @@ export default function MainLayout() {
     { path: '/agenda', icon: Calendar, label: 'Agenda' },
     { path: '/prescriptions', icon: FileText, label: 'Recetas' },
     { path: '/quotations', icon: ClipboardList, label: 'Cotizaciones' },
-    { path: '/inventory', icon: Package, label: 'Inventario' },
-    { path: '/sales', icon: ShoppingCart, label: 'Ventas' },
-    { path: '/suppliers', icon: Truck, label: 'Proveedores' },
-    { path: '/finance', icon: DollarSign, label: 'Finanzas' },
+    ...(hasModule('inventario') ? [{ path: '/inventory', icon: Package, label: 'Inventario' }] : []),
+    ...(hasModule('ventas') ? [{ path: '/sales', icon: ShoppingCart, label: 'Ventas' }] : []),
+    ...(hasModule('proveedores') ? [{ path: '/suppliers', icon: Truck, label: 'Proveedores' }] : []),
+    ...(hasModule('finanzas') ? [{ path: '/finance', icon: DollarSign, label: 'Finanzas' }] : []),
     ...(isAdmin ? [
       { path: '/branches', icon: Building2, label: 'Sucursales' },
       { path: '/users', icon: UserCog, label: 'Usuarios' },

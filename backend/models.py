@@ -342,6 +342,22 @@ class SupplierUpdate(BaseModel):
     categories: Optional[List[str]] = None
     notes: Optional[str] = None
 
+class PlanCreate(BaseModel):
+    name: str
+    price: float = 0
+    max_branches: int = 1
+    max_patients: int = 50
+    modules: List[str] = []
+    is_active: bool = True
+
+class PlanUpdate(BaseModel):
+    name: Optional[str] = None
+    price: Optional[float] = None
+    max_branches: Optional[int] = None
+    max_patients: Optional[int] = None
+    modules: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str

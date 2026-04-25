@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../context/AuthContext';
+import { api, useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { 
   Users, Calendar, TrendingUp, TrendingDown, 
-  AlertTriangle, Clock, DollarSign, ShoppingBag
+  AlertTriangle, Clock, DollarSign, ShoppingBag, CreditCard
 } from 'lucide-react';
 import { BranchFilter } from '../components/BranchFilter';
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [alertDetails, setAlertDetails] = useState([]);
   const [loading, setLoading] = useState(true);

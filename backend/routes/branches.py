@@ -44,6 +44,15 @@ async def create_branch(data: BranchCreate, user: dict = Depends(get_current_use
             raise HTTPException(status_code=400, detail="No tiene empresa asignada")
         target_company_id = ObjectId(user["company_id"])
     
+    # Check plan branch limit
+    company = await db.companies.find_one({"_id": target_company_id})
+    if company and company.get("plan_id"):
+        plan = await db.plans.find_one({"_id": company["plan_id"]})
+        if plan and plan.get("max_branches", 0) > 0:
+            current_count = await db.branches.count_documents({"company_id": target_company_id})
+            if current_count >= plan["max_branches"]:
+                raise HTTPException(status_code=403, detail=f"Limite de sucursales alcanzado ({plan['max_branches']}). Actualice su plan para agregar mas.")
+    
     branch_doc = {
         "company_id": target_company_id, "name": data.name, "address": data.address,
         "phone": data.phone, "email": data.email.lower() if data.email else None,

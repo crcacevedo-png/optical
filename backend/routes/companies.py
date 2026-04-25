@@ -14,12 +14,27 @@ async def list_companies(user: dict = Depends(get_current_user)):
     if user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
     companies = await db.companies.find({}).to_list(1000)
+    # Batch load plans
+    plan_ids = list({c["plan_id"] for c in companies if c.get("plan_id")})
+    plan_map = {}
+    if plan_ids:
+        plans = await db.plans.find({"_id": {"$in": plan_ids}}).to_list(len(plan_ids))
+        plan_map = {str(p["_id"]): p for p in plans}
     for c in companies:
         serialize_doc(c)
         cid = ObjectId(c["_id"])
         c["branches_count"] = await db.branches.count_documents({"company_id": cid})
         c["users_count"] = await db.users.count_documents({"company_id": cid})
-        c["patients_count"] = await db.patients.count_documents({"company_id": cid})
+        c["patients_count"] = await db.patients.count_documents({"company_id": cid, "is_deleted": {"$ne": True}})
+        plan = plan_map.get(c.get("plan_id"))
+        if plan:
+            c["plan_name"] = plan["name"]
+            c["max_patients"] = plan.get("max_patients", 0)
+            c["max_branches"] = plan.get("max_branches", 0)
+            c["patients_warning"] = plan.get("max_patients", 0) > 0 and c["patients_count"] >= plan["max_patients"] * 0.8
+            c["branches_warning"] = plan.get("max_branches", 0) > 0 and c["branches_count"] >= plan["max_branches"] * 0.8
+        else:
+            c["plan_name"] = "Sin plan"
     return companies
 
 @router.post("")

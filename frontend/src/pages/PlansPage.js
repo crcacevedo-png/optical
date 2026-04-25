@@ -1,0 +1,278 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { api, formatApiErrorDetail } from '../context/AuthContext';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Badge } from '../components/ui/badge';
+import { Switch } from '../components/ui/switch';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
+} from '../components/ui/dialog';
+import { toast } from 'sonner';
+import {
+  Plus, CreditCard, Edit, Trash2, Package, ShoppingCart, Truck, DollarSign,
+  Users, Building2, Crown, Infinity
+} from 'lucide-react';
+
+const ALL_MODULES = [
+  { key: 'inventario', label: 'Inventario', icon: Package },
+  { key: 'ventas', label: 'Ventas', icon: ShoppingCart },
+  { key: 'proveedores', label: 'Proveedores', icon: Truck },
+  { key: 'finanzas', label: 'Finanzas', icon: DollarSign },
+];
+
+const emptyForm = {
+  name: '', price: 0, max_branches: 1, max_patients: 50, modules: []
+};
+
+const PLAN_COLORS = {
+  'Free': 'from-slate-500 to-slate-600',
+  'Basic': 'from-blue-500 to-blue-600',
+  'Enterprise': 'from-amber-500 to-amber-600',
+};
+
+export default function PlansPage() {
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [planToDelete, setPlanToDelete] = useState(null);
+
+  const fetchPlans = useCallback(async () => {
+    try {
+      const res = await api.get('/api/plans');
+      setPlans(res.data);
+    } catch (err) {
+      toast.error('Error al cargar planes');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchPlans(); }, [fetchPlans]);
+
+  const openNew = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (plan) => {
+    setEditing(plan);
+    setForm({
+      name: plan.name, price: plan.price,
+      max_branches: plan.max_branches, max_patients: plan.max_patients,
+      modules: plan.modules || []
+    });
+    setDialogOpen(true);
+  };
+
+  const toggleModule = (mod) => {
+    setForm(prev => ({
+      ...prev,
+      modules: prev.modules.includes(mod)
+        ? prev.modules.filter(m => m !== mod)
+        : [...prev.modules, mod]
+    }));
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { toast.error('Nombre requerido'); return; }
+    setSaving(true);
+    try {
+      if (editing) {
+        await api.put(`/api/plans/${editing._id}`, form);
+        toast.success('Plan actualizado');
+      } else {
+        await api.post('/api/plans', form);
+        toast.success('Plan creado');
+      }
+      setDialogOpen(false);
+      fetchPlans();
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!planToDelete) return;
+    try {
+      await api.delete(`/api/plans/${planToDelete._id}`);
+      toast.success('Plan eliminado');
+      setDeleteDialogOpen(false);
+      setPlanToDelete(null);
+      fetchPlans();
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail));
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pine-900"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6" data-testid="plans-page">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-2xl sm:text-3xl font-semibold text-slate-900">Planes</h1>
+          <p className="text-slate-500 mt-1">Administra los planes de suscripcion para opticas</p>
+        </div>
+        <Button onClick={openNew} className="bg-pine-900 hover:bg-pine-800" data-testid="new-plan-btn">
+          <Plus className="w-4 h-4 mr-2" /> Nuevo Plan
+        </Button>
+      </div>
+
+      {/* Plan Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {plans.map(plan => {
+          const gradient = PLAN_COLORS[plan.name] || 'from-pine-500 to-pine-600';
+          return (
+            <Card key={plan._id} className="overflow-hidden border-slate-200/80 hover:shadow-lg transition-shadow" data-testid={`plan-card-${plan._id}`}>
+              <div className={`bg-gradient-to-r ${gradient} p-5 text-white`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Crown className="w-5 h-5" />
+                    <h3 className="font-heading text-lg font-bold">{plan.name}</h3>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
+                      onClick={() => openEdit(plan)} data-testid={`edit-plan-${plan._id}`}>
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
+                      onClick={() => { setPlanToDelete(plan); setDeleteDialogOpen(true); }} data-testid={`delete-plan-${plan._id}`}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <span className="text-3xl font-bold">Q{plan.price}</span>
+                  <span className="text-white/70 text-sm">/mes</span>
+                </div>
+              </div>
+              <CardContent className="p-5 space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2 text-slate-600"><Building2 className="w-4 h-4" /> Sucursales</span>
+                    <span className="font-semibold">{plan.max_branches === 0 ? 'Ilimitadas' : plan.max_branches}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2 text-slate-600"><Users className="w-4 h-4" /> Pacientes</span>
+                    <span className="font-semibold">{plan.max_patients === 0 ? 'Ilimitados' : plan.max_patients}</span>
+                  </div>
+                </div>
+                <div className="border-t pt-3">
+                  <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Modulos incluidos</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['Dashboard', 'Pacientes', 'Consultas', 'Agenda', 'Recetas', 'Cotizaciones'].map(m => (
+                      <Badge key={m} variant="secondary" className="text-xs bg-green-50 text-green-700 border-green-200">{m}</Badge>
+                    ))}
+                    {ALL_MODULES.map(mod => {
+                      const included = (plan.modules || []).includes(mod.key);
+                      return (
+                        <Badge key={mod.key} variant={included ? "secondary" : "outline"}
+                          className={`text-xs ${included ? 'bg-blue-50 text-blue-700 border-blue-200' : 'text-slate-400 border-slate-200'}`}>
+                          {mod.label}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Create/Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-heading">{editing ? 'Editar Plan' : 'Nuevo Plan'}</DialogTitle>
+            <DialogDescription>{editing ? 'Modifica los parametros del plan' : 'Crea un nuevo plan de suscripcion'}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Nombre del Plan *</Label>
+              <Input value={form.name} onChange={(e) => setForm({...form, name: e.target.value})}
+                placeholder="Ej: Pro" data-testid="plan-name-input" />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label>Precio (Q/mes)</Label>
+                <Input type="number" min="0" step="1" value={form.price}
+                  onChange={(e) => setForm({...form, price: parseFloat(e.target.value) || 0})}
+                  data-testid="plan-price-input" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Max Sucursales</Label>
+                <Input type="number" min="0" value={form.max_branches}
+                  onChange={(e) => setForm({...form, max_branches: parseInt(e.target.value) || 0})}
+                  data-testid="plan-branches-input" />
+                <p className="text-[10px] text-slate-400">0 = ilimitado</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Max Pacientes</Label>
+                <Input type="number" min="0" value={form.max_patients}
+                  onChange={(e) => setForm({...form, max_patients: parseInt(e.target.value) || 0})}
+                  data-testid="plan-patients-input" />
+                <p className="text-[10px] text-slate-400">0 = ilimitado</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Modulos opcionales incluidos</Label>
+              <div className="space-y-2">
+                {ALL_MODULES.map(mod => (
+                  <div key={mod.key} className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <mod.icon className="w-4 h-4 text-slate-500" />
+                      <span className="text-sm font-medium">{mod.label}</span>
+                    </div>
+                    <Switch
+                      checked={form.modules.includes(mod.key)}
+                      onCheckedChange={() => toggleModule(mod.key)}
+                      data-testid={`plan-module-${mod.key}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving} className="bg-pine-900 hover:bg-pine-800" data-testid="plan-save-btn">
+              {saving ? 'Guardando...' : editing ? 'Actualizar' : 'Crear Plan'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Eliminar Plan</DialogTitle>
+            <DialogDescription>
+              Eliminar el plan <strong>{planToDelete?.name}</strong>? No se puede eliminar si hay empresas asignadas.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDelete} data-testid="plan-delete-confirm-btn">Eliminar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
