@@ -36,6 +36,7 @@ export default function MainLayout() {
   const hasModule = (mod) => planModules.includes(mod);
 
   const navItems = isSuperAdmin ? [
+    { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/admin/opticas', icon: Store, label: 'Opticas' },
     { path: '/admin/planes', icon: CreditCard, label: 'Planes' },
     { path: '/users', icon: UserCog, label: 'Usuarios' },

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api, useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { 
   Users, Calendar, TrendingUp, TrendingDown, 
@@ -9,14 +10,19 @@ import { BranchFilter } from '../components/BranchFilter';
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [alertDetails, setAlertDetails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [branchId, setBranchId] = useState('');
 
   useEffect(() => {
+    if (user?.role === 'superadmin') {
+      navigate('/admin/dashboard', { replace: true });
+      return;
+    }
     fetchDashboard();
-  }, [branchId]);
+  }, [branchId, user, navigate]);
 
   const fetchDashboard = async () => {
     try {

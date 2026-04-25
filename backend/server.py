@@ -12,7 +12,7 @@ from auth_utils import get_current_user, hash_password
 from routes import (
     auth, companies, settings, branches, patients, appointments,
     prescriptions, inventory, sales, quotations, consultations,
-    finance, reports, users, suppliers, plans
+    finance, reports, users, suppliers, plans, superadmin
 )
 
 app = FastAPI(title="Cortexia Optical API")
@@ -36,6 +36,7 @@ api_router.include_router(users.router)
 api_router.include_router(suppliers.router)
 api_router.include_router(settings.router)
 api_router.include_router(plans.router)
+api_router.include_router(superadmin.router)
 
 # Global search
 @api_router.get("/search")
