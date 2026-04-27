@@ -120,9 +120,25 @@ async def create_inventory_movement(data: InventoryMovement, user: dict = Depend
     if not product or str(product["company_id"]) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     
+    # Resolve branch_id: use provided, then user's, then first branch of company
+    resolved_branch_id = None
+    if data.branch_id:
+        try:
+            resolved_branch_id = ObjectId(data.branch_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="branch_id invalido")
+    elif user.get("branch_id"):
+        resolved_branch_id = ObjectId(user["branch_id"])
+    else:
+        first_branch = await db.branches.find_one({"company_id": ObjectId(user["company_id"])})
+        if first_branch:
+            resolved_branch_id = first_branch["_id"]
+        else:
+            raise HTTPException(status_code=400, detail="No hay sucursales configuradas. Cree una sucursal primero.")
+    
     stock = await db.stock.find_one({
         "company_id": ObjectId(user["company_id"]),
-        "branch_id": ObjectId(data.branch_id),
+        "branch_id": resolved_branch_id,
         "product_id": ObjectId(data.product_id)
     })
     
@@ -141,7 +157,7 @@ async def create_inventory_movement(data: InventoryMovement, user: dict = Depend
             raise HTTPException(status_code=400, detail="Stock insuficiente")
         await db.stock.insert_one({
             "company_id": ObjectId(user["company_id"]),
-            "branch_id": ObjectId(data.branch_id),
+            "branch_id": resolved_branch_id,
             "product_id": ObjectId(data.product_id),
             "quantity": quantity_change,
             "created_at": datetime.now(timezone.utc).isoformat()
@@ -149,7 +165,7 @@ async def create_inventory_movement(data: InventoryMovement, user: dict = Depend
     
     movement_doc = {
         "company_id": ObjectId(user["company_id"]),
-        "branch_id": ObjectId(data.branch_id),
+        "branch_id": resolved_branch_id,
         "product_id": ObjectId(data.product_id),
         "type": data.type,
         "quantity": data.quantity,

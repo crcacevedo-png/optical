@@ -195,7 +195,7 @@ class ProductUpdate(BaseModel):
 
 class InventoryMovement(BaseModel):
     product_id: str
-    branch_id: str
+    branch_id: Optional[str] = None
     type: str
     quantity: int
     notes: Optional[str] = None
