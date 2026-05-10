@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../components/ui/badge';
 import { 
   Plus, Search, Package, AlertTriangle, ArrowUpCircle, 
-  ArrowDownCircle, Glasses, Droplets, Box
+  ArrowDownCircle, Glasses, Droplets, Box, Edit, Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BranchFilter } from '../components/BranchFilter';
@@ -29,6 +29,8 @@ export default function InventoryPage() {
   const [showAddStockDialog, setShowAddStockDialog] = useState(false);
   const [addStockForm, setAddStockForm] = useState({ quantity: '', notes: '' });
   const [addStockProduct, setAddStockProduct] = useState(null);
+  const [editingMinStock, setEditingMinStock] = useState(null);
+  const [minStockValue, setMinStockValue] = useState('');
 
   const [productForm, setProductForm] = useState({
     name: '', sku: '', category: '', brand: '', description: '',
@@ -131,6 +133,22 @@ export default function InventoryPage() {
 
   const formatCurrency = (amount) => {
     return `Q ${(amount || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`;
+  };
+
+  const handleSaveMinStock = async (productId) => {
+    const val = parseInt(minStockValue);
+    if (isNaN(val) || val < 1) {
+      toast.error('El stock minimo debe ser mayor o igual a 1');
+      return;
+    }
+    try {
+      await api.put(`/api/inventory/products/${productId}`, { min_stock: val });
+      toast.success('Stock minimo actualizado');
+      setEditingMinStock(null);
+      fetchData();
+    } catch (error) {
+      toast.error('Error al actualizar');
+    }
   };
 
   const filteredProducts = products.filter(p => {
@@ -331,6 +349,7 @@ export default function InventoryPage() {
                     <Label>Stock Min</Label>
                     <Input
                       type="number"
+                      min="1"
                       value={productForm.min_stock}
                       onChange={(e) => setProductForm({...productForm, min_stock: e.target.value})}
                       data-testid="product-min-stock"
@@ -416,6 +435,7 @@ export default function InventoryPage() {
                 <TableHead>Costo</TableHead>
                 <TableHead>Precio</TableHead>
                 <TableHead className="text-center">Stock</TableHead>
+                <TableHead className="text-center">Min</TableHead>
                 <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -447,6 +467,34 @@ export default function InventoryPage() {
                       </span>
                     </TableCell>
                     <TableCell className="text-center">
+                      {editingMinStock === product._id ? (
+                        <div className="flex items-center gap-1 justify-center">
+                          <Input
+                            type="number"
+                            min="1"
+                            className="w-16 h-7 text-center text-xs px-1"
+                            value={minStockValue}
+                            onChange={(e) => setMinStockValue(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveMinStock(product._id); if (e.key === 'Escape') setEditingMinStock(null); }}
+                            autoFocus
+                            data-testid={`min-stock-input-${product._id}`}
+                          />
+                          <button onClick={() => handleSaveMinStock(product._id)} className="p-0.5 rounded hover:bg-green-100 text-green-600" data-testid={`min-stock-save-${product._id}`}>
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-slate-600 hover:bg-slate-100 transition-colors"
+                          onClick={() => { setEditingMinStock(product._id); setMinStockValue(String(product.min_stock || 5)); }}
+                          data-testid={`min-stock-edit-${product._id}`}
+                        >
+                          {product.min_stock || 5}
+                          <Edit className="w-3 h-3 text-slate-400" />
+                        </button>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
                       <Button size="sm" variant="outline" className="text-pine-700 border-pine-200 hover:bg-pine-50" onClick={() => openAddStock(product)} data-testid={`add-stock-${product._id}`}>
                         <Plus className="w-3.5 h-3.5 mr-1" /> Agregar
                       </Button>
@@ -456,7 +504,7 @@ export default function InventoryPage() {
               })}
               {filteredProducts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={8} className="text-center py-8 text-slate-500">
                     <Package className="w-12 h-12 mx-auto mb-2 opacity-30" />
                     <p>No se encontraron productos</p>
                   </TableCell>
