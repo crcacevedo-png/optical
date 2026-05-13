@@ -5,36 +5,37 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 
 ## Arquitectura
 - Frontend: React 19 + Tailwind CSS + Shadcn UI + Recharts
-- Backend: FastAPI + Motor (MongoDB async) - Modular (20 archivos de rutas)
+- Backend: FastAPI + Motor (MongoDB async) - Modular (21 archivos de rutas)
 - Auth: JWT con cookies httpOnly
 - Moneda: Quetzal (GTQ) | Idioma: Espanol
 
 ## Lo Implementado
 
-### Dashboard SuperAdmin (Abril 2026)
-- 4 KPIs: opticas activas (+nuevas este mes), pacientes totales, usuarios activos, revenue mensual estimado
-- Grafica pie: opticas por plan
-- Grafica barras: crecimiento de pacientes ultimos 6 meses
-- Grafica barras horizontal: revenue estimado por plan
-- Alertas: opticas cerca del limite con porcentajes (pacientes/sucursales)
-- Timeline: cambios de plan recientes
-- Redireccion automatica /dashboard -> /admin/dashboard para superadmin
+### Modulo de Comunicacion (Mayo 2026)
+- CRUD de anuncios para SuperAdmin (titulo, mensaje, tipo, segmentacion)
+- 3 tipos: Informativo (azul), Alerta (amarillo), Promocion (verde)
+- Segmentacion por plan (Free/Basic/Enterprise) y por ciudad
+- Fecha de vigencia (inicio/fin)
+- Toggle activo/inactivo
+- Banners en dashboard de admins con colores segun tipo
+- Boton X para descartar por sesion
+- Filtrado automatico: cada admin solo ve anuncios relevantes a su plan
+
+### Dashboard SuperAdmin
+- 4 KPIs, graficas pie/barras, alertas de limite, timeline cambios
 
 ### Sistema de Planes
-- 3 planes: Free (Q0, 1 suc, 50 pac), Basic (Q299, 3 suc, 500 pac), Enterprise (Q799, ilimitado)
-- Modulos opcionales: inventario, ventas, proveedores, finanzas
-- CRUD planes, asignacion, sidebar filtrado, alertas limite, validacion
-- Historial de cambios de plan con timeline visual
+- 3 planes, modulos opcionales, CRUD, historial de cambios
 
 ### Exportacion Excel
-- Boton "Excel" en Reportes con 3 hojas: Resumen, Ventas, Finanzas
+- 3 hojas: Resumen, Ventas, Finanzas
 
 ### Modulos Funcionales
-- Auth, Login Premium, Panel SuperAdmin, Dashboard con alertas
-- Pacientes, Consultas, Recetas (3 tipos, 3 estilos PDF)
+- Auth, Login Premium, Panel SuperAdmin + Dashboard
+- Pacientes, Consultas Opticas, Recetas (3 tipos, 3 estilos PDF)
 - Busqueda Global (Ctrl+K), Agenda, Cotizaciones
-- Inventario, Ventas, Proveedores, Finanzas (opcionales por plan)
-- Reportes por Sucursal, Configuracion, Gestion de Proveedores
+- Inventario (con min stock editable), Ventas, Proveedores, Finanzas
+- Reportes por Sucursal, Configuracion
 
 ## Backlog
 
