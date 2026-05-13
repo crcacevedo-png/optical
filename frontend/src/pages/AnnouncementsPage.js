@@ -16,7 +16,8 @@ import {
 } from '../components/ui/table';
 import { toast } from 'sonner';
 import {
-  Plus, Megaphone, Edit, Trash2, Info, AlertTriangle, Sparkles, Eye, EyeOff, CalendarDays
+  Plus, Megaphone, Edit, Trash2, Info, AlertTriangle, Sparkles, Eye, EyeOff, CalendarDays,
+  BarChart3, MousePointerClick, X as XIcon
 } from 'lucide-react';
 
 const TYPE_OPTIONS = [
@@ -42,6 +43,9 @@ export default function AnnouncementsPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState(null);
+  const [metricsDialogOpen, setMetricsDialogOpen] = useState(false);
+  const [metricsData, setMetricsData] = useState(null);
+  const [metricsAnn, setMetricsAnn] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -136,6 +140,18 @@ export default function AnnouncementsPage() {
     }
   };
 
+  const openMetrics = async (ann) => {
+    setMetricsAnn(ann);
+    setMetricsData(null);
+    setMetricsDialogOpen(true);
+    try {
+      const res = await api.get(`/api/announcements/${ann._id}/metrics`);
+      setMetricsData(res.data);
+    } catch {
+      toast.error('Error al cargar metricas');
+    }
+  };
+
   const getTypeBadge = (type) => {
     const t = TYPE_OPTIONS.find(o => o.value === type) || TYPE_OPTIONS[0];
     return <Badge className={`${t.color} text-xs`}>{t.label}</Badge>;
@@ -204,6 +220,7 @@ export default function AnnouncementsPage() {
                 <TableHead>Tipo</TableHead>
                 <TableHead className="hidden md:table-cell">Segmento</TableHead>
                 <TableHead className="hidden md:table-cell">Vigencia</TableHead>
+                <TableHead className="text-center hidden sm:table-cell">Metricas</TableHead>
                 <TableHead className="text-center">Activo</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -211,7 +228,7 @@ export default function AnnouncementsPage() {
             <TableBody>
               {announcements.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-slate-500">
+                  <TableCell colSpan={7} className="text-center py-12 text-slate-500">
                     <Megaphone className="w-12 h-12 mx-auto mb-3 opacity-30" />
                     <p className="font-medium">Sin anuncios</p>
                     <p className="text-sm mt-1">Crea tu primer anuncio para las opticas</p>
@@ -243,6 +260,19 @@ export default function AnnouncementsPage() {
                         <CalendarDays className="w-3 h-3" />
                         {ann.start_date} {ann.end_date ? `- ${ann.end_date}` : ''}
                       </div>
+                    </TableCell>
+                    <TableCell className="text-center hidden sm:table-cell">
+                      <button
+                        onClick={() => openMetrics(ann)}
+                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs hover:bg-slate-100 transition-colors"
+                        data-testid={`metrics-btn-${ann._id}`}
+                      >
+                        <Eye className="w-3 h-3 text-blue-500" />
+                        <span className="font-medium text-slate-700">{ann.views_count || 0}</span>
+                        <span className="text-slate-300">|</span>
+                        <MousePointerClick className="w-3 h-3 text-amber-500" />
+                        <span className="font-medium text-slate-700">{ann.dismissals_count || 0}</span>
+                      </button>
                     </TableCell>
                     <TableCell className="text-center">
                       <Switch
@@ -354,6 +384,86 @@ export default function AnnouncementsPage() {
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
             <Button variant="destructive" onClick={handleDelete} data-testid="ann-delete-confirm">Eliminar</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Metrics Dialog */}
+      <Dialog open={metricsDialogOpen} onOpenChange={setMetricsDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-heading flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-pine-700" /> Metricas del Anuncio
+            </DialogTitle>
+            <DialogDescription>{metricsAnn?.title}</DialogDescription>
+          </DialogHeader>
+          {!metricsData ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pine-900"></div>
+            </div>
+          ) : (
+            <div className="space-y-5 py-2">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-3 rounded-lg bg-blue-50 text-center">
+                  <Eye className="w-5 h-5 text-blue-600 mx-auto" />
+                  <p className="text-2xl font-bold text-blue-900 mt-1">{metricsData.views_count}</p>
+                  <p className="text-[10px] text-blue-600 font-medium">Opticas vieron</p>
+                </div>
+                <div className="p-3 rounded-lg bg-amber-50 text-center">
+                  <MousePointerClick className="w-5 h-5 text-amber-600 mx-auto" />
+                  <p className="text-2xl font-bold text-amber-900 mt-1">{metricsData.dismissals_count}</p>
+                  <p className="text-[10px] text-amber-600 font-medium">Descartaron</p>
+                </div>
+                <div className="p-3 rounded-lg bg-slate-50 text-center">
+                  <BarChart3 className="w-5 h-5 text-slate-600 mx-auto" />
+                  <p className="text-2xl font-bold text-slate-900 mt-1">
+                    {metricsData.views_count > 0 ? Math.round((metricsData.dismissals_count / metricsData.views_count) * 100) : 0}%
+                  </p>
+                  <p className="text-[10px] text-slate-600 font-medium">Tasa descarte</p>
+                </div>
+              </div>
+
+              {/* Views Detail */}
+              {metricsData.view_details.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Opticas que vieron ({metricsData.views_count})</p>
+                  <div className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1">
+                    {metricsData.view_details.map((v, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-blue-50/50 border border-blue-100" data-testid={`view-detail-${i}`}>
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">{v.company_name}</p>
+                          <p className="text-[10px] text-slate-500">{v.user_name}</p>
+                        </div>
+                        <span className="text-[10px] text-slate-400">{v.date}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Dismissals Detail */}
+              {metricsData.dismiss_details.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Opticas que descartaron ({metricsData.dismissals_count})</p>
+                  <div className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1">
+                    {metricsData.dismiss_details.map((d, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-amber-50/50 border border-amber-100" data-testid={`dismiss-detail-${i}`}>
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">{d.company_name}</p>
+                          <p className="text-[10px] text-slate-500">{d.user_name}</p>
+                        </div>
+                        <span className="text-[10px] text-slate-400">{d.date}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {metricsData.views_count === 0 && metricsData.dismissals_count === 0 && (
+                <p className="text-sm text-slate-400 text-center py-4">Sin metricas aun. Las opticas aun no han visto este anuncio.</p>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

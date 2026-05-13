@@ -1,0 +1,76 @@
+{
+  "summary": "Iteration 17: End-to-end testing of the new Announcement Metrics feature (track + metrics endpoints). Backend pytest: 15/15 PASS covering view/dismiss tracking, per-company deduplication, schema validation, SuperAdmin-only authorization on /metrics, invalid action/id error handling, and that GET /api/announcements now includes views_count and dismissals_count per announcement. Frontend Playwright: Enterprise admin dashboard automatically fires POST /track?action=view for each banner on load (deduplicated server-side, confirmed). Dismiss X button fires POST /track?action=dismiss before hiding banner (2 banners -> 1). SuperAdmin /admin/comunicacion table shows a 'Metricas' column with eye-icon + view count | click-icon + dismiss count per row (observed: 1|0, 1|1, 2|0 matching expected seed state). Clicking a metrics button opens a dialog with title 'Metricas del Anuncio', 3 KPI cards (Opticas vieron / Descartaron / Tasa descarte %), and a per-company detail list showing company_name, user_name and date. Verified Mantenimiento dialog lists Altavista Opticas + Cortexia Optical Demo as the 2 viewing companies, exactly matching backend metrics.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/announcements/{id}/track", "issue": "Returns {'message':'ok'} (HTTP 200) silently when the authenticated user has no company_id (e.g., orphan account). Acceptable for a non-critical telemetry endpoint, but a 204 No Content or explicit reason would be more honest."},
+      {"endpoint": "GET /api/announcements", "issue": "Performs 2 count_documents per announcement in a loop (N+1). For 200 announcements this is 400 round-trips. Consider a single aggregation pipeline with $lookup or $group on announcement_metrics."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Dashboard auto-track view", "issue": "Dashboard fires duplicate POST /track?action=view per banner on load (observed 4 calls for 2 banners). Backend dedup masks the impact, but it doubles network noise and metrics-collection load. Likely caused by React 18 StrictMode double-invoking useEffect or a missing dependency guard.", "affected_selectors": ["DashboardPage useEffect"]}
+    ],
+    "design_issues": []
+  },
+  "passed_tests": {
+    "backend": [
+      "TestTrack::test_track_view_records_metric",
+      "TestTrack::test_track_dismiss_records_metric",
+      "TestTrack::test_track_view_deduplicates_same_company (3 calls -> 1 metric)",
+      "TestTrack::test_track_two_companies_two_views (Enterprise+Free -> 2 distinct view rows)",
+      "TestTrack::test_track_view_and_dismiss_independent",
+      "TestTrack::test_track_invalid_action_returns_400 ('clicked')",
+      "TestTrack::test_track_invalid_announcement_id_returns_400",
+      "TestTrack::test_track_unauthenticated (401/403)",
+      "TestMetrics::test_metrics_superadmin_zero_counts_new_announcement",
+      "TestMetrics::test_metrics_schema (views_count/dismissals_count/view_details/dismiss_details with company_name,user_name,date)",
+      "TestMetrics::test_metrics_forbidden_for_admin (403 for Enterprise admin)",
+      "TestMetrics::test_metrics_invalid_id_returns_400",
+      "TestMetrics::test_metrics_unauthenticated (401/403)",
+      "TestListIncludesCounts::test_list_has_counts_fields (every announcement has int views_count + dismissals_count)",
+      "TestListIncludesCounts::test_list_counts_reflect_tracked_metrics (2 views + 1 dismiss surfaced in list)"
+    ],
+    "frontend": [
+      "Enterprise admin /dashboard fires POST /api/announcements/{id}/track?action=view automatically per visible banner",
+      "Enterprise admin clicking X on a banner fires POST /track?action=dismiss and removes banner from view (2 -> 1)",
+      "SuperAdmin /admin/comunicacion table renders Metricas column with eye icon + view count, pipe, click icon + dismiss count (data-testid metrics-btn-{id})",
+      "Clicking metrics-btn opens dialog with title 'Metricas del Anuncio' and subtitle = announcement title",
+      "Dialog shows 3 KPI cards: 'Opticas vieron' (blue), 'Descartaron' (amber), 'Tasa descarte %' (slate)",
+      "Tasa descarte computed as round(dismissals/views*100) and renders 0% when views_count is 0 (no division by zero)",
+      "Detail rows render with company_name, user_name, date (data-testid view-detail-{i} / dismiss-detail-{i})",
+      "Mantenimiento dialog correctly lists Altavista Opticas + Cortexia Optical Demo (matches backend seed state)"
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_announcement_metrics.py",
+    "/app/test_reports/pytest/announcement_metrics_results.xml"
+  ],
+  "action_items": [
+    "Optional: Guard DashboardPage useEffect against double-firing track?action=view (e.g., useRef sentinel) - currently dedup-saved by backend but doubles request volume",
+    "Optional perf: Replace N+1 count_documents loop in GET /api/announcements with a single $group aggregation on announcement_metrics"
+  ],
+  "critical_code_review_comments": [
+    "/app/backend/routes/announcements.py L16-20: For every announcement in the list, 2 count_documents queries are issued. With many announcements this is an N+1 pattern. Recommend: collect all _ids, run a single aggregate({$match: {_id: {$in: ids}}}, {$group: {_id: {announcement_id, action}, count: {$sum:1}}}), and zip the results.",
+    "/app/backend/routes/announcements.py L67-96: Track endpoint reads action from query string (not body). This is fine but inconsistent with the rest of the REST surface. Also, no rate limiting - a malicious admin could spam track on every announcement; dedup prevents row explosion but still N writes per request batch.",
+    "/app/backend/routes/announcements.py L94: created_at is stored as ISO string. metrics endpoint then slices [:10] to extract YYYY-MM-DD. Safer to store as a real datetime (BSON Date) and format on read; current approach breaks if the string format changes.",
+    "/app/backend/routes/announcements.py L107-108: Two separate find().to_list(500) calls per metrics request. Could be merged into one $facet aggregation for symmetry and ~half the round-trips.",
+    "/app/frontend/src/pages/DashboardPage.js L30-33: Track calls fire on every render where announcements change; observed 2x duplicate POSTs per banner on first load. Add a useRef set of already-tracked ids or move into a one-shot useEffect keyed by announcement ids JSON.",
+    "/app/frontend/src/pages/AnnouncementsPage.js L143-148: openMetrics catches no error - if the GET fails the dialog will stay in the spinner state forever. Add a try/catch with toast.error and onOpenChange=false on failure."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_announcement_metrics.py (new)"
+  ],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100% (8/8 flows)"},
+  "test_credentials": {
+    "superadmin": "superadmin@cortexia.com / Admin123! (worked)",
+    "altavista_enterprise": "analuhs@gmail.com / Alta2026$ (worked)",
+    "demo_free": "admin@cortexia.gt / Demo123! (worked)"
+  },
+  "seed_data_creation": "None for permanent data. Each backend test class uses fresh_announcement fixture that creates a TEST_Metrics_Announcement, runs the test, and DELETE-cleans up (also cascades to announcement_metrics rows since DELETE /announcements/{id} clears related metrics).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Metrics feature endpoints: POST /api/announcements/{id}/track?action={view|dismiss} (any authenticated admin, deduped per (announcement, company, action)); GET /api/announcements/{id}/metrics (SuperAdmin only, returns {views_count,dismissals_count,view_details[],dismiss_details[]} where each detail row has company_name,user_name,date). GET /api/announcements list now embeds views_count + dismissals_count per row. Frontend: DashboardPage useEffect auto-tracks views on load; banner X button (data-testid='dismiss-{id}') tracks dismiss and hides banner via setDismissedAnnouncements state. SuperAdmin announcements page has data-testid='metrics-btn-{id}' for each row and 'view-detail-{i}'/'dismiss-detail-{i}' inside the dialog. Existing seeded metric state: Mantenimiento=2 views (Altavista+Demo), Cotizaciones=1 view + 1 dismiss (Altavista), Actualiza tu plan=1 view (Demo). Note: dismiss is intentionally deduped per (announcement, company), so a company calling dismiss twice keeps the count at 1 - by design.",
+  "rca_of_issue": "N/A - no failures observed."
+}

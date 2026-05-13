@@ -25,7 +25,13 @@ export default function DashboardPage() {
       return;
     }
     fetchDashboard();
-    api.get('/api/announcements/active').then(res => setAnnouncements(res.data || [])).catch(() => {});
+    api.get('/api/announcements/active').then(res => {
+      setAnnouncements(res.data || []);
+      // Track views for each announcement
+      (res.data || []).forEach(ann => {
+        api.post(`/api/announcements/${ann._id}/track?action=view`).catch(() => {});
+      });
+    }).catch(() => {});
   }, [branchId, user, navigate]);
 
   const fetchDashboard = async () => {
@@ -144,7 +150,10 @@ export default function DashboardPage() {
                   <p className={`text-sm mt-0.5 ${s.textColor}`}>{ann.message}</p>
                 </div>
                 <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mt-0.5 hover:bg-white/50"
-                  onClick={() => setDismissedAnnouncements(prev => [...prev, ann._id])} data-testid={`dismiss-${ann._id}`}>
+                  onClick={() => {
+                    api.post(`/api/announcements/${ann._id}/track?action=dismiss`).catch(() => {});
+                    setDismissedAnnouncements(prev => [...prev, ann._id]);
+                  }} data-testid={`dismiss-${ann._id}`}>
                   <X className="w-4 h-4 text-slate-400" />
                 </Button>
               </div>

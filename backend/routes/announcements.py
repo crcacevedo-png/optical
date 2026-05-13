@@ -15,6 +15,9 @@ async def list_announcements(user: dict = Depends(get_current_user)):
     announcements = await db.announcements.find({}).sort("created_at", -1).to_list(200)
     for a in announcements:
         serialize_doc(a)
+        ann_oid = ObjectId(a["_id"])
+        a["views_count"] = await db.announcement_metrics.count_documents({"announcement_id": ann_oid, "action": "view"})
+        a["dismissals_count"] = await db.announcement_metrics.count_documents({"announcement_id": ann_oid, "action": "dismiss"})
     return announcements
 
 @router.post("")
@@ -58,7 +61,73 @@ async def delete_announcement(announcement_id: str, user: dict = Depends(get_cur
     if user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
     await db.announcements.delete_one({"_id": ObjectId(announcement_id)})
+    await db.announcement_metrics.delete_many({"announcement_id": ObjectId(announcement_id)})
     return {"message": "Anuncio eliminado"}
+
+@router.post("/{announcement_id}/track")
+async def track_announcement(announcement_id: str, action: str, user: dict = Depends(get_current_user)):
+    if action not in ("view", "dismiss"):
+        raise HTTPException(status_code=400, detail="Accion invalida: use 'view' o 'dismiss'")
+    try:
+        ann_oid = ObjectId(announcement_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID invalido")
+    
+    company_id = user.get("company_id")
+    if not company_id:
+        return {"message": "ok"}
+    
+    existing = await db.announcement_metrics.find_one({
+        "announcement_id": ann_oid,
+        "company_id": ObjectId(company_id),
+        "action": action
+    })
+    if not existing:
+        company = await db.companies.find_one({"_id": ObjectId(company_id)}, {"name": 1})
+        await db.announcement_metrics.insert_one({
+            "announcement_id": ann_oid,
+            "company_id": ObjectId(company_id),
+            "company_name": company["name"] if company else "",
+            "user_id": user["_id"],
+            "user_name": user.get("name", ""),
+            "action": action,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+    return {"message": "ok"}
+
+@router.get("/{announcement_id}/metrics")
+async def get_announcement_metrics(announcement_id: str, user: dict = Depends(get_current_user)):
+    if user["role"] != "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    try:
+        ann_oid = ObjectId(announcement_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID invalido")
+    
+    views = await db.announcement_metrics.find({"announcement_id": ann_oid, "action": "view"}).to_list(500)
+    dismissals = await db.announcement_metrics.find({"announcement_id": ann_oid, "action": "dismiss"}).to_list(500)
+    
+    view_companies = []
+    for v in views:
+        view_companies.append({
+            "company_name": v.get("company_name", ""),
+            "user_name": v.get("user_name", ""),
+            "date": v.get("created_at", "")[:10]
+        })
+    dismiss_companies = []
+    for d in dismissals:
+        dismiss_companies.append({
+            "company_name": d.get("company_name", ""),
+            "user_name": d.get("user_name", ""),
+            "date": d.get("created_at", "")[:10]
+        })
+    
+    return {
+        "views_count": len(views),
+        "dismissals_count": len(dismissals),
+        "view_details": view_companies,
+        "dismiss_details": dismiss_companies,
+    }
 
 @router.get("/active")
 async def get_active_announcements(user: dict = Depends(get_current_user)):
