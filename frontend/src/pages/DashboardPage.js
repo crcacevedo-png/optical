@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { api, useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
 import { 
   Users, Calendar, TrendingUp, TrendingDown, 
-  AlertTriangle, Clock, DollarSign, ShoppingBag, CreditCard
+  AlertTriangle, Clock, DollarSign, ShoppingBag, CreditCard, X, Info, Sparkles, Megaphone
 } from 'lucide-react';
 import { BranchFilter } from '../components/BranchFilter';
 
@@ -15,6 +16,8 @@ export default function DashboardPage() {
   const [alertDetails, setAlertDetails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [branchId, setBranchId] = useState('');
+  const [announcements, setAnnouncements] = useState([]);
+  const [dismissedAnnouncements, setDismissedAnnouncements] = useState([]);
 
   useEffect(() => {
     if (user?.role === 'superadmin') {
@@ -22,6 +25,7 @@ export default function DashboardPage() {
       return;
     }
     fetchDashboard();
+    api.get('/api/announcements/active').then(res => setAnnouncements(res.data || [])).catch(() => {});
   }, [branchId, user, navigate]);
 
   const fetchDashboard = async () => {
@@ -120,6 +124,34 @@ export default function DashboardPage() {
         </div>
         <BranchFilter value={branchId} onChange={setBranchId} />
       </div>
+
+      {/* Announcement Banners */}
+      {announcements.filter(a => !dismissedAnnouncements.includes(a._id)).length > 0 && (
+        <div className="space-y-2" data-testid="announcement-banners">
+          {announcements.filter(a => !dismissedAnnouncements.includes(a._id)).map(ann => {
+            const styles = {
+              info: { bg: 'bg-blue-50 border-blue-200', icon: Info, iconColor: 'text-blue-600', titleColor: 'text-blue-900', textColor: 'text-blue-700' },
+              warning: { bg: 'bg-amber-50 border-amber-200', icon: AlertTriangle, iconColor: 'text-amber-600', titleColor: 'text-amber-900', textColor: 'text-amber-700' },
+              promo: { bg: 'bg-emerald-50 border-emerald-200', icon: Sparkles, iconColor: 'text-emerald-600', titleColor: 'text-emerald-900', textColor: 'text-emerald-700' },
+            };
+            const s = styles[ann.type] || styles.info;
+            const Icon = s.icon;
+            return (
+              <div key={ann._id} className={`${s.bg} border rounded-lg p-3.5 flex items-start gap-3`} data-testid={`banner-${ann._id}`}>
+                <div className="flex-shrink-0 mt-0.5"><Icon className={`w-5 h-5 ${s.iconColor}`} /></div>
+                <div className="flex-1 min-w-0">
+                  <p className={`font-semibold text-sm ${s.titleColor}`}>{ann.title}</p>
+                  <p className={`text-sm mt-0.5 ${s.textColor}`}>{ann.message}</p>
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mt-0.5 hover:bg-white/50"
+                  onClick={() => setDismissedAnnouncements(prev => [...prev, ann._id])} data-testid={`dismiss-${ann._id}`}>
+                  <X className="w-4 h-4 text-slate-400" />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Plan Limit Warnings */}
       {(user?.patients_warning || user?.branches_warning) && (

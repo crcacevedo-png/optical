@@ -1,0 +1,72 @@
+{
+  "summary": "Iteration 16: End-to-end testing of the new Comunicacion (Announcements) module. Backend pytest: 12/12 PASS covering list/CRUD/active flows + plan-based filtering for Enterprise and Free admins. Frontend Playwright: SuperAdmin /admin/comunicacion page loads, stats cards (3 total, 3 activos, 0 inactivos), 3 seeded rows render with correct type badges (Informativo=blue, Promocion=green, Alerta=amber) and segment badges (Free, Basic+Enterprise, Todos). Create -> Edit -> Toggle -> Delete dialog flow works end-to-end via UI with toasts. Admin dashboards verified: Enterprise admin (analuhs@gmail.com) sees 2 banners (promo green + warning amber); Free admin (admin@cortexia.gt) sees 2 banners (info blue + warning amber). X dismiss button removes banner from view (2->1). Sidebar shows 'Comunicacion' with megaphone icon for SuperAdmin only.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/announcements/active", "issue": "Target city filtering uses substring match on company.address (lowercased) - functional but may cause false-positive matches if a city name is a substring of any address field (e.g., 'Guate' would match 'Guatemala'). Currently no real failures observed."},
+      {"endpoint": "GET /api/announcements/active", "issue": "Date filtering relies on YYYY-MM-DD string lexicographic comparison ($lte/$gte) - works because dates are stored as strings, but coupling is fragile if date storage changes to datetime objects."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": {
+    "backend": [
+      "TestList::test_list_as_superadmin (>=3 seeded items, schema valid, _id is string)",
+      "TestList::test_list_forbidden_for_admin (403 for Enterprise admin)",
+      "TestList::test_list_unauthenticated (401/403 without auth)",
+      "TestCRUD::test_create_update_delete_flow (POST->verify via GET->PUT->verify->DELETE->verify removed)",
+      "TestCRUD::test_create_forbidden_for_admin (403 for Enterprise admin POSTing)",
+      "TestCRUD::test_update_invalid_id_returns_400",
+      "TestCRUD::test_update_nonexistent_returns_404",
+      "TestActive::test_active_superadmin_returns_empty (SuperAdmin sees [])",
+      "TestActive::test_active_enterprise_admin (sees warning+promo, NOT info; len==2)",
+      "TestActive::test_active_free_admin (sees warning+info, NOT promo; len==2)",
+      "TestActive::test_active_unauthenticated (401/403)",
+      "TestActive::test_inactive_announcement_excluded (is_active=false hides from /active)"
+    ],
+    "frontend": [
+      "SuperAdmin sidebar shows 'Comunicacion' link with Megaphone icon",
+      "/admin/comunicacion loads announcements-page testid",
+      "Stats cards: 3 Total / 3 Activos / 0 Inactivos render correctly",
+      "Table shows 3 rows with correct type badges (Informativo blue, Promocion green, Alerta amber) and segment badges (Free, Basic+Enterprise, Todos)",
+      "New Anuncio dialog: title/message/type-select/plan pills/city input/start-end date all functional",
+      "Create flow: TEST_UI_AnuncioPW created with type=Promocion and target plan Free, then visible in list",
+      "Toggle switch deactivates announcement",
+      "Edit dialog: prefills form, updates title, persists change",
+      "Delete confirmation dialog: removes announcement and shows 'Anuncio eliminado' toast",
+      "Enterprise admin /dashboard: 2 banners (emerald promo 'Nuevo modulo de Cotizaciones' + amber 'Mantenimiento programado')",
+      "Free admin /dashboard: 2 banners (blue info 'Actualiza tu plan' + amber 'Mantenimiento programado')",
+      "Dismiss X button removes banner from session view (2->1)"
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_announcements.py",
+    "/app/test_reports/pytest/announcements_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "/app/backend/routes/announcements.py L81-89: company.plan_id is used directly as the _id in db.plans.find_one. If plan_id is ever stored as a string instead of ObjectId, the lookup silently returns None and ALL plan-targeted announcements get filtered out (admins see nothing). Consider being defensive: if isinstance(company['plan_id'], str): ObjectId(company['plan_id']).",
+    "/app/backend/routes/announcements.py L99-101: target_cities filter uses substring containment against company.address (lowercased). 'Guate' would match 'Guatemala', and 'a' matches almost anything. Prefer exact match against a dedicated company.city field or word-boundary match.",
+    "/app/backend/routes/announcements.py L51-53: AnnouncementUpdate model_dump(exclude_unset=True) is correct, but there is no validation that 'type' is one of (info/warning/promo) on update. A malicious/buggy PUT could store an arbitrary type string and the UI would silently default to 'info' styling.",
+    "/app/backend/routes/announcements.py L60: DELETE returns 200 even if the ObjectId is malformed or the document does not exist - no 400/404 distinction. Wrap with try/except like update_announcement does for consistency.",
+    "/app/frontend/src/pages/AnnouncementsPage.js: dismissedAnnouncements is component state only - dismissals reset on full page refresh. The PRD says 'por sesion' so this matches the spec, but if persistence per browser session is desired use sessionStorage.",
+    "/app/frontend/src/pages/AnnouncementsPage.js L52: setPlans(planRes.data) assumes /api/plans returns an array. If response shape changes the map at L144 will crash without an error boundary."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_announcements.py (new)"
+  ],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100% (12/12 flows)"},
+  "test_credentials": {
+    "superadmin": "superadmin@cortexia.com / Admin123! (worked)",
+    "altavista_enterprise": "analuhs@gmail.com / Alta2026$ (worked)",
+    "demo_free": "admin@cortexia.gt / Demo123! (worked)"
+  },
+  "seed_data_creation": "None - used existing 3 seeded announcements. Test created and cleaned up TEST_ prefixed announcements within each test run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Communication module backend at /app/backend/routes/announcements.py. Endpoints: GET/POST /api/announcements (SuperAdmin only, 403 for others), PUT/DELETE /api/announcements/{id} (SuperAdmin only), GET /api/announcements/active (admins only - filtered by plan_name and city substring against company.address). Frontend page at /admin/comunicacion (AnnouncementsPage.js), banners rendered in DashboardPage.js with data-testid='banner-{id}' and dismiss button 'dismiss-{id}'. Sidebar nav item added at line 42 of MainLayout.js. 3 seeded announcements assumed: warning (all plans), promo (Basic+Enterprise), info (Free only). Active counts depend on this seed - changing it will alter the filter expectations in test_announcements.py TestActive.",
+  "rca_of_issue": "N/A - no failures"
+}

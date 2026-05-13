@@ -358,6 +358,25 @@ class PlanUpdate(BaseModel):
     modules: Optional[List[str]] = None
     is_active: Optional[bool] = None
 
+class AnnouncementCreate(BaseModel):
+    title: str
+    message: str
+    type: str = "info"
+    target_plans: Optional[List[str]] = []
+    target_cities: Optional[List[str]] = []
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
+class AnnouncementUpdate(BaseModel):
+    title: Optional[str] = None
+    message: Optional[str] = None
+    type: Optional[str] = None
+    target_plans: Optional[List[str]] = None
+    target_cities: Optional[List[str]] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    is_active: Optional[bool] = None
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
