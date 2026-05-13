@@ -11,40 +11,41 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 
 ## Lo Implementado
 
-### Modulo de Comunicacion (Mayo 2026)
-- CRUD de anuncios para SuperAdmin (titulo, mensaje, tipo, segmentacion)
-- 3 tipos: Informativo (azul), Alerta (amarillo), Promocion (verde)
-- Segmentacion por plan (Free/Basic/Enterprise) y por ciudad
-- Fecha de vigencia (inicio/fin)
-- Toggle activo/inactivo
+### Metricas de Anuncios (Mayo 2026)
+- Tracking automatico de vistas al cargar dashboard del admin
+- Tracking de descartes al cerrar banner con X
+- Deduplicacion por empresa (una vista/descarte por optica por anuncio)
+- Contadores inline en tabla de anuncios (vistas | descartes)
+- Dialog detallado con: KPIs (vistas, descartes, tasa descarte %), lista de opticas con nombre, usuario y fecha
+
+### Modulo de Comunicacion
+- CRUD anuncios con segmentacion por plan y ciudad
+- 3 tipos: Info, Alerta, Promocion
 - Banners en dashboard de admins con colores segun tipo
-- Boton X para descartar por sesion
-- Filtrado automatico: cada admin solo ve anuncios relevantes a su plan
 
 ### Dashboard SuperAdmin
-- 4 KPIs, graficas pie/barras, alertas de limite, timeline cambios
+- KPIs, graficas, alertas de limite, timeline cambios
 
 ### Sistema de Planes
-- 3 planes, modulos opcionales, CRUD, historial de cambios
+- 3 planes, modulos opcionales, CRUD, historial
 
-### Exportacion Excel
-- 3 hojas: Resumen, Ventas, Finanzas
+### Exportacion Excel + Reportes por Sucursal
 
 ### Modulos Funcionales
-- Auth, Login Premium, Panel SuperAdmin + Dashboard
-- Pacientes, Consultas Opticas, Recetas (3 tipos, 3 estilos PDF)
-- Busqueda Global (Ctrl+K), Agenda, Cotizaciones
-- Inventario (con min stock editable), Ventas, Proveedores, Finanzas
-- Reportes por Sucursal, Configuracion
+- Auth, Login Premium, Panel SuperAdmin
+- Pacientes, Consultas, Recetas (3 tipos, 3 estilos PDF)
+- Busqueda Global, Agenda, Cotizaciones
+- Inventario (min stock editable), Ventas, Proveedores, Finanzas
+- Configuracion, Gestion Proveedores
 
 ## Backlog
 
-### P1 - Alta
+### P1
 - [ ] Facturacion formal (IVA Guatemala)
 
-### P2 - Media
-- [ ] Portal del paciente (ver receta, proxima cita)
+### P2
+- [ ] Portal del paciente
 
-### P3 - Baja
-- [ ] Recordatorios citas (WhatsApp/SMS)
-- [ ] Marketing (origen de pacientes, segmentacion)
+### P3
+- [ ] Recordatorios WhatsApp/SMS
+- [ ] Marketing (origen pacientes)

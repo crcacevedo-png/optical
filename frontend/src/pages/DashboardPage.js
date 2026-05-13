@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api, useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [branchId, setBranchId] = useState('');
   const [announcements, setAnnouncements] = useState([]);
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState([]);
+  const trackedViewsRef = useRef(new Set());
 
   useEffect(() => {
     if (user?.role === 'superadmin') {
@@ -27,9 +28,11 @@ export default function DashboardPage() {
     fetchDashboard();
     api.get('/api/announcements/active').then(res => {
       setAnnouncements(res.data || []);
-      // Track views for each announcement
       (res.data || []).forEach(ann => {
-        api.post(`/api/announcements/${ann._id}/track?action=view`).catch(() => {});
+        if (!trackedViewsRef.current.has(ann._id)) {
+          trackedViewsRef.current.add(ann._id);
+          api.post(`/api/announcements/${ann._id}/track?action=view`).catch(() => {});
+        }
       });
     }).catch(() => {});
   }, [branchId, user, navigate]);
