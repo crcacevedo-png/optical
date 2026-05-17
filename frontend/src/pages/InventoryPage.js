@@ -34,7 +34,7 @@ export default function InventoryPage() {
 
   const [productForm, setProductForm] = useState({
     name: '', sku: '', category: '', brand: '', description: '',
-    cost_price: '', sale_price: '', min_stock: 5, initial_stock: 0
+    cost_price: '', sale_price: '', min_stock: 1, initial_stock: 0
   });
 
   const [movementForm, setMovementForm] = useState({
@@ -84,7 +84,7 @@ export default function InventoryPage() {
       });
       toast.success('Producto creado exitosamente');
       setShowProductDialog(false);
-      setProductForm({ name: '', sku: '', category: '', brand: '', description: '', cost_price: '', sale_price: '', min_stock: 5 });
+      setProductForm({ name: '', sku: '', category: '', brand: '', description: '', cost_price: '', sale_price: '', min_stock: 1 });
       fetchData();
     } catch (error) {
       toast.error(formatApiErrorDetail(error.response?.data?.detail));
@@ -442,7 +442,7 @@ export default function InventoryPage() {
             <TableBody>
               {filteredProducts.map((product) => {
                 const currentStock = getStockForProduct(product._id);
-                const isLowStock = currentStock <= (product.min_stock || 5);
+                const isLowStock = currentStock <= (product.min_stock || 1);
                 return (
                   <TableRow key={product._id} className="data-table-row" data-testid={`product-row-${product._id}`}>
                     <TableCell>
@@ -486,10 +486,10 @@ export default function InventoryPage() {
                       ) : (
                         <button
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-slate-600 hover:bg-slate-100 transition-colors"
-                          onClick={() => { setEditingMinStock(product._id); setMinStockValue(String(product.min_stock || 5)); }}
+                          onClick={() => { setEditingMinStock(product._id); setMinStockValue(String(product.min_stock || 1)); }}
                           data-testid={`min-stock-edit-${product._id}`}
                         >
-                          {product.min_stock || 5}
+                          {product.min_stock || 1}
                           <Edit className="w-3 h-3 text-slate-400" />
                         </button>
                       )}

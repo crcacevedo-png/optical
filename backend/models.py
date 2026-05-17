@@ -179,7 +179,7 @@ class ProductCreate(BaseModel):
     description: Optional[str] = None
     cost_price: float
     sale_price: float
-    min_stock: int = 5
+    min_stock: int = 1
     initial_stock: int = 0
     branch_id: Optional[str] = None
 
