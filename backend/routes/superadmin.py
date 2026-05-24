@@ -53,23 +53,12 @@ async def get_superadmin_dashboard(user: dict = Depends(get_current_user)):
     
     arpu = round(estimated_revenue / len(companies), 2) if companies else 0
     
-    # MRR trend 6 months (based on plan_history to estimate past revenue)
-    mrr_trend = []
-    for i in range(5, -1, -1):
-        m_dt = now - timedelta(days=i * 30)
-        m_label = m_dt.strftime("%b %Y")
-        # Simplified: current MRR minus changes after that month
-        # For accuracy we just show current MRR for all months (real tracking would need snapshots)
-        mrr_trend.append({"month": m_label, "mrr": estimated_revenue})
-    # Adjust past months roughly by counting plan changes
-    history = await db.plan_history.find({}).sort("changed_at", 1).to_list(500)
-    # Simple approach: current MRR is our baseline, we won't backtrack for simplicity
-    
     # Churn rate
     churn_rate = round((inactive_companies / (total_companies + inactive_companies)) * 100, 1) if (total_companies + inactive_companies) > 0 else 0
     
     # ========== PLAN CONVERSION FUNNEL ==========
     plan_order = {"Free": 0, "Basic": 1, "Enterprise": 2}
+    history = await db.plan_history.find({}).sort("changed_at", 1).to_list(500)
     upgrades = 0
     downgrades = 0
     for h in history:
@@ -105,8 +94,6 @@ async def get_superadmin_dashboard(user: dict = Depends(get_current_user)):
     seven_days_ago = (now - timedelta(days=7)).isoformat()
     thirty_days_ago = (now - timedelta(days=30)).isoformat()
     
-    active_7d = await db.login_attempts.count_documents({})  # Simplified
-    # Better: count distinct users who logged in (use sales/appointments as proxy for activity)
     active_users_30d = set()
     active_users_7d = set()
     

@@ -6,46 +6,39 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 ## Arquitectura
 - Frontend: React 19 + Tailwind CSS + Shadcn UI + Recharts
 - Backend: FastAPI + Motor (MongoDB async) - Modular (21 archivos de rutas)
-- Auth: JWT con cookies httpOnly
-- Moneda: Quetzal (GTQ) | Idioma: Espanol
+- Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 ## Lo Implementado
 
-### Metricas de Anuncios (Mayo 2026)
-- Tracking automatico de vistas al cargar dashboard del admin
-- Tracking de descartes al cerrar banner con X
-- Deduplicacion por empresa (una vista/descarte por optica por anuncio)
-- Contadores inline en tabla de anuncios (vistas | descartes)
-- Dialog detallado con: KPIs (vistas, descartes, tasa descarte %), lista de opticas con nombre, usuario y fecha
+### Dashboard SaaS SuperAdmin (Mayo 2026) - COMPLETO
+**Revenue & Conversion:**
+- MRR (Monthly Recurring Revenue), ARPU (Average Revenue Per User)
+- Churn rate (opticas inactivas vs total)
+- Funnel de conversion Free -> Basic -> Enterprise con upgrades/downgrades
+- Revenue estimado por plan (grafica barras)
 
-### Modulo de Comunicacion
-- CRUD anuncios con segmentacion por plan y ciudad
-- 3 tipos: Info, Alerta, Promocion
-- Banners en dashboard de admins con colores segun tipo
+**Engagement:**
+- Usuarios activos ultimos 7 y 30 dias (basado en actividad real: ventas, citas, consultas, pacientes)
+- Top 5 opticas por actividad (pacientes + ventas + consultas, con ranking)
+- Modulos mas usados: cuantas opticas tienen acceso a inventario, ventas, proveedores, finanzas
 
-### Dashboard SuperAdmin
-- KPIs, graficas, alertas de limite, timeline cambios
+**Operativo:**
+- Pacientes promedio por optica
+- Volumen transaccional (ventas totales plataforma + mes actual)
+- Crecimiento de pacientes 6 meses (area chart)
+- Opticas cerca del limite con porcentajes
+- Cambios de plan recientes (timeline)
 
-### Sistema de Planes
-- 3 planes, modulos opcionales, CRUD, historial
-
-### Exportacion Excel + Reportes por Sucursal
-
-### Modulos Funcionales
-- Auth, Login Premium, Panel SuperAdmin
-- Pacientes, Consultas, Recetas (3 tipos, 3 estilos PDF)
+### Otros Modulos
+- Comunicacion: anuncios segmentados + metricas de visualizacion
+- Planes: Free/Basic/Enterprise, modulos opcionales, historial
+- Exportacion Excel, Reportes por Sucursal
+- Auth, Login Premium, Pacientes, Consultas, Recetas (3 tipos, 3 estilos PDF)
 - Busqueda Global, Agenda, Cotizaciones
 - Inventario (min stock editable), Ventas, Proveedores, Finanzas
 - Configuracion, Gestion Proveedores
 
 ## Backlog
-
-### P1
-- [ ] Facturacion formal (IVA Guatemala)
-
-### P2
-- [ ] Portal del paciente
-
-### P3
-- [ ] Recordatorios WhatsApp/SMS
-- [ ] Marketing (origen pacientes)
+### P1: Facturacion formal IVA Guatemala
+### P2: Portal del paciente
+### P3: Recordatorios WhatsApp/SMS, Marketing
