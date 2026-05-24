@@ -28,7 +28,13 @@ async def unread_count(user: dict = Depends(get_current_user)):
 async def mark_as_read(notification_id: str, user: dict = Depends(get_current_user)):
     if user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
-    await db.notifications.update_one({"_id": ObjectId(notification_id)}, {"$set": {"is_read": True}})
+    try:
+        oid = ObjectId(notification_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID invalido")
+    result = await db.notifications.update_one({"_id": oid}, {"$set": {"is_read": True}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Notificacion no encontrada")
     return {"message": "ok"}
 
 @router.put("/read-all")
