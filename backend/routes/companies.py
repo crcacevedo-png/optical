@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from db import db, serialize_doc, UPLOADS_DIR
 from auth_utils import get_current_user, hash_password
 from models import CompanyCreate, CompanyUpdate
+from routes.notifications import create_notification
 
 router = APIRouter(prefix="/companies", tags=["Empresas"])
 
@@ -58,6 +59,12 @@ async def create_company(data: CompanyCreate, user: dict = Depends(get_current_u
         "is_active": True, "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.users.insert_one(admin_doc)
+    
+    await create_notification(
+        "new_company", "Nueva optica registrada",
+        f"{data.name} se ha registrado con admin {data.admin_name} ({data.admin_email})",
+        {"company_id": str(company_id), "company_name": data.name}
+    )
     
     return {"_id": str(company_id), "name": data.name, "message": "Empresa creada exitosamente"}
 

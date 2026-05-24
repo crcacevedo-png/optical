@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from db import db, serialize_doc
 from auth_utils import get_current_user
 from models import PlanCreate, PlanUpdate
+from routes.notifications import create_notification
 
 router = APIRouter(prefix="/plans", tags=["Planes"])
 
@@ -92,6 +93,13 @@ async def assign_plan(company_id: str, plan_id: str, user: dict = Depends(get_cu
         "changed_by_name": user.get("name", ""),
         "changed_at": datetime.now(timezone.utc).isoformat()
     })
+    
+    company_name = company["name"] if company else "Desconocida"
+    await create_notification(
+        "plan_change", "Cambio de plan",
+        f"{company_name} cambio de {old_plan_name or 'Sin plan'} a {new_plan['name']}",
+        {"company_id": str(cid), "company_name": company_name, "old_plan": old_plan_name, "new_plan": new_plan["name"]}
+    )
     
     return {"message": "Plan asignado"}
 

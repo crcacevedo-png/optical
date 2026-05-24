@@ -6,6 +6,7 @@ from typing import Optional
 from db import db, serialize_doc, calculate_age
 from auth_utils import get_current_user
 from models import PatientCreate, PatientUpdate
+from routes.notifications import create_notification
 
 router = APIRouter(prefix="/patients", tags=["Pacientes"])
 
@@ -64,6 +65,28 @@ async def create_patient(data: PatientCreate, user: dict = Depends(get_current_u
         "created_by": ObjectId(user["_id"])
     }
     result = await db.patients.insert_one(patient_doc)
+    
+    # Check limit threshold for notification
+    if company and company.get("plan_id"):
+        plan = await db.plans.find_one({"_id": company["plan_id"]})
+        if plan and plan.get("max_patients", 0) > 0:
+            new_count = await db.patients.count_documents({"company_id": ObjectId(user["company_id"]), "is_deleted": {"$ne": True}})
+            max_p = plan["max_patients"]
+            pct = new_count / max_p
+            cname = company.get("name", "Optica")
+            if pct >= 1.0:
+                existing = await db.notifications.find_one({"event_type": "limit_reached", "metadata.company_id": user["company_id"], "metadata.resource": "pacientes"})
+                if not existing:
+                    await create_notification("limit_reached", "Limite de pacientes alcanzado",
+                        f"{cname} alcanzo el limite de {max_p} pacientes (plan {plan['name']})",
+                        {"company_id": user["company_id"], "company_name": cname, "resource": "pacientes", "current": new_count, "max": max_p})
+            elif pct >= 0.8:
+                existing = await db.notifications.find_one({"event_type": "limit_warning", "metadata.company_id": user["company_id"], "metadata.resource": "pacientes"})
+                if not existing:
+                    await create_notification("limit_warning", "Optica cerca del limite de pacientes",
+                        f"{cname} tiene {new_count}/{max_p} pacientes ({round(pct*100)}%) en plan {plan['name']}",
+                        {"company_id": user["company_id"], "company_name": cname, "resource": "pacientes", "current": new_count, "max": max_p})
+    
     return {"_id": str(result.inserted_id), "message": "Paciente creado"}
 
 @router.get("/{patient_id}")
