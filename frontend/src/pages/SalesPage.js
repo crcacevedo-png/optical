@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { 
   Plus, ShoppingCart, Trash2, User, CreditCard, 
-  Banknote, Smartphone, Receipt
+  Banknote, Smartphone, Receipt, Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BranchFilter } from '../components/BranchFilter';
@@ -22,6 +22,7 @@ export default function SalesPage() {
   const [loading, setLoading] = useState(true);
   const [branchId, setBranchId] = useState('');
   const [showSaleDialog, setShowSaleDialog] = useState(false);
+  const [detailSale, setDetailSale] = useState(null);
 
   const [cart, setCart] = useState([]);
   const [saleForm, setSaleForm] = useState({
@@ -356,6 +357,7 @@ export default function SalesPage() {
                 <TableHead>Total</TableHead>
                 <TableHead>Pagado</TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -384,11 +386,16 @@ export default function SalesPage() {
                       {sale.status === 'completada' ? 'Pagado' : 'Pendiente'}
                     </span>
                   </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" onClick={() => setDetailSale(sale)} data-testid={`view-sale-${sale._id}`}>
+                      <Eye className="w-4 h-4 text-slate-500" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
               {sales.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                     <ShoppingCart className="w-12 h-12 mx-auto mb-2 opacity-30" />
                     <p>No hay ventas registradas</p>
                   </TableCell>
@@ -398,6 +405,110 @@ export default function SalesPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Sale Detail Dialog */}
+      <Dialog open={!!detailSale} onOpenChange={(open) => !open && setDetailSale(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-heading flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-pine-700" /> Detalle de Venta
+            </DialogTitle>
+          </DialogHeader>
+          {detailSale && (
+            <div className="space-y-4" data-testid="sale-detail">
+              {/* Header info */}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-slate-400">Fecha:</span>
+                  <span className="ml-2 font-medium">{detailSale.created_at?.slice(0, 10)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Estado:</span>
+                  <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
+                    detailSale.status === 'completada' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+                  }`}>{detailSale.status === 'completada' ? 'Pagado' : 'Pendiente'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Cliente:</span>
+                  <span className="ml-2 font-medium">{detailSale.patient_name || 'Consumidor final'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Vendedor:</span>
+                  <span className="ml-2 font-medium">{detailSale.seller_name || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Metodo:</span>
+                  <span className="ml-2 font-medium">
+                    {{'cash': 'Efectivo', 'card': 'Tarjeta', 'transfer': 'Transferencia'}[detailSale.payment_method] || detailSale.payment_method}
+                  </span>
+                </div>
+              </div>
+
+              {/* Items */}
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Articulos</p>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 text-xs text-slate-500">
+                        <th className="text-left p-2.5 font-medium">Producto</th>
+                        <th className="text-center p-2.5 font-medium">Cant</th>
+                        <th className="text-right p-2.5 font-medium">Precio</th>
+                        <th className="text-right p-2.5 font-medium">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(detailSale.items || []).map((item, idx) => (
+                        <tr key={item.product_id || `item-${idx}`} className="border-t border-slate-100">
+                          <td className="p-2.5 font-medium text-slate-800">{item.name || 'Producto'}</td>
+                          <td className="p-2.5 text-center text-slate-600">{item.quantity || 1}</td>
+                          <td className="p-2.5 text-right text-slate-600">{formatCurrency(item.unit_price || item.price || 0)}</td>
+                          <td className="p-2.5 text-right font-medium">{formatCurrency(item.subtotal || (item.unit_price || item.price || 0) * (item.quantity || 1))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Totals */}
+              <div className="border-t pt-3 space-y-1.5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Subtotal</span>
+                  <span>{formatCurrency(detailSale.subtotal)}</span>
+                </div>
+                {detailSale.discount > 0 && (
+                  <div className="flex justify-between text-red-600">
+                    <span>Descuento</span>
+                    <span>-{formatCurrency(detailSale.discount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-base pt-1 border-t">
+                  <span>Total</span>
+                  <span>{formatCurrency(detailSale.total)}</span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>Pagado</span>
+                  <span>{formatCurrency(detailSale.amount_paid)}</span>
+                </div>
+                {detailSale.balance > 0 && (
+                  <div className="flex justify-between text-amber-600 font-medium">
+                    <span>Saldo pendiente</span>
+                    <span>{formatCurrency(detailSale.balance)}</span>
+                  </div>
+                )}
+              </div>
+
+              {detailSale.notes && (
+                <div className="text-sm">
+                  <span className="text-slate-400">Notas:</span>
+                  <p className="mt-1 text-slate-600">{detailSale.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
