@@ -34,7 +34,8 @@ export default function MainLayout() {
   const isAdmin = user?.role === 'admin';
 
   const planModules = user?.plan_modules || [];
-  const hasModule = (mod) => planModules.includes(mod);
+  const hasPlanInfo = user?.plan_name !== undefined;
+  const hasModule = (mod) => !hasPlanInfo || planModules.includes(mod);
 
   const navItems = isSuperAdmin ? [
     { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
