@@ -81,9 +81,24 @@ async def add_no_cache_headers(request: Request, call_next):
     return response
 
 # CORS
+cors_origins_raw = os.environ.get("CORS_ORIGINS", "")
+if cors_origins_raw == "*":
+    cors_origins = ["*"]
+elif cors_origins_raw:
+    cors_origins = [o.strip() for o in cors_origins_raw.split(",") if o.strip()]
+else:
+    cors_origins = []
+
+frontend_url = os.environ.get("FRONTEND_URL", "")
+if frontend_url and frontend_url not in cors_origins and cors_origins != ["*"]:
+    cors_origins.append(frontend_url)
+
+if not cors_origins:
+    cors_origins = ["http://localhost:3000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.environ.get("FRONTEND_URL", "http://localhost:3000")],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

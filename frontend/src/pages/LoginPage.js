@@ -63,7 +63,13 @@ export default function LoginPage() {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(formatApiErrorDetail(err.response?.data?.detail) || 'Error al iniciar sesión');
+      if (err.response?.data?.detail) {
+        setError(formatApiErrorDetail(err.response.data.detail));
+      } else if (err.message?.includes('Network Error')) {
+        setError('Error de conexion con el servidor. Verifique su conexion a internet.');
+      } else {
+        setError('Error al iniciar sesion. Intente de nuevo.');
+      }
     } finally {
       setLoading(false);
     }
