@@ -1,0 +1,76 @@
+{
+  "summary": "Iteration 18: End-to-end testing of the new SaaS Dashboard metrics on GET /api/superadmin/dashboard and frontend /admin/dashboard. Backend pytest: 18/18 PASS - validates ARPU (174.75 = MRR/companies), churn_rate (20% = 1 inactive / 5 total), funnel (free=3, basic=0, enterprise=1, upgrades_total=2, downgrades_total=2), engagement (active_7d=0, active_30d=1, total_users=10, with 30d >= 7d), top_companies (sorted desc by score, schema name/plan/patients/sales/consultations/score), module_usage (array {name,count} for Inventario/Ventas/Proveedores/Finanzas), platform_volume (total_sales_volume=Q5300, sales_volume_month=Q0, total_transactions=5, avg_patients_per_company=5.0), 403 for non-superadmin admin, 401/403 unauthenticated. Frontend Playwright: SuperAdmin login lands on /admin/opticas; clicking Dashboard nav opens /admin/dashboard rendering all sections. Verified 5 KPI cards (Q699 MRR / 4 Opticas / 20 Pacientes / Q174.75 ARPU / 20% Churn), 4 engagement mini cards (0 Activos 7d/10, 1 Activos 30d/10, Q0 Ventas del mes, 5 Pac. promedio/optica), Funnel de Conversion card showing Free=3, Basic=0, Enterprise=1 with bars + '2 upgrades' (green) / '2 downgrades' (red), Top 5 Opticas list (Cortexia Demo #1 9pac 5ventas 58cons Free, Visión Clara #2, Altavista #3 Enterprise, TEST_Optica_1775523355 #4 - only 4 rows because there are 4 active companies), Uso de Modulos Opcionales bar chart with 4 colored bars (Inventario/Ventas/Proveedores/Finanzas all =1), Crecimiento de Pacientes 6-month AreaChart, Revenue por Plan bar, Opticas por Plan pie. 4 recharts SVGs rendered.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/superadmin/dashboard", "issue": "Performs N+1 queries (3 count_documents per active company for patients/sales/consultations in top_companies loop + 1 per company in companies_at_limit + 1 per company in patients_per_company). With many companies this scales poorly. Recommend a single aggregation pipeline grouped by company_id."},
+      {"endpoint": "GET /api/superadmin/dashboard", "issue": "mrr_trend is computed but NOT returned in response (lines 56-66 in routes/superadmin.py). The 6-month MRR trend variable is built then dropped. Either return it or remove the dead code."},
+      {"endpoint": "GET /api/superadmin/dashboard", "issue": "Engagement 'active_7d/active_30d' uses string-based ISO comparison on created_at - works only because all data is stored as ISO strings in UTC. If a downstream service writes datetime objects, the >= comparison will silently fail and return 0. Recommend storing as BSON Date."},
+      {"endpoint": "GET /api/superadmin/dashboard", "issue": "active_7d variable on line 108 (`db.login_attempts.count_documents({})`) is computed then immediately overwritten by `len(active_users_7d)` on line 247. Dead code."},
+      {"endpoint": "GET /api/superadmin/dashboard", "issue": "churn_rate denominator is (active + inactive) but companies count_documents uses `is_active: {$ne: False}` which counts docs without the field as active. This is fine but worth documenting; if a company doc lacks is_active it counts as active, masking incomplete data."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Top 5 Opticas list", "issues": ["Currently shows only 4 entries (because there are only 4 active companies) - consider showing a 'No more data' or empty-row placeholder for visual consistency when < 5 companies exist."]},
+      {"screen": "Top 5 Opticas list", "issues": ["TEST_Optica_1775523355 (test data) appears in the Top 5 ranking. Not a bug, but the seed leak makes the list noisy. Consider filtering names starting with 'TEST_' OR cleaning the seed."]},
+      {"screen": "Funnel de Conversion", "issues": ["Basic plan shows count=0 but still renders a tiny blue dot (the bar has min-width). Acceptable, but consider hiding bars where count=0."]}
+    ]
+  },
+  "passed_tests": {
+    "backend": [
+      "TestSuperAdminDashboard 10/10 (dashboard 200, totals, companies_by_plan, estimated_revenue, revenue_by_plan, patient_growth, companies_at_limit, recent_plan_changes, 403 for admin, 401/403 unauth)",
+      "TestNewMetrics::test_arpu_present_and_valid (174.75 = 699/4)",
+      "TestNewMetrics::test_churn_rate_valid_percentage (20.0)",
+      "TestNewMetrics::test_funnel_structure (free=3, basic=0, enterprise=1, upgrades=2, downgrades=2)",
+      "TestNewMetrics::test_engagement_structure (7d=0 <= 30d=1 <= total=10)",
+      "TestNewMetrics::test_top_companies_structure (schema + sorted desc by score)",
+      "TestNewMetrics::test_module_usage_structure (4 modules, all count>=0)",
+      "TestNewMetrics::test_platform_volume_structure (total=5300 >= month=0, txns=5, avg=5.0)",
+      "TestNewMetrics::test_funnel_sum_matches_companies_total (3+0+1=4 <= 4 active companies)"
+    ],
+    "frontend": [
+      "SuperAdmin login -> sidebar Dashboard nav opens /admin/dashboard rendering data-testid='superadmin-dashboard'",
+      "5 KPI cards data-testid kpi-mrr/kpi-companies/kpi-patients/kpi-arpu/kpi-churn render correct backend values (Q699/4/20/Q174.75/20%)",
+      "4 engagement mini cards eng-7d/eng-30d/vol-month/avg-patients render (0/10, 1/10, Q0, 5)",
+      "Funnel de Conversion card shows Free=3, Basic=0, Enterprise=1 with bars + '2 upgrades' (green arrow-up) / '2 downgrades' (red arrow-down)",
+      "Top 5 Opticas list renders 4 ranked rows (Cortexia Demo #1 Free 9pac/5ventas/58cons, Visión Clara #2, Altavista Enterprise #3, TEST_Optica #4) with data-testid top-company-{i}",
+      "Uso de Modulos Opcionales bar chart renders 4 modules (Inventario/Ventas/Proveedores/Finanzas) all = 1",
+      "Crecimiento de Pacientes 6-month AreaChart renders with monthly buckets Dec 2025 -> May 2026",
+      "Revenue por Plan + Opticas por Plan + Cambios de Plan Recientes + Opticas Cerca del Limite all render with no errors",
+      "4 recharts SVGs present (pie, area, bar revenue, bar modules)"
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_superadmin_dashboard.py",
+    "/app/test_reports/pytest/superadmin_dashboard_iter18.xml"
+  ],
+  "action_items": [
+    "Optional perf: collapse N+1 count_documents loops in /api/superadmin/dashboard into a single $group aggregation per collection grouped by company_id",
+    "Optional cleanup: remove dead code (mrr_trend computed but not returned; active_7d initialised from login_attempts then overwritten)",
+    "Optional cleanup: hide or filter TEST_ prefixed companies from Top 5 list (or seed clean DB)"
+  ],
+  "critical_code_review_comments": [
+    "/app/backend/routes/superadmin.py L56-66: mrr_trend list is built (6 months) but is NOT returned in the response payload. Either expose it (the frontend imports a 'mrr_trend' nowhere, but the feature spec mentions MRR trend) or delete the dead lines. Currently the frontend has no historical MRR chart.",
+    "/app/backend/routes/superadmin.py L108: `active_7d = await db.login_attempts.count_documents({})` is dead code - immediately overwritten at L247 by `len(active_users_7d)`. Remove.",
+    "/app/backend/routes/superadmin.py L159-171 (top_companies loop) issues 3*N count_documents calls per active company. For 100 companies that's 300 round-trips per dashboard load. Refactor to a single aggregation: `db.patients.aggregate([{$match:{is_deleted:{$ne:true}}},{$group:{_id:'$company_id', n:{$sum:1}}}])` then join in memory.",
+    "/app/backend/routes/superadmin.py L97: end-of-month computation `(m_dt + timedelta(days=30)).strftime('%Y-%m')-01` is fragile; for months with 31 days the next-month boundary skips a day. Use dateutil.relativedelta(months=1) or proper calendar arithmetic.",
+    "/app/backend/routes/superadmin.py L176-185 module_usage: nested 3-loop O(plans * companies * modules). Build a plan_id->modules map once then a single pass over companies.",
+    "/app/frontend/src/pages/SuperAdminDashboard.js L260-268: Opticas Cerca del Limite shows percentages > 100% as text (e.g. '3/1 suc (300%)' was observed). The bar/alert UI clamps at 100% but the text shows 300%. Either clamp the displayed % at 100% or change the label to 'Excedido'."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_superadmin_dashboard.py (added TestNewMetrics class with 8 new test methods)"
+  ],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "100% (9/9 flows)"},
+  "test_credentials": {
+    "superadmin": "superadmin@cortexia.com / Admin123! (worked)",
+    "altavista_enterprise_admin": "analuhs@gmail.com / Alta2026$ (worked, used for 403 test)"
+  },
+  "seed_data_creation": "None. Tests are read-only on /api/superadmin/dashboard.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "SuperAdmin dashboard endpoint /api/superadmin/dashboard returns: totals, companies_by_plan, estimated_revenue, arpu, churn_rate, revenue_by_plan, funnel{free,basic,enterprise,upgrades_total,downgrades_total}, patient_growth (6 months), engagement{active_7d,active_30d,total_users}, top_companies (top 5 by score = patients + 2*sales + consultations), module_usage[{name,count}] for inventario/ventas/proveedores/finanzas, platform_volume{total_sales_volume,sales_volume_month,total_transactions,avg_patients_per_company}, companies_at_limit, recent_plan_changes, new_companies_month. Frontend renders at /admin/dashboard with data-testid='superadmin-dashboard'. KPI testids: kpi-mrr, kpi-companies, kpi-patients, kpi-arpu, kpi-churn. Engagement testids: eng-7d, eng-30d, vol-month, avg-patients. Top companies testid pattern: top-company-{0..N}. Note: SuperAdmin login redirects to /admin/opticas by default - must navigate to /admin/dashboard manually. Current data snapshot: 4 active companies (3 Free / 1 Enterprise) + 1 inactive, MRR Q699, ARPU Q174.75, Churn 20%, 20 patients across 4 companies (avg 5), 5 sales totalling Q5300 all from Cortexia Demo, 2 upgrades + 2 downgrades in plan_history, engagement active_7d=0 / active_30d=1 / total_users=10.",
+  "rca_of_issue": "N/A - no failures."
+}
