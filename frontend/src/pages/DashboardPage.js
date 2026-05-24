@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api, useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -8,6 +8,12 @@ import {
   AlertTriangle, Clock, DollarSign, ShoppingBag, CreditCard, X, Info, Sparkles, Megaphone
 } from 'lucide-react';
 import { BranchFilter } from '../components/BranchFilter';
+
+const ANNOUNCEMENT_STYLES = {
+  info: { bg: 'bg-blue-50 border-blue-200', icon: Info, iconColor: 'text-blue-600', titleColor: 'text-blue-900', textColor: 'text-blue-700' },
+  warning: { bg: 'bg-amber-50 border-amber-200', icon: AlertTriangle, iconColor: 'text-amber-600', titleColor: 'text-amber-900', textColor: 'text-amber-700' },
+  promo: { bg: 'bg-emerald-50 border-emerald-200', icon: Sparkles, iconColor: 'text-emerald-600', titleColor: 'text-emerald-900', textColor: 'text-emerald-700' },
+};
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -19,6 +25,11 @@ export default function DashboardPage() {
   const [announcements, setAnnouncements] = useState([]);
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState([]);
   const trackedViewsRef = useRef(new Set());
+
+  const visibleAnnouncements = useMemo(
+    () => announcements.filter(a => !dismissedAnnouncements.includes(a._id)),
+    [announcements, dismissedAnnouncements]
+  );
 
   useEffect(() => {
     if (user?.role === 'superadmin') {
@@ -135,15 +146,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Announcement Banners */}
-      {announcements.filter(a => !dismissedAnnouncements.includes(a._id)).length > 0 && (
+      {visibleAnnouncements.length > 0 && (
         <div className="space-y-2" data-testid="announcement-banners">
-          {announcements.filter(a => !dismissedAnnouncements.includes(a._id)).map(ann => {
-            const styles = {
-              info: { bg: 'bg-blue-50 border-blue-200', icon: Info, iconColor: 'text-blue-600', titleColor: 'text-blue-900', textColor: 'text-blue-700' },
-              warning: { bg: 'bg-amber-50 border-amber-200', icon: AlertTriangle, iconColor: 'text-amber-600', titleColor: 'text-amber-900', textColor: 'text-amber-700' },
-              promo: { bg: 'bg-emerald-50 border-emerald-200', icon: Sparkles, iconColor: 'text-emerald-600', titleColor: 'text-emerald-900', textColor: 'text-emerald-700' },
-            };
-            const s = styles[ann.type] || styles.info;
+          {visibleAnnouncements.map(ann => {
+            const s = ANNOUNCEMENT_STYLES[ann.type] || ANNOUNCEMENT_STYLES.info;
             const Icon = s.icon;
             return (
               <div key={ann._id} className={`${s.bg} border rounded-lg p-3.5 flex items-start gap-3`} data-testid={`banner-${ann._id}`}>
@@ -203,7 +209,7 @@ export default function DashboardPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
-          <Card key={index} className="border-slate-200/80" data-testid={`stat-card-${index}`}>
+          <Card key={stat.title} className="border-slate-200/80" data-testid={`stat-card-${index}`}>
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
                 <div>
@@ -225,7 +231,7 @@ export default function DashboardPage() {
       {/* Finance Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {financeStats.map((stat, index) => (
-          <Card key={index} className={`border-0 ${stat.bgColor}`} data-testid={`finance-card-${index}`}>
+          <Card key={stat.title} className={`border-0 ${stat.bgColor}`} data-testid={`finance-card-${index}`}>
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div>

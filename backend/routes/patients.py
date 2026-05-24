@@ -10,6 +10,40 @@ from routes.notifications import create_notification
 
 router = APIRouter(prefix="/patients", tags=["Pacientes"])
 
+
+async def _check_patient_limit(company_id: str):
+    """Check plan patient limit. Raises 403 if limit reached. Returns (company, plan) or (None, None)."""
+    company = await db.companies.find_one({"_id": ObjectId(company_id)})
+    if not company or not company.get("plan_id"):
+        return company, None
+    plan = await db.plans.find_one({"_id": company["plan_id"]})
+    if not plan or plan.get("max_patients", 0) <= 0:
+        return company, plan
+    current_count = await db.patients.count_documents({"company_id": ObjectId(company_id), "is_deleted": {"$ne": True}})
+    if current_count >= plan["max_patients"]:
+        raise HTTPException(status_code=403, detail=f"Limite de pacientes alcanzado ({plan['max_patients']}). Actualice su plan para agregar mas.")
+    return company, plan
+
+
+async def _notify_patient_limit(company, plan, company_id: str):
+    """Send notification if company is near or at patient limit."""
+    if not company or not plan or plan.get("max_patients", 0) <= 0:
+        return
+    max_p = plan["max_patients"]
+    new_count = await db.patients.count_documents({"company_id": ObjectId(company_id), "is_deleted": {"$ne": True}})
+    pct = new_count / max_p
+    cname = company.get("name", "Optica")
+    if pct >= 1.0:
+        if not await db.notifications.find_one({"event_type": "limit_reached", "metadata.company_id": company_id, "metadata.resource": "pacientes"}):
+            await create_notification("limit_reached", "Limite de pacientes alcanzado",
+                f"{cname} alcanzo el limite de {max_p} pacientes (plan {plan['name']})",
+                {"company_id": company_id, "company_name": cname, "resource": "pacientes", "current": new_count, "max": max_p})
+    elif pct >= 0.8:
+        if not await db.notifications.find_one({"event_type": "limit_warning", "metadata.company_id": company_id, "metadata.resource": "pacientes"}):
+            await create_notification("limit_warning", "Optica cerca del limite de pacientes",
+                f"{cname} tiene {new_count}/{max_p} pacientes ({round(pct*100)}%) en plan {plan['name']}",
+                {"company_id": company_id, "company_name": cname, "resource": "pacientes", "current": new_count, "max": max_p})
+
 @router.get("")
 async def list_patients(
     user: dict = Depends(get_current_user),
@@ -44,14 +78,7 @@ async def create_patient(data: PatientCreate, user: dict = Depends(get_current_u
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="SuperAdmin no puede crear pacientes")
     
-    # Check plan patient limit
-    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
-    if company and company.get("plan_id"):
-        plan = await db.plans.find_one({"_id": company["plan_id"]})
-        if plan and plan.get("max_patients", 0) > 0:
-            current_count = await db.patients.count_documents({"company_id": ObjectId(user["company_id"]), "is_deleted": {"$ne": True}})
-            if current_count >= plan["max_patients"]:
-                raise HTTPException(status_code=403, detail=f"Limite de pacientes alcanzado ({plan['max_patients']}). Actualice su plan para agregar mas.")
+    company, plan = await _check_patient_limit(user["company_id"])
     
     patient_doc = {
         "company_id": ObjectId(user["company_id"]),
@@ -66,26 +93,7 @@ async def create_patient(data: PatientCreate, user: dict = Depends(get_current_u
     }
     result = await db.patients.insert_one(patient_doc)
     
-    # Check limit threshold for notification
-    if company and company.get("plan_id"):
-        plan = await db.plans.find_one({"_id": company["plan_id"]})
-        if plan and plan.get("max_patients", 0) > 0:
-            new_count = await db.patients.count_documents({"company_id": ObjectId(user["company_id"]), "is_deleted": {"$ne": True}})
-            max_p = plan["max_patients"]
-            pct = new_count / max_p
-            cname = company.get("name", "Optica")
-            if pct >= 1.0:
-                existing = await db.notifications.find_one({"event_type": "limit_reached", "metadata.company_id": user["company_id"], "metadata.resource": "pacientes"})
-                if not existing:
-                    await create_notification("limit_reached", "Limite de pacientes alcanzado",
-                        f"{cname} alcanzo el limite de {max_p} pacientes (plan {plan['name']})",
-                        {"company_id": user["company_id"], "company_name": cname, "resource": "pacientes", "current": new_count, "max": max_p})
-            elif pct >= 0.8:
-                existing = await db.notifications.find_one({"event_type": "limit_warning", "metadata.company_id": user["company_id"], "metadata.resource": "pacientes"})
-                if not existing:
-                    await create_notification("limit_warning", "Optica cerca del limite de pacientes",
-                        f"{cname} tiene {new_count}/{max_p} pacientes ({round(pct*100)}%) en plan {plan['name']}",
-                        {"company_id": user["company_id"], "company_name": cname, "resource": "pacientes", "current": new_count, "max": max_p})
+    await _notify_patient_limit(company, plan, user["company_id"])
     
     return {"_id": str(result.inserted_id), "message": "Paciente creado"}
 

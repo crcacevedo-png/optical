@@ -429,7 +429,7 @@ export default function AnnouncementsPage() {
                   <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Opticas que vieron ({metricsData.views_count})</p>
                   <div className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1">
                     {metricsData.view_details.map((v, i) => (
-                      <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-blue-50/50 border border-blue-100" data-testid={`view-detail-${i}`}>
+                      <div key={`view-${v.company_name}-${v.date}`} className="flex items-center justify-between p-2 rounded-lg bg-blue-50/50 border border-blue-100" data-testid={`view-detail-${i}`}>
                         <div>
                           <p className="text-sm font-medium text-slate-800">{v.company_name}</p>
                           <p className="text-[10px] text-slate-500">{v.user_name}</p>

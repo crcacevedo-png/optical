@@ -1,6 +1,22 @@
 from pydantic import BaseModel, EmailStr, model_validator
 from typing import List, Optional
 
+
+def _clean_optical_fields(data):
+    """Normalize optical prescription field values. Reduces nesting in model validators."""
+    if not isinstance(data, dict):
+        return data
+    plano_aliases = ('plano', 'pl', 'piano', 'neutro', 'n')
+    for k, v in data.items():
+        if not isinstance(v, str):
+            continue
+        stripped = v.strip().lower()
+        if stripped == '':
+            data[k] = None
+        elif stripped in plano_aliases:
+            data[k] = 0.0
+    return data
+
 class UserRegister(BaseModel):
     email: EmailStr
     password: str
@@ -119,15 +135,7 @@ class EyeglassPrescriptionCreate(BaseModel):
     @model_validator(mode='before')
     @classmethod
     def clean_optical_values(cls, data):
-        if isinstance(data, dict):
-            for k, v in data.items():
-                if isinstance(v, str):
-                    stripped = v.strip().lower()
-                    if stripped == '':
-                        data[k] = None
-                    elif stripped in ('plano', 'pl', 'piano', 'neutro', 'n'):
-                        data[k] = 0.0
-        return data
+        return _clean_optical_fields(data)
 
 class MedicalPrescriptionCreate(BaseModel):
     patient_id: str
@@ -161,15 +169,7 @@ class ContactLensPrescriptionCreate(BaseModel):
     @model_validator(mode='before')
     @classmethod
     def clean_optical_values(cls, data):
-        if isinstance(data, dict):
-            for k, v in data.items():
-                if isinstance(v, str):
-                    stripped = v.strip().lower()
-                    if stripped == '':
-                        data[k] = None
-                    elif stripped in ('plano', 'pl', 'piano', 'neutro', 'n'):
-                        data[k] = 0.0
-        return data
+        return _clean_optical_fields(data)
 
 class ProductCreate(BaseModel):
     name: str

@@ -215,7 +215,7 @@ export default function LoginPage() {
         <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }}>
           {CONNECTIONS.map(([a, b], i) => (
             <line
-              key={i}
+              key={`conn-${a}-${b}`}
               x1={`${NODES[a].x}%`} y1={`${NODES[a].y}%`}
               x2={`${NODES[b].x}%`} y2={`${NODES[b].y}%`}
               stroke="rgba(26,188,156,0.1)"

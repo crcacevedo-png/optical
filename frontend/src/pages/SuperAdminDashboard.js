@@ -89,8 +89,8 @@ export default function SuperAdminDashboard() {
                 <Pie data={companies_by_plan} dataKey="value" nameKey="name" cx="50%" cy="50%"
                   outerRadius={72} innerRadius={38} paddingAngle={3}
                   label={({ name, value }) => `${name} (${value})`}>
-                  {companies_by_plan.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  {companies_by_plan.map((entry, i) => (
+                    <Cell key={`pie-${entry.name}`} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip formatter={(v) => [`${v} opticas`, 'Cantidad']} />
@@ -197,7 +197,7 @@ export default function SuperAdminDashboard() {
             ) : (
               <div className="space-y-2">
                 {top_companies.map((c, i) => (
-                  <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-slate-50 transition-colors" data-testid={`top-company-${i}`}>
+                  <div key={`top-${c.name}-${i}`} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-slate-50 transition-colors" data-testid={`top-company-${i}`}>
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                       i === 0 ? 'bg-amber-100 text-amber-700' : i === 1 ? 'bg-slate-200 text-slate-600' : i === 2 ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-500'
                     }`}>{i + 1}</div>
@@ -231,7 +231,7 @@ export default function SuperAdminDashboard() {
                 <Tooltip formatter={(v) => [`${v} opticas`, 'Tienen acceso']} />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                   {module_usage.map((entry, i) => (
-                    <Cell key={i} fill={MODULE_COLORS[entry.name] || PIE_COLORS[i]} />
+                    <Cell key={`mod-${entry.name}`} fill={MODULE_COLORS[entry.name] || PIE_COLORS[i]} />
                   ))}
                 </Bar>
               </BarChart>
@@ -257,7 +257,7 @@ export default function SuperAdminDashboard() {
             ) : (
               <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
                 {companies_at_limit.map((c, i) => (
-                  <div key={i} className="p-2.5 rounded-lg border border-amber-100 bg-amber-50/50" data-testid={`limit-alert-${i}`}>
+                  <div key={`limit-${c.name}`} className="p-2.5 rounded-lg border border-amber-100 bg-amber-50/50" data-testid={`limit-alert-${i}`}>
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-sm text-slate-800">{c.name}</span>
                       <Badge className="bg-slate-100 text-slate-600 text-[10px]">{c.plan_name}</Badge>
