@@ -137,8 +137,8 @@ export default function InventoryPage() {
 
   const handleSaveMinStock = async (productId) => {
     const val = parseInt(minStockValue);
-    if (isNaN(val) || val < 1) {
-      toast.error('El stock minimo debe ser mayor o igual a 1');
+    if (isNaN(val) || val < 0) {
+      toast.error('El stock minimo debe ser mayor o igual a 0');
       return;
     }
     try {
@@ -234,7 +234,7 @@ export default function InventoryPage() {
                     <Label>Cantidad *</Label>
                     <Input
                       type="number"
-                      min="1"
+                      min="0"
                       value={movementForm.quantity}
                       onChange={(e) => setMovementForm({...movementForm, quantity: e.target.value})}
                       required
@@ -349,7 +349,7 @@ export default function InventoryPage() {
                     <Label>Stock Min</Label>
                     <Input
                       type="number"
-                      min="1"
+                      min="0"
                       value={productForm.min_stock}
                       onChange={(e) => setProductForm({...productForm, min_stock: e.target.value})}
                       data-testid="product-min-stock"
@@ -442,7 +442,7 @@ export default function InventoryPage() {
             <TableBody>
               {filteredProducts.map((product) => {
                 const currentStock = getStockForProduct(product._id);
-                const isLowStock = currentStock <= (product.min_stock || 1);
+                const isLowStock = currentStock <= (product.min_stock ?? 0);
                 return (
                   <TableRow key={product._id} className="data-table-row" data-testid={`product-row-${product._id}`}>
                     <TableCell>
@@ -471,7 +471,7 @@ export default function InventoryPage() {
                         <div className="flex items-center gap-1 justify-center">
                           <Input
                             type="number"
-                            min="1"
+                            min="0"
                             className="w-16 h-7 text-center text-xs px-1"
                             value={minStockValue}
                             onChange={(e) => setMinStockValue(e.target.value)}
@@ -533,7 +533,7 @@ export default function InventoryPage() {
                 <Label>Cantidad a agregar *</Label>
                 <Input
                   type="number"
-                  min="1"
+                  min="0"
                   value={addStockForm.quantity}
                   onChange={(e) => setAddStockForm({...addStockForm, quantity: e.target.value})}
                   required
