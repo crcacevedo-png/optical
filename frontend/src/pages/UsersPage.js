@@ -5,19 +5,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-import { Plus, Users, UserCheck, UserX } from 'lucide-react';
+import { Plus, Users, UserCheck, UserX, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function UsersPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -90,6 +91,20 @@ export default function UsersPage() {
     const branch = branches.find(b => b._id === branchId);
     return branch?.name || '-';
   };
+
+  const handleDeleteUser = async () => {
+    if (!deleteDialog) return;
+    try {
+      await api.delete(`/api/users/${deleteDialog._id}`);
+      toast.success('Usuario eliminado');
+      setDeleteDialog(null);
+      fetchData();
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail));
+    }
+  };
+
+  const isSuperAdmin = currentUser?.role === 'superadmin';
 
   if (loading) {
     return (
@@ -204,7 +219,7 @@ export default function UsersPage() {
                 <TableHead>Rol</TableHead>
                 <TableHead>Sucursal</TableHead>
                 <TableHead>Estado</TableHead>
-                {isAdmin && <TableHead className="text-right">Acciones</TableHead>}
+                {(isAdmin || isSuperAdmin) && <TableHead className="text-right">Acciones</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -231,17 +246,30 @@ export default function UsersPage() {
                       {user.is_active !== false ? 'Activo' : 'Inactivo'}
                     </span>
                   </TableCell>
-                  {isAdmin && (
+                  {(isAdmin || isSuperAdmin) && (
                     <TableCell className="text-right">
-                      {user.role !== 'superadmin' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => toggleUserStatus(user._id, user.is_active !== false)}
-                        >
-                          {user.is_active !== false ? 'Desactivar' : 'Activar'}
-                        </Button>
-                      )}
+                      <div className="flex justify-end gap-1">
+                        {user.role !== 'superadmin' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => toggleUserStatus(user._id, user.is_active !== false)}
+                              data-testid={`toggle-user-${user._id}`}
+                            >
+                              {user.is_active !== false ? 'Desactivar' : 'Activar'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setDeleteDialog(user)}
+                              data-testid={`delete-user-${user._id}`}
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   )}
                 </TableRow>
@@ -258,6 +286,22 @@ export default function UsersPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation */}
+      <Dialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Eliminar Usuario</DialogTitle>
+            <DialogDescription>
+              Desactivar al usuario <strong>{deleteDialog?.name}</strong> ({deleteDialog?.email})? No podra acceder al sistema.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialog(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDeleteUser} data-testid="confirm-delete-user">Eliminar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
