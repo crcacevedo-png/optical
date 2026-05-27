@@ -55,29 +55,49 @@ async def register(data: UserRegister, response: Response):
 async def login(data: UserLogin, response: Response, request: Request):
     email = data.email.lower()
     
+    # Brute force check
     ip = request.client.host if request.client else "unknown"
     identifier = f"{ip}:{email}"
-    attempt = await db.login_attempts.find_one({"identifier": identifier})
-    if attempt and attempt.get("count", 0) >= 5:
-        lockout_until = attempt.get("lockout_until")
-        if lockout_until and datetime.fromisoformat(lockout_until) > datetime.now(timezone.utc):
-            raise HTTPException(status_code=429, detail="Demasiados intentos. Intente en 15 minutos.")
-        else:
+    try:
+        attempt = await db.login_attempts.find_one({"identifier": identifier})
+        if attempt and attempt.get("count", 0) >= 5:
+            lockout_until = attempt.get("lockout_until")
+            if lockout_until:
+                try:
+                    if datetime.fromisoformat(lockout_until) > datetime.now(timezone.utc):
+                        raise HTTPException(status_code=429, detail="Demasiados intentos. Intente en 15 minutos.")
+                except (ValueError, TypeError):
+                    pass
             await db.login_attempts.delete_one({"identifier": identifier})
+    except HTTPException:
+        raise
+    except Exception:
+        pass
     
     user = await db.users.find_one({"email": email})
     if not user:
         await increment_login_attempts(identifier)
         raise HTTPException(status_code=401, detail="Credenciales invalidas")
     
-    if not verify_password(data.password, user["password_hash"]):
+    # Verify password safely
+    try:
+        pw_hash = user.get("password_hash", "")
+        if not pw_hash or not verify_password(data.password, pw_hash):
+            await increment_login_attempts(identifier)
+            raise HTTPException(status_code=401, detail="Credenciales invalidas")
+    except HTTPException:
+        raise
+    except Exception:
         await increment_login_attempts(identifier)
         raise HTTPException(status_code=401, detail="Credenciales invalidas")
     
     if not user.get("is_active", True):
         raise HTTPException(status_code=403, detail="Cuenta desactivada")
     
-    await db.login_attempts.delete_one({"identifier": identifier})
+    try:
+        await db.login_attempts.delete_one({"identifier": identifier})
+    except Exception:
+        pass
     
     user_id = str(user["_id"])
     company_id = str(user["company_id"]) if user.get("company_id") else None

@@ -1,5 +1,4 @@
-from fastapi import FastAPI, APIRouter, Depends, Query, Request
-from starlette.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, APIRouter, Depends, Query, Request, Response
 from bson import ObjectId
 from pathlib import Path
 from datetime import datetime, timezone
@@ -80,29 +79,26 @@ async def add_no_cache_headers(request: Request, call_next):
         response.headers["Pragma"] = "no-cache"
     return response
 
-# CORS
-cors_origins_raw = os.environ.get("CORS_ORIGINS", "")
-if cors_origins_raw == "*":
-    cors_origins = ["*"]
-elif cors_origins_raw:
-    cors_origins = [o.strip() for o in cors_origins_raw.split(",") if o.strip()]
-else:
-    cors_origins = []
-
-frontend_url = os.environ.get("FRONTEND_URL", "")
-if frontend_url and frontend_url not in cors_origins and cors_origins != ["*"]:
-    cors_origins.append(frontend_url)
-
-if not cors_origins:
-    cors_origins = ["http://localhost:3000"]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS - Reflect origin for credentials support
+@app.middleware("http")
+async def cors_middleware(request: Request, call_next):
+    origin = request.headers.get("origin", "")
+    
+    if request.method == "OPTIONS":
+        response = Response(status_code=200)
+        response.headers["Access-Control-Allow-Origin"] = origin or "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Max-Age"] = "600"
+        return response
+    
+    response = await call_next(request)
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    return response
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)

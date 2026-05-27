@@ -1,7 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL || '';
+// In production (custom domain), use relative URL (same-origin).
+// In preview/dev, use the env variable.
+const isProduction = typeof window !== 'undefined' && 
+  window.location.hostname !== 'localhost' && 
+  !window.location.hostname.includes('preview.emergentagent.com');
+
+const API_URL = isProduction ? '' : (process.env.REACT_APP_BACKEND_URL || '');
 
 const AuthContext = createContext(null);
 
