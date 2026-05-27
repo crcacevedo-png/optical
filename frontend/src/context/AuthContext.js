@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
 const AuthContext = createContext(null);
 
@@ -9,6 +9,9 @@ const AuthContext = createContext(null);
 const api = axios.create({
   baseURL: API_URL,
   withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+  }
 });
 
 // Auto-refresh interceptor: retry once with refreshed token on 401
