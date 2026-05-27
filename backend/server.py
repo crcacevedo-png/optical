@@ -119,10 +119,11 @@ async def startup():
     await db.optical_consultations.create_index([("company_id", 1), ("patient_id", 1)])
     await db.optical_consultations.create_index([("company_id", 1), ("created_at", -1)])
     
-    # Seed superadmin - always reset password to ensure access
-    admin_email = os.environ.get("ADMIN_EMAIL", "superadmin@cortexia.com")
-    admin_password = os.environ.get("ADMIN_PASSWORD", "") or "Montecristo2026"
-    admin_password = admin_password.strip()
+    # Seed superadmin - HARDCODED password to avoid env var corruption (shell $ expansion)
+    # in production. DO NOT read from os.environ.get("ADMIN_PASSWORD") because that
+    # variable may be set with a stale/corrupted value in the production deployment.
+    admin_email = "superadmin@cortexia.com"
+    admin_password = "Montecristo2026"
     logger.info(f"SuperAdmin seed: email={admin_email}, pw_chars={admin_password[:3]}***{admin_password[-2:]}, len={len(admin_password)}")
     try:
         existing = await db.users.find_one({"email": admin_email})

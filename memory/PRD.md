@@ -10,6 +10,13 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 
 ## Lo Implementado
 
+### Fix Login Produccion - Hardcode SuperAdmin (Mayo 2026)
+- Eliminado el lookup de env var ADMIN_PASSWORD en server.py seed
+- Password hardcodeado "Montecristo2026" para evitar corrupcion de shell ($ expansion) en deploy
+- Seed resetea password en cada startup garantizando acceso
+- Verificado en preview: login + /me HTTP 200 OK
+- Requiere REDEPLOY en cortexiaoptical.com para aplicar
+
 ### Notificaciones Push SuperAdmin (Mayo 2026)
 - Campana con badge rojo de no leidas en header (polling 30s)
 - Dropdown con lista de notificaciones ordenadas por fecha
