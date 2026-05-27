@@ -240,7 +240,7 @@ export default function SettingsPage() {
               <div className="w-32 h-32 rounded-xl border-2 border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center shrink-0" data-testid="settings-logo-preview">
                 {company?.logo_filename ? (
                   <img
-                    src={`${process.env.REACT_APP_BACKEND_URL}/api/companies/${company._id}/logo?t=${logoTimestamp}`}
+                    src={`/api/companies/${company._id}/logo?t=${logoTimestamp}`}
                     alt="Logo"
                     className="w-full h-full object-contain p-2"
                     onError={(e) => { e.target.style.display = 'none'; }}

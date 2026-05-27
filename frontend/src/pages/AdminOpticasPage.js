@@ -401,7 +401,7 @@ export default function AdminOpticasPage() {
                         {selectedCompany.logo_filename ? (
                           <div className="w-24 h-24 rounded-lg border-2 border-slate-200 overflow-hidden bg-white flex items-center justify-center" data-testid="company-logo-preview">
                             <img
-                              src={`${process.env.REACT_APP_BACKEND_URL}/api/companies/${selectedCompany._id}/logo?t=${Date.now()}`}
+                              src={`/api/companies/${selectedCompany._id}/logo?t=${Date.now()}`}
                               alt="Logo"
                               className="max-w-full max-h-full object-contain"
                             />

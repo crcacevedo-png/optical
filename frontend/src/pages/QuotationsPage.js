@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+import { BranchFilter } from '../components/BranchFilter';
 
 const formatCurrency = (amount) => `Q${(amount || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`;
 

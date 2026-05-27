@@ -119,25 +119,30 @@ async def startup():
     await db.optical_consultations.create_index([("company_id", 1), ("patient_id", 1)])
     await db.optical_consultations.create_index([("company_id", 1), ("created_at", -1)])
     
-    # Seed superadmin
+    # Seed superadmin - always reset password to ensure access
     admin_email = os.environ.get("ADMIN_EMAIL", "superadmin@cortexia.com")
-    admin_password = os.environ.get("ADMIN_PASSWORD", "Montecristo2026")
-    logger.info(f"SuperAdmin seed: email={admin_email}, password_len={len(admin_password)}")
-    existing = await db.users.find_one({"email": admin_email})
-    if existing:
-        await db.users.update_one(
-            {"email": admin_email},
-            {"$set": {"password_hash": hash_password(admin_password), "role": "superadmin"}}
-        )
-        logger.info(f"SuperAdmin password reset: {admin_email}")
-    else:
-        await db.users.insert_one({
-            "email": admin_email, "password_hash": hash_password(admin_password),
-            "name": "Super Administrador", "role": "superadmin",
-            "company_id": None, "branch_id": None, "is_active": True,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        })
-        logger.info(f"SuperAdmin created: {admin_email}")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "") or "Montecristo2026"
+    admin_password = admin_password.strip()
+    logger.info(f"SuperAdmin seed: email={admin_email}, pw_chars={admin_password[:3]}***{admin_password[-2:]}, len={len(admin_password)}")
+    try:
+        existing = await db.users.find_one({"email": admin_email})
+        new_hash = hash_password(admin_password)
+        if existing:
+            await db.users.update_one(
+                {"email": admin_email},
+                {"$set": {"password_hash": new_hash, "role": "superadmin", "is_active": True}}
+            )
+            logger.info(f"SuperAdmin password reset OK: {admin_email}")
+        else:
+            await db.users.insert_one({
+                "email": admin_email, "password_hash": new_hash,
+                "name": "Super Administrador", "role": "superadmin",
+                "company_id": None, "branch_id": None, "is_active": True,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+            logger.info(f"SuperAdmin created: {admin_email}")
+    except Exception as e:
+        logger.error(f"SuperAdmin seed error: {e}")
     
     # Seed demo company
     demo_company = await db.companies.find_one({"name": "Cortexia Optical Demo"})
