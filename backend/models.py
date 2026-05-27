@@ -26,6 +26,10 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class ChangePassword(BaseModel):
+    current_password: str
+    new_password: str
+
 class CompanyCreate(BaseModel):
     name: str
     legal_name: str = ""

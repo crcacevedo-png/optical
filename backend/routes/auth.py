@@ -8,7 +8,7 @@ from auth_utils import (
     get_current_user, hash_password, verify_password,
     create_access_token, create_refresh_token, get_jwt_secret, JWT_ALGORITHM
 )
-from models import UserRegister, UserLogin
+from models import UserRegister, UserLogin, ChangePassword
 import jwt
 
 router = APIRouter(prefix="/auth", tags=["Autenticacion"])
@@ -177,6 +177,22 @@ async def get_me(user: dict = Depends(get_current_user)):
         except Exception:
             pass
     return user
+
+@router.post("/change-password")
+async def change_password(data: ChangePassword, user: dict = Depends(get_current_user)):
+    """Permite que cualquier usuario autenticado cambie su propia contraseña."""
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 6 caracteres")
+    db_user = await db.users.find_one({"_id": ObjectId(user["_id"])})
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if not verify_password(data.current_password, db_user.get("password_hash", "")):
+        raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
+    await db.users.update_one(
+        {"_id": ObjectId(user["_id"])},
+        {"$set": {"password_hash": hash_password(data.new_password)}}
+    )
+    return {"message": "Contraseña actualizada correctamente"}
 
 @router.post("/refresh")
 async def refresh_token(request: Request, response: Response):

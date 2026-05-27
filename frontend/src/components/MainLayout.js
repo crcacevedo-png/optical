@@ -3,12 +3,13 @@ import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { GlobalSearch } from './GlobalSearch';
 import { NotificationBell } from './NotificationBell';
+import { ChangeMyPasswordDialog } from './ChangeMyPasswordDialog';
 import { Button } from '../components/ui/button';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { 
   LayoutDashboard, Users, Calendar, FileText, Package, 
   ShoppingCart, DollarSign, Building2, UserCog, BarChart3,
-  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone
+  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone, Key
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -23,6 +24,7 @@ export default function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -127,6 +129,10 @@ export default function MainLayout() {
                 <p className="text-sm font-medium">{user?.role === 'admin' ? 'Administrador' : user?.role === 'superadmin' ? 'Super Admin' : 'Usuario'}</p>
               </div>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowPasswordDialog(true)} className="cursor-pointer" data-testid="change-my-password-btn">
+                <Key className="w-4 h-4 mr-2" /> Cambiar mi contraseña
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer" data-testid="logout-btn">
                 <LogOut className="w-4 h-4 mr-2" /> Cerrar Sesión
               </DropdownMenuItem>
@@ -179,6 +185,14 @@ export default function MainLayout() {
                 </div>
                 <Button
                   variant="outline"
+                  className="w-full mb-2"
+                  onClick={() => { setShowPasswordDialog(true); setSidebarOpen(false); }}
+                  data-testid="change-my-password-mobile-btn"
+                >
+                  <Key className="w-4 h-4 mr-2" /> Cambiar mi contraseña
+                </Button>
+                <Button
+                  variant="outline"
                   className="w-full text-red-600 border-red-200 hover:bg-red-50"
                   onClick={handleLogout}
                 >
@@ -200,6 +214,7 @@ export default function MainLayout() {
           <Outlet />
         </div>
       </main>
+      <ChangeMyPasswordDialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog} />
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-import { Plus, Users, UserCheck, UserX, Trash2 } from 'lucide-react';
+import { Plus, Users, UserCheck, UserX, Trash2, Key } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function UsersPage() {
@@ -19,6 +19,8 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(null);
+  const [passwordDialog, setPasswordDialog] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -99,6 +101,23 @@ export default function UsersPage() {
       toast.success('Usuario eliminado');
       setDeleteDialog(null);
       fetchData();
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail));
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (!passwordDialog) return;
+    if (newPassword.length < 6) {
+      toast.error('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    try {
+      await api.put(`/api/users/${passwordDialog._id}`, { password: newPassword });
+      toast.success(`Contraseña actualizada para ${passwordDialog.name}`);
+      setPasswordDialog(null);
+      setNewPassword('');
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail));
     }
@@ -262,6 +281,15 @@ export default function UsersPage() {
                             <Button
                               size="sm"
                               variant="ghost"
+                              onClick={() => { setPasswordDialog(user); setNewPassword(''); }}
+                              title="Cambiar contraseña"
+                              data-testid={`reset-password-${user._id}`}
+                            >
+                              <Key className="w-4 h-4 text-blue-600" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
                               onClick={() => setDeleteDialog(user)}
                               data-testid={`delete-user-${user._id}`}
                             >
@@ -300,6 +328,40 @@ export default function UsersPage() {
             <Button variant="outline" onClick={() => setDeleteDialog(null)}>Cancelar</Button>
             <Button variant="destructive" onClick={handleDeleteUser} data-testid="confirm-delete-user">Eliminar</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Reset Password Dialog */}
+      <Dialog open={!!passwordDialog} onOpenChange={(open) => { if (!open) { setPasswordDialog(null); setNewPassword(''); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-heading">Cambiar Contraseña</DialogTitle>
+            <DialogDescription>
+              Asigna una nueva contraseña para <strong>{passwordDialog?.name}</strong> ({passwordDialog?.email}).
+              El usuario podrá ingresar con esta nueva contraseña la próxima vez.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleResetPassword} className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>Nueva contraseña *</Label>
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                minLength={6}
+                required
+                data-testid="new-password-input"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setPasswordDialog(null); setNewPassword(''); }}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="bg-pine-900 hover:bg-pine-700" data-testid="save-new-password">
+                Guardar contraseña
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
