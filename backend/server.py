@@ -121,7 +121,8 @@ async def startup():
     
     # Seed superadmin
     admin_email = os.environ.get("ADMIN_EMAIL", "superadmin@cortexia.com")
-    admin_password = os.environ.get("ADMIN_PASSWORD", "Admin123!")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "Montecristo2026")
+    logger.info(f"SuperAdmin seed: email={admin_email}, password_len={len(admin_password)}")
     existing = await db.users.find_one({"email": admin_email})
     if existing:
         await db.users.update_one(
