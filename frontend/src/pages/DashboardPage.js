@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { 
   Users, Calendar, TrendingUp, TrendingDown, 
-  AlertTriangle, Clock, DollarSign, ShoppingBag, CreditCard, X, Info, Sparkles, Megaphone
+  AlertTriangle, Clock, DollarSign, ShoppingBag, CreditCard, X, Info, Sparkles, Megaphone, ShieldCheck
 } from 'lucide-react';
 import { BranchFilter } from '../components/BranchFilter';
+import { Link } from 'react-router-dom';
 
 const ANNOUNCEMENT_STYLES = {
   info: { bg: 'bg-blue-50 border-blue-200', icon: Info, iconColor: 'text-blue-600', titleColor: 'text-blue-900', textColor: 'text-blue-700' },
@@ -140,7 +141,21 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="font-heading text-2xl sm:text-3xl font-semibold text-slate-900">Dashboard</h1>
-          <p className="text-slate-500 mt-1">Resumen de operaciones del dia</p>
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+            <p className="text-slate-500">Resumen de operaciones del dia</p>
+            <Link
+              to="/settings"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100 hover:bg-emerald-100/70 transition-colors group"
+              data-testid="security-trust-badge"
+              title="Plataforma segura - clic para ver detalles"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-700 group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-semibold text-emerald-800 tracking-wide">
+                Plataforma Segura
+              </span>
+              <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+            </Link>
+          </div>
         </div>
         <BranchFilter value={branchId} onChange={setBranchId} />
       </div>
