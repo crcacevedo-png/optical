@@ -5,8 +5,12 @@ from datetime import datetime, timezone
 import os
 import logging
 
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
 from db import db, client
-from auth_utils import get_current_user, hash_password
+from auth_utils import get_current_user, hash_password, get_real_ip
+from rate_limiter import limiter
 
 from routes import (
     auth, companies, settings, branches, patients, appointments,
@@ -16,6 +20,8 @@ from routes import (
 )
 
 app = FastAPI(title="Cortexia Optical API")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 api_router = APIRouter(prefix="/api")
 

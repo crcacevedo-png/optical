@@ -6,9 +6,11 @@ import os
 from db import db
 from auth_utils import (
     get_current_user, hash_password, verify_password,
-    create_access_token, create_refresh_token, get_jwt_secret, JWT_ALGORITHM
+    create_access_token, create_refresh_token, get_jwt_secret, JWT_ALGORITHM,
+    get_real_ip, validate_password_strength
 )
 from models import UserRegister, UserLogin, ChangePassword
+from rate_limiter import limiter
 import jwt
 
 router = APIRouter(prefix="/auth", tags=["Autenticacion"])
@@ -37,11 +39,12 @@ async def register(data: UserRegister, response: Response):
     raise HTTPException(status_code=403, detail="Registro publico deshabilitado. Contacte al administrador.")
 
 @router.post("/login")
+@limiter.limit("10/minute")
 async def login(data: UserLogin, response: Response, request: Request):
     email = data.email.lower()
     
-    # Brute force check
-    ip = request.client.host if request.client else "unknown"
+    # Brute force check usando IP real (X-Forwarded-For)
+    ip = get_real_ip(request)
     identifier = f"{ip}:{email}"
     try:
         attempt = await db.login_attempts.find_one({"identifier": identifier})
@@ -164,22 +167,30 @@ async def get_me(user: dict = Depends(get_current_user)):
     return user
 
 @router.post("/change-password")
-async def change_password(data: ChangePassword, user: dict = Depends(get_current_user)):
+@limiter.limit("5/minute")
+async def change_password(data: ChangePassword, request: Request, user: dict = Depends(get_current_user)):
     """Permite que cualquier usuario autenticado cambie su propia contraseña."""
-    if len(data.new_password) < 6:
-        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 6 caracteres")
+    is_valid, msg = validate_password_strength(data.new_password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=msg)
     db_user = await db.users.find_one({"_id": ObjectId(user["_id"])})
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     if not verify_password(data.current_password, db_user.get("password_hash", "")):
         raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
+    # Revoca todos los tokens emitidos antes de este momento
+    now_ts = int(datetime.now(timezone.utc).timestamp())
     await db.users.update_one(
         {"_id": ObjectId(user["_id"])},
-        {"$set": {"password_hash": hash_password(data.new_password)}}
+        {"$set": {
+            "password_hash": hash_password(data.new_password),
+            "password_changed_at": now_ts,
+        }}
     )
     return {"message": "Contraseña actualizada correctamente"}
 
 @router.post("/refresh")
+@limiter.limit("30/minute")
 async def refresh_token(request: Request, response: Response):
     token = request.cookies.get("refresh_token")
     if not token:
@@ -191,6 +202,14 @@ async def refresh_token(request: Request, response: Response):
         user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
         if not user:
             raise HTTPException(status_code=401, detail="Usuario no encontrado")
+        # Verificar que la cuenta este activa
+        if not user.get("is_active", True):
+            raise HTTPException(status_code=401, detail="Cuenta desactivada")
+        # Verificar que el refresh token no haya sido invalidado por cambio de password
+        token_iat = payload.get("iat", 0)
+        pw_changed_at = user.get("password_changed_at", 0)
+        if pw_changed_at and token_iat < pw_changed_at:
+            raise HTTPException(status_code=401, detail="Sesion invalidada. Inicie sesion nuevamente.")
         
         user_id = str(user["_id"])
         company_id = str(user["company_id"]) if user.get("company_id") else None

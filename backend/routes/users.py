@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from db import db, serialize_doc
-from auth_utils import get_current_user, hash_password
+from auth_utils import get_current_user, hash_password, validate_password_strength
 from models import UserCreate, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["Usuarios"])
@@ -27,6 +27,10 @@ async def list_users(user: dict = Depends(get_current_user)):
 async def create_user(data: UserCreate, user: dict = Depends(get_current_user), company_id: Optional[str] = None):
     if user["role"] not in ["admin", "superadmin"]:
         raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    is_valid, msg = validate_password_strength(data.password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=msg)
     
     existing = await db.users.find_one({"email": data.email.lower()})
     if existing:
@@ -81,9 +85,12 @@ async def update_user(user_id: str, data: UserUpdate, user: dict = Depends(get_c
             raise HTTPException(status_code=400, detail="No puede cambiar su propio estado")
         update_data["is_active"] = data.is_active
     if data.password is not None and data.password:
-        if len(data.password) < 6:
-            raise HTTPException(status_code=400, detail="La contrasena debe tener al menos 6 caracteres")
+        is_valid, msg = validate_password_strength(data.password)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=msg)
         update_data["password_hash"] = hash_password(data.password)
+        # Revocar tokens del usuario afectado
+        update_data["password_changed_at"] = int(datetime.now(timezone.utc).timestamp())
     if data.role is not None:
         # Solo superadmin puede cambiar roles, y nunca a si mismo
         if user["role"] != "superadmin":
