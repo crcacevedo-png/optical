@@ -5,7 +5,7 @@ from typing import Optional
 
 from db import db, serialize_doc
 from auth_utils import get_current_user, hash_password
-from models import UserCreate
+from models import UserCreate, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["Usuarios"])
 
@@ -50,27 +50,49 @@ async def create_user(data: UserCreate, user: dict = Depends(get_current_user), 
     return {"_id": str(result.inserted_id), "message": "Usuario creado"}
 
 @router.put("/{user_id}")
-async def update_user(user_id: str, data: dict, user: dict = Depends(get_current_user)):
+async def update_user(user_id: str, data: UserUpdate, user: dict = Depends(get_current_user)):
     if user["role"] not in ["admin", "superadmin"]:
         raise HTTPException(status_code=403, detail="Acceso denegado")
     
     target_user = await db.users.find_one({"_id": ObjectId(user_id)})
     if not target_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Aislamiento multi-tenant: admin solo puede modificar usuarios de su empresa
     if user["role"] == "admin" and str(target_user.get("company_id")) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
+    # Protecciones contra escalada de privilegios
+    is_self = user_id == user["_id"]
+    target_is_superadmin = target_user.get("role") == "superadmin"
+    
+    # Nadie (excepto otro superadmin) puede modificar a un superadmin
+    if target_is_superadmin and user["role"] != "superadmin":
+        raise HTTPException(status_code=403, detail="No puede modificar a un superadmin")
+    
     update_data = {}
-    if "name" in data:
-        update_data["name"] = data["name"]
-    if "role" in data:
-        update_data["role"] = data["role"]
-    if "branch_id" in data:
-        update_data["branch_id"] = ObjectId(data["branch_id"]) if data["branch_id"] else None
-    if "is_active" in data:
-        update_data["is_active"] = data["is_active"]
-    if "password" in data and data["password"]:
-        update_data["password_hash"] = hash_password(data["password"])
+    if data.name is not None:
+        update_data["name"] = data.name
+    if data.branch_id is not None:
+        update_data["branch_id"] = ObjectId(data.branch_id) if data.branch_id else None
+    if data.is_active is not None:
+        # Evitar que un usuario se desactive a si mismo (lockout)
+        if is_self:
+            raise HTTPException(status_code=400, detail="No puede cambiar su propio estado")
+        update_data["is_active"] = data.is_active
+    if data.password is not None and data.password:
+        if len(data.password) < 6:
+            raise HTTPException(status_code=400, detail="La contrasena debe tener al menos 6 caracteres")
+        update_data["password_hash"] = hash_password(data.password)
+    if data.role is not None:
+        # Solo superadmin puede cambiar roles, y nunca a si mismo
+        if user["role"] != "superadmin":
+            raise HTTPException(status_code=403, detail="Solo superadmin puede cambiar roles")
+        if is_self:
+            raise HTTPException(status_code=400, detail="No puede cambiar su propio rol")
+        if data.role not in ["user", "admin", "superadmin"]:
+            raise HTTPException(status_code=400, detail="Rol invalido")
+        update_data["role"] = data.role
     
     if update_data:
         await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": update_data})

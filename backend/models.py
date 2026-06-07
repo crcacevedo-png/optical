@@ -387,3 +387,10 @@ class UserCreate(BaseModel):
     name: str
     role: str
     branch_id: Optional[str] = None
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    branch_id: Optional[str] = None
+    is_active: Optional[bool] = None
+    password: Optional[str] = None
+    role: Optional[str] = None  # Solo aplicable si quien hace la request es superadmin

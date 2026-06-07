@@ -10,6 +10,13 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 
 ## Lo Implementado
 
+### Hardening de Seguridad P0 (Junio 2026)
+- **#1 Mass-assignment fix:** `PUT /api/users/{id}` ahora valida con modelo Pydantic `UserUpdate`. Solo superadmin puede cambiar `role`. Nadie puede auto-desactivarse ni auto-cambiar rol. Admin no puede modificar superadmins.
+- **#2 CORS whitelist:** Reemplazado el reflejo de cualquier origen por whitelist explicita (cortexiaoptical.com, www, preview). Defensa en profundidad: el ingress responde `*` sin credentials (bloqueando CSRF), y el backend solo emite headers CORS para origenes permitidos.
+- **#3 Registro publico deshabilitado:** `POST /api/auth/register` devuelve 403. Creacion de usuarios solo via admin/superadmin.
+- **#4 Password SuperAdmin no hardcodeada:** Lee de env vars `ADMIN_EMAIL` y `ADMIN_PASSWORD` (con check >= 8 chars). Si no estan, el seed se omite con warning. Log de password reducido a `pw_len` solamente (sin chars).
+- Verificado E2E con curl + login screenshot.
+
 ### Fix Login Produccion - Hardcode SuperAdmin (Mayo 2026)
 - Eliminado el lookup de env var ADMIN_PASSWORD en server.py seed
 - Password hardcodeado "Montecristo2026" para evitar corrupcion de shell ($ expansion) en deploy

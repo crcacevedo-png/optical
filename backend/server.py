@@ -79,25 +79,47 @@ async def add_no_cache_headers(request: Request, call_next):
         response.headers["Pragma"] = "no-cache"
     return response
 
-# CORS - Reflect origin for credentials support
+# CORS - Strict whitelist + reflect allowed origins for credentials support
+ALLOWED_ORIGINS = {
+    "https://cortexiaoptical.com",
+    "https://www.cortexiaoptical.com",
+    "https://eyecare-erp.preview.emergentagent.com",
+}
+# Optional: allow extra origins via env (comma-separated)
+_extra = os.environ.get("EXTRA_CORS_ORIGINS", "").strip()
+if _extra:
+    for o in _extra.split(","):
+        o = o.strip()
+        if o:
+            ALLOWED_ORIGINS.add(o)
+
+def _is_allowed_origin(origin: str) -> bool:
+    if not origin:
+        return False
+    return origin in ALLOWED_ORIGINS
+
 @app.middleware("http")
 async def cors_middleware(request: Request, call_next):
     origin = request.headers.get("origin", "")
+    allowed = _is_allowed_origin(origin)
     
     if request.method == "OPTIONS":
-        response = Response(status_code=200)
-        response.headers["Access-Control-Allow-Origin"] = origin or "*"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Max-Age"] = "600"
+        response = Response(status_code=200 if allowed else 403)
+        if allowed:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Max-Age"] = "600"
+            response.headers["Vary"] = "Origin"
         return response
     
     response = await call_next(request)
-    if origin:
+    if allowed:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Vary"] = "Origin"
     return response
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -119,31 +141,36 @@ async def startup():
     await db.optical_consultations.create_index([("company_id", 1), ("patient_id", 1)])
     await db.optical_consultations.create_index([("company_id", 1), ("created_at", -1)])
     
-    # Seed superadmin - HARDCODED password to avoid env var corruption (shell $ expansion)
-    # in production. DO NOT read from os.environ.get("ADMIN_PASSWORD") because that
-    # variable may be set with a stale/corrupted value in the production deployment.
-    admin_email = "superadmin@cortexia.com"
-    admin_password = "Montecristo2026"
-    logger.info(f"SuperAdmin seed: email={admin_email}, pw_chars={admin_password[:3]}***{admin_password[-2:]}, len={len(admin_password)}")
-    try:
-        existing = await db.users.find_one({"email": admin_email})
-        new_hash = hash_password(admin_password)
-        if existing:
-            await db.users.update_one(
-                {"email": admin_email},
-                {"$set": {"password_hash": new_hash, "role": "superadmin", "is_active": True}}
-            )
-            logger.info(f"SuperAdmin password reset OK: {admin_email}")
-        else:
-            await db.users.insert_one({
-                "email": admin_email, "password_hash": new_hash,
-                "name": "Super Administrador", "role": "superadmin",
-                "company_id": None, "branch_id": None, "is_active": True,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            })
-            logger.info(f"SuperAdmin created: {admin_email}")
-    except Exception as e:
-        logger.error(f"SuperAdmin seed error: {e}")
+    # Seed superadmin - lee credenciales SOLO de env vars. Si no estan presentes,
+    # NO crea ni resetea el SuperAdmin (evita hardcodear secretos en el repo).
+    # IMPORTANTE: En el panel de Emergent Deployments, configura las variables:
+    #   ADMIN_EMAIL='superadmin@cortexia.com'
+    #   ADMIN_PASSWORD='TuPasswordSegura'  <-- usa comillas simples para evitar shell expansion de $
+    admin_email = (os.environ.get("ADMIN_EMAIL", "") or "").strip()
+    admin_password = (os.environ.get("ADMIN_PASSWORD", "") or "").strip()
+    if admin_email and admin_password and len(admin_password) >= 8:
+        logger.info(f"SuperAdmin seed: email={admin_email}, pw_len={len(admin_password)}")
+        try:
+            existing = await db.users.find_one({"email": admin_email})
+            new_hash = hash_password(admin_password)
+            if existing:
+                await db.users.update_one(
+                    {"email": admin_email},
+                    {"$set": {"password_hash": new_hash, "role": "superadmin", "is_active": True}}
+                )
+                logger.info(f"SuperAdmin password reset OK: {admin_email}")
+            else:
+                await db.users.insert_one({
+                    "email": admin_email, "password_hash": new_hash,
+                    "name": "Super Administrador", "role": "superadmin",
+                    "company_id": None, "branch_id": None, "is_active": True,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                })
+                logger.info(f"SuperAdmin created: {admin_email}")
+        except Exception as e:
+            logger.error(f"SuperAdmin seed error: {e}")
+    else:
+        logger.warning("SuperAdmin seed SKIPPED: ADMIN_EMAIL/ADMIN_PASSWORD env vars no configurados o password < 8 chars")
     
     # Seed demo company
     demo_company = await db.companies.find_one({"name": "Cortexia Optical Demo"})

@@ -31,25 +31,10 @@ def _clear_auth_cookies(response: Response):
 
 @router.post("/register")
 async def register(data: UserRegister, response: Response):
-    email = data.email.lower()
-    existing = await db.users.find_one({"email": email})
-    if existing:
-        raise HTTPException(status_code=400, detail="El email ya esta registrado")
-    
-    user_doc = {
-        "email": email, "password_hash": hash_password(data.password), "name": data.name,
-        "role": "user", "company_id": None, "branch_id": None, "is_active": True,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    result = await db.users.insert_one(user_doc)
-    user_id = str(result.inserted_id)
-    
-    access_token = create_access_token(user_id, email, "user")
-    refresh_token = create_refresh_token(user_id)
-    
-    _set_auth_cookies(response, access_token, refresh_token)
-    
-    return {"_id": user_id, "email": email, "name": data.name, "role": "user"}
+    # Endpoint deshabilitado por seguridad. La creacion de usuarios solo se hace
+    # via /api/users (requiere admin/superadmin) o via /api/companies/register
+    # cuando un superadmin crea una nueva empresa con su admin.
+    raise HTTPException(status_code=403, detail="Registro publico deshabilitado. Contacte al administrador.")
 
 @router.post("/login")
 async def login(data: UserLogin, response: Response, request: Request):
