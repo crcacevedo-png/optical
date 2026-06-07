@@ -6,7 +6,7 @@ import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
-import { Settings, Building2, Upload, FileText, Save, ImageIcon, Glasses, Pill } from 'lucide-react';
+import { Settings, Building2, Upload, FileText, Save, ImageIcon, Glasses, Pill, ShieldCheck, Lock, KeyRound, Server, Users as UsersIcon, Activity } from 'lucide-react';
 
 const PRESCRIPTION_FONTS = [
   { value: 'Helvetica', label: 'Helvetica (Moderno)' },
@@ -404,6 +404,84 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Seguridad y Cumplimiento */}
+        <Card className="border-slate-200/80" data-testid="security-compliance-card">
+          <CardHeader>
+            <CardTitle className="font-heading text-lg flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-700" />
+              Seguridad y Cumplimiento
+            </CardTitle>
+            <p className="text-sm text-slate-500 mt-1">
+              Tu información clínica y de pacientes está protegida con las mejores prácticas de la industria.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <SecurityFeature
+                icon={<Lock className="w-5 h-5" />}
+                title="Contraseñas con bcrypt"
+                desc="Las contraseñas se almacenan con hash bcrypt (salt único por usuario). Imposibles de revertir incluso si la base de datos fuera comprometida."
+              />
+              <SecurityFeature
+                icon={<KeyRound className="w-5 h-5" />}
+                title="Autenticación JWT + cookies HttpOnly"
+                desc="Tokens firmados con HS256, transmitidos en cookies HttpOnly y Secure. No accesibles desde JavaScript: protección contra robo por XSS."
+              />
+              <SecurityFeature
+                icon={<UsersIcon className="w-5 h-5" />}
+                title="Aislamiento multi-empresa"
+                desc="Cada óptica solo accede a sus propios datos. Aislamiento estricto por company_id en todas las consultas a la base de datos."
+              />
+              <SecurityFeature
+                icon={<Activity className="w-5 h-5" />}
+                title="Rate limiting y anti brute-force"
+                desc="Login limitado a 10 intentos/min por IP. Bloqueo automático tras 5 fallos consecutivos. Defensa en profundidad contra ataques."
+              />
+              <SecurityFeature
+                icon={<ShieldCheck className="w-5 h-5" />}
+                title="Política de contraseñas robusta"
+                desc="Mínimo 8 caracteres con mayúsculas, minúsculas y dígitos. Sesiones revocables al cambiar la contraseña."
+              />
+              <SecurityFeature
+                icon={<Server className="w-5 h-5" />}
+                title="Infraestructura cifrada"
+                desc="HTTPS/TLS en todo el tráfico. MongoDB Atlas con cifrado en reposo. Backups automáticos diarios."
+              />
+            </div>
+
+            <div className="mt-6 p-4 bg-emerald-50/50 border border-emerald-200/60 rounded-lg">
+              <p className="text-sm text-slate-700">
+                <strong className="text-emerald-800">Tus datos clínicos son críticos.</strong> Cortexia Optical cumple con
+                principios de privacidad para datos de salud: consultas, recetas, diagnósticos y datos personales
+                de pacientes nunca son compartidos con terceros y se acceden únicamente con autenticación válida.
+              </p>
+            </div>
+
+            <div className="mt-4 text-xs text-slate-500">
+              <p>
+                ¿Detectaste un problema de seguridad? Reporta de forma responsable a{' '}
+                <a href="mailto:seguridad@cortexia.com" className="text-pine-700 underline font-medium">
+                  seguridad@cortexia.com
+                </a>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function SecurityFeature({ icon, title, desc }) {
+  return (
+    <div className="flex gap-3 p-4 border border-slate-200/80 rounded-lg bg-white hover:border-emerald-200 hover:bg-emerald-50/30 transition-colors" data-testid={`security-feature-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <h4 className="text-sm font-semibold text-slate-900 mb-1">{title}</h4>
+        <p className="text-xs text-slate-600 leading-relaxed">{desc}</p>
       </div>
     </div>
   );
