@@ -16,7 +16,7 @@ from routes import (
     auth, companies, settings, branches, patients, appointments,
     prescriptions, inventory, sales, quotations, consultations,
     finance, reports, users, suppliers, plans, superadmin, announcements,
-    notifications
+    notifications, security
 )
 
 app = FastAPI(title="Cortexia Optical API")
@@ -45,6 +45,7 @@ api_router.include_router(plans.router)
 api_router.include_router(superadmin.router)
 api_router.include_router(announcements.router)
 api_router.include_router(notifications.router)
+api_router.include_router(security.router)
 
 # Global search
 @api_router.get("/search")

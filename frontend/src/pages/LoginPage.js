@@ -243,10 +243,19 @@ export default function LoginPage() {
                 </div>
                 <p className="text-[11px] text-slate-400 pt-1 border-t border-slate-100">
                   Reporte responsable:{' '}
-                  <a href="mailto:seguridad@cortexia.com" className="text-pine-700 underline font-medium">
-                    seguridad@cortexia.com
+                  <a href="mailto:info@cortexiagt.com" className="text-pine-700 underline font-medium">
+                    info@cortexiagt.com
                   </a>
                 </p>
+                <a
+                  href={`${process.env.REACT_APP_BACKEND_URL || ''}/api/security/manifesto.pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-center px-3 py-2 mt-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-semibold text-emerald-800 transition-colors"
+                  data-testid="login-download-manifesto"
+                >
+                  Descargar Manifiesto de Seguridad (PDF)
+                </a>
               </div>
             )}
           </div>

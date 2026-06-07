@@ -458,13 +458,23 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            <div className="mt-4 text-xs text-slate-500">
-              <p>
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-slate-100">
+              <div className="text-xs text-slate-500">
                 ¿Detectaste un problema de seguridad? Reporta de forma responsable a{' '}
-                <a href="mailto:seguridad@cortexia.com" className="text-pine-700 underline font-medium">
-                  seguridad@cortexia.com
+                <a href="mailto:info@cortexiagt.com" className="text-pine-700 underline font-medium">
+                  info@cortexiagt.com
                 </a>
-              </p>
+              </div>
+              <a
+                href={`${process.env.REACT_APP_BACKEND_URL || ''}/api/security/manifesto.pdf`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors shrink-0"
+                data-testid="download-security-manifesto"
+              >
+                <FileText className="w-4 h-4" />
+                Descargar Manifiesto PDF
+              </a>
             </div>
           </CardContent>
         </Card>
