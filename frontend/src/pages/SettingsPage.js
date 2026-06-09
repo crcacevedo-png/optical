@@ -6,7 +6,7 @@ import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
-import { Settings, Building2, Upload, FileText, Save, ImageIcon, Glasses, Pill, ShieldCheck, Lock, KeyRound, Server, Users as UsersIcon, Activity } from 'lucide-react';
+import { Settings, Building2, Upload, FileText, Save, ImageIcon, Glasses, Pill, ShieldCheck, Lock, KeyRound, Server, Users as UsersIcon, Activity, Database, Download } from 'lucide-react';
 
 const PRESCRIPTION_FONTS = [
   { value: 'Helvetica', label: 'Helvetica (Moderno)' },
@@ -31,6 +31,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [exportingDb, setExportingDb] = useState(false);
   const [company, setCompany] = useState(null);
   const [form, setForm] = useState({
     name: '', legal_name: '', tax_id: '', address: '', phone: '', email: '',
@@ -107,6 +108,34 @@ export default function SettingsPage() {
       toast.error(formatApiErrorDetail(error.response?.data?.detail) || 'Error al guardar');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleExportDatabase = async () => {
+    setExportingDb(true);
+    const toastId = toast.loading('Generando exportacion completa de su base de datos...');
+    try {
+      const response = await api.get('/api/data-export/full-database', { responseType: 'blob' });
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      // Try to read filename from Content-Disposition header
+      const cd = response.headers?.['content-disposition'] || '';
+      const match = cd.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : `Cortexia_Export_${Date.now()}.xlsx`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Base de datos exportada exitosamente', { id: toastId });
+    } catch (error) {
+      toast.error(formatApiErrorDetail(error.response?.data?.detail) || 'Error al exportar', { id: toastId });
+    } finally {
+      setExportingDb(false);
     }
   };
 
@@ -404,6 +433,75 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Exportacion de Datos */}
+        {!isSuperAdmin && (
+          <Card className="border-slate-200/80" data-testid="data-export-card">
+            <CardHeader>
+              <CardTitle className="font-heading text-lg flex items-center gap-2">
+                <Database className="w-5 h-5 text-blue-700" />
+                Exportacion de Base de Datos
+              </CardTitle>
+              <p className="text-sm text-slate-500 mt-1">
+                Descarga una copia completa de todos los datos de tu optica en un solo archivo Excel.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div className="flex items-center gap-2 text-slate-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  Pacientes, citas y consultas
+                </div>
+                <div className="flex items-center gap-2 text-slate-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  Recetas oftalmicas, contacto y medicas
+                </div>
+                <div className="flex items-center gap-2 text-slate-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  Inventario, stock y movimientos
+                </div>
+                <div className="flex items-center gap-2 text-slate-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  Ventas, cotizaciones y finanzas
+                </div>
+                <div className="flex items-center gap-2 text-slate-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  Proveedores y sucursales
+                </div>
+                <div className="flex items-center gap-2 text-slate-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  Usuarios (sin contrase&#241;as)
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-amber-50/60 border border-amber-200/60 text-xs text-amber-900">
+                <strong>Importante:</strong> Este archivo contiene informacion clinica y personal confidencial.
+                Almacenalo en un lugar seguro y nunca lo compartas con terceros no autorizados.
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <Button
+                  onClick={handleExportDatabase}
+                  disabled={exportingDb}
+                  className="bg-blue-700 hover:bg-blue-800 text-white"
+                  data-testid="export-database-btn"
+                >
+                  {exportingDb ? (
+                    <>
+                      <div className="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Generando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 mr-2" />
+                      Descargar Base de Datos (Excel)
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Seguridad y Cumplimiento */}
         <Card className="border-slate-200/80" data-testid="security-compliance-card">
