@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth, formatApiErrorDetail } from '../context/AuthContext';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Eye, EyeOff, Users, Package, Calendar, FileText, ShieldCheck, Lock, KeyRound, Activity, Server, ChevronDown } from 'lucide-react';
+import { Eye, EyeOff, Users, Package, Calendar, FileText, ShieldCheck } from 'lucide-react';
 
 const LOGO_URL = 'https://customer-assets.emergentagent.com/job_eyecare-erp/artifacts/80lobcqc_logo%20cortexia%20optical%20transparente.png';
 
@@ -48,7 +48,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showSecurity, setShowSecurity] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -204,61 +203,6 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
-
-          {/* Security & Trust accordion */}
-          <div className="mt-4 login-stagger-4">
-            <button
-              type="button"
-              onClick={() => setShowSecurity(!showSecurity)}
-              className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl bg-emerald-50/40 border border-emerald-100/80 hover:bg-emerald-50/70 transition-colors text-left"
-              data-testid="toggle-security-info"
-              aria-expanded={showSecurity}
-            >
-              <div className="flex items-center gap-2.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
-                <span className="text-[13px] font-semibold text-emerald-900">
-                  ¿Por qué confiar en Cortexia?
-                </span>
-              </div>
-              <ChevronDown
-                className={`w-4 h-4 text-emerald-700 transition-transform duration-200 ${showSecurity ? 'rotate-180' : ''}`}
-              />
-            </button>
-
-            {showSecurity && (
-              <div
-                className="mt-2 p-4 rounded-xl bg-white border border-slate-100 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200"
-                data-testid="security-info-panel"
-              >
-                <p className="text-[12px] text-slate-500 leading-relaxed">
-                  Tus datos clínicos y de pacientes están protegidos con prácticas de seguridad de nivel empresarial.
-                </p>
-                <div className="space-y-2">
-                  <TrustItem icon={Lock} text="Contraseñas cifradas con bcrypt" />
-                  <TrustItem icon={KeyRound} text="Sesiones JWT en cookies HttpOnly + HTTPS" />
-                  <TrustItem icon={Users} text="Aislamiento total entre ópticas (multi-tenant)" />
-                  <TrustItem icon={Activity} text="Rate limiting y bloqueo anti brute-force" />
-                  <TrustItem icon={ShieldCheck} text="Política de contraseñas robusta + sesiones revocables" />
-                  <TrustItem icon={Server} text="Datos en MongoDB Atlas cifrados en reposo" />
-                </div>
-                <p className="text-[11px] text-slate-400 pt-1 border-t border-slate-100">
-                  Reporte responsable:{' '}
-                  <a href="mailto:info@cortexiagt.com" className="text-pine-700 underline font-medium">
-                    info@cortexiagt.com
-                  </a>
-                </p>
-                <a
-                  href={`${process.env.REACT_APP_BACKEND_URL || ''}/api/security/manifesto.pdf`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-center px-3 py-2 mt-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-semibold text-emerald-800 transition-colors"
-                  data-testid="login-download-manifesto"
-                >
-                  Descargar Manifiesto de Seguridad (PDF)
-                </a>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -352,17 +296,6 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function TrustItem({ icon: Icon, text }) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
-        <Icon className="w-3.5 h-3.5" />
-      </div>
-      <span className="text-[12px] text-slate-700 leading-snug">{text}</span>
     </div>
   );
 }
