@@ -139,6 +139,25 @@ export default function SettingsPage() {
     }
   };
 
+  const handleDownloadManifesto = async () => {
+    const toastId = toast.loading('Generando manifiesto...');
+    try {
+      const response = await api.get('/api/security/manifesto.pdf', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'Cortexia_Manifiesto_Seguridad.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Manifiesto descargado', { id: toastId });
+    } catch (error) {
+      toast.error(formatApiErrorDetail(error.response?.data?.detail) || 'Error al descargar', { id: toastId });
+    }
+  };
+
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -564,10 +583,9 @@ export default function SettingsPage() {
                 </a>
               </div>
               <a
-                href={`${process.env.REACT_APP_BACKEND_URL || ''}/api/security/manifesto.pdf`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors shrink-0"
+                href="#"
+                onClick={(e) => { e.preventDefault(); handleDownloadManifesto(); }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors shrink-0 cursor-pointer"
                 data-testid="download-security-manifesto"
               >
                 <FileText className="w-4 h-4" />
