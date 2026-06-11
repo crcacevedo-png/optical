@@ -307,8 +307,12 @@ async def reset_password(data: ResetPassword, request: Request):
     if reset.get("used"):
         raise HTTPException(status_code=400, detail="Token ya fue utilizado")
     expires = reset.get("expires_at")
-    if expires and expires.replace(tzinfo=timezone.utc) if expires.tzinfo is None else expires < datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="Token expirado. Solicita un nuevo enlace.")
+    if expires:
+        # Normalizar a UTC si viene sin tzinfo
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        if expires < datetime.now(timezone.utc):
+            raise HTTPException(status_code=400, detail="Token expirado. Solicita un nuevo enlace.")
     user = await db.users.find_one({"_id": reset["user_id"]})
     if not user:
         raise HTTPException(status_code=400, detail="Usuario no encontrado")

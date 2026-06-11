@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth, formatApiErrorDetail } from '../context/AuthContext';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -181,6 +181,16 @@ export default function LoginPage() {
                 </span>
               ) : 'Iniciar Sesión'}
             </button>
+
+            <div className="text-center pt-1">
+              <Link
+                to="/forgot-password"
+                className="text-[13px] text-slate-500 hover:text-pine-900 transition-colors"
+                data-testid="forgot-password-link"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
           </form>
 
           {/* Demo credentials */}
