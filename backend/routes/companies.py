@@ -7,6 +7,8 @@ from db import db, serialize_doc, UPLOADS_DIR
 from auth_utils import get_current_user, hash_password
 from models import CompanyCreate, CompanyUpdate
 from routes.notifications import create_notification
+from email_service import send_email, render_welcome_company
+import os
 
 router = APIRouter(prefix="/companies", tags=["Empresas"])
 
@@ -64,6 +66,21 @@ async def create_company(data: CompanyCreate, user: dict = Depends(get_current_u
         "new_company", "Nueva optica registrada",
         f"{data.name} se ha registrado con admin {data.admin_name} ({data.admin_email})",
         {"company_id": str(company_id), "company_name": data.name}
+    )
+    
+    # Email de bienvenida al admin de la nueva optica
+    app_url = os.environ.get("APP_URL", "https://cortexiaoptical.com")
+    welcome_html = render_welcome_company(
+        admin_name=data.admin_name,
+        company_name=data.name,
+        admin_email=data.admin_email.lower(),
+        login_link=app_url,
+    )
+    await send_email(
+        data.admin_email.lower(),
+        f"Bienvenido a Cortexia Optical - {data.name}",
+        welcome_html,
+        tag="welcome",
     )
     
     return {"_id": str(company_id), "name": data.name, "message": "Empresa creada exitosamente"}

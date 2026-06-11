@@ -9,10 +9,12 @@ from auth_utils import (
     create_access_token, create_refresh_token, get_jwt_secret, JWT_ALGORITHM,
     get_real_ip, validate_password_strength
 )
-from models import UserRegister, UserLogin, ChangePassword
+from models import UserRegister, UserLogin, ChangePassword, ForgotPassword, ResetPassword
 from rate_limiter import limiter
 from audit import log_audit
+from email_service import send_email, render_password_reset, render_security_alert
 import jwt
+import secrets
 
 router = APIRouter(prefix="/auth", tags=["Autenticacion"])
 
@@ -73,9 +75,26 @@ async def login(data: UserLogin, response: Response, request: Request):
     try:
         pw_hash = user.get("password_hash", "")
         if not pw_hash or not verify_password(data.password, pw_hash):
-            await increment_login_attempts(identifier)
+            attempts = await increment_login_attempts(identifier)
             await log_audit("LOGIN_FAILED", actor_id=str(user["_id"]), actor_email=email,
-                            metadata={"reason": "wrong_password"}, request=request)
+                            metadata={"reason": "wrong_password", "attempts": attempts}, request=request)
+            # Alerta de seguridad cuando se alcanzan 3 intentos fallidos
+            if attempts == 3:
+                app_url = os.environ.get("APP_URL", "https://cortexiaoptical.com")
+                ip = (request.headers.get("X-Forwarded-For", "") or "").split(",")[0].strip() or (request.client.host if request.client else "n/a")
+                html = render_security_alert(
+                    name=user.get("name", "Usuario"),
+                    event_title="Multiples intentos fallidos de login",
+                    event_description="Se han detectado varios intentos fallidos de inicio de sesion en tu cuenta. Si fuiste tu olvidando tu contrasena, usa la opcion de restablecer contrasena. Si no, alguien podria estar intentando acceder.",
+                    event_meta={
+                        "Email": email,
+                        "Intentos fallidos": str(attempts),
+                        "IP de origen": ip,
+                        "Fecha": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+                    },
+                    app_url=app_url,
+                )
+                await send_email(email, "[Cortexia] Intentos fallidos de inicio de sesion", html, tag="security_alert")
             raise HTTPException(status_code=401, detail="Credenciales invalidas")
     except HTTPException:
         raise
@@ -131,7 +150,7 @@ async def login(data: UserLogin, response: Response, request: Request):
             pass
     return result
 
-async def increment_login_attempts(identifier: str):
+async def increment_login_attempts(identifier: str) -> int:
     attempt = await db.login_attempts.find_one({"identifier": identifier})
     if attempt:
         new_count = attempt.get("count", 0) + 1
@@ -139,8 +158,10 @@ async def increment_login_attempts(identifier: str):
         if new_count >= 5:
             update["lockout_until"] = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
         await db.login_attempts.update_one({"identifier": identifier}, {"$set": update})
+        return new_count
     else:
         await db.login_attempts.insert_one({"identifier": identifier, "count": 1})
+        return 1
 
 @router.post("/logout")
 async def logout(request: Request, response: Response):
@@ -223,7 +244,99 @@ async def change_password(data: ChangePassword, request: Request, user: dict = D
     )
     await log_audit("PASSWORD_CHANGED", actor_id=user["_id"], actor_email=user.get("email"),
                     actor_role=user.get("role"), company_id=user.get("company_id"), request=request)
+    # Alerta de seguridad por email
+    if user.get("email"):
+        app_url = os.environ.get("APP_URL", "https://cortexiaoptical.com")
+        html = render_security_alert(
+            name=user.get("name", "Usuario"),
+            event_title="Tu contrasena fue cambiada",
+            event_description="La contrasena de tu cuenta acaba de ser modificada. Si fuiste tu, puedes ignorar este mensaje.",
+            event_meta={
+                "Email": user.get("email"),
+                "IP": (request.headers.get("X-Forwarded-For", "") or "").split(",")[0].strip() or (request.client.host if request.client else "n/a"),
+                "Fecha": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+            },
+            app_url=app_url,
+        )
+        await send_email(user["email"], "[Cortexia] Tu contrasena fue cambiada", html, tag="security_alert")
     return {"message": "Contraseña actualizada correctamente"}
+
+
+@router.post("/forgot-password")
+@limiter.limit("3/minute")
+async def forgot_password(data: ForgotPassword, request: Request):
+    """Solicita un email para restablecer la contrasena. Respuesta neutra: siempre 200
+    para no revelar si el email existe (anti-enumeration)."""
+    email = data.email.lower().strip()
+    neutral_response = {"message": "Si el email existe, recibiras instrucciones para restablecer tu contrasena."}
+    user = await db.users.find_one({"email": email})
+    if not user or not user.get("is_active", True):
+        return neutral_response
+    # Generar token seguro
+    token = secrets.token_urlsafe(48)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    await db.password_resets.insert_one({
+        "user_id": user["_id"],
+        "email": email,
+        "token": token,
+        "expires_at": expires_at,
+        "used": False,
+        "created_at": datetime.now(timezone.utc),
+        "ip": (request.headers.get("X-Forwarded-For", "") or "").split(",")[0].strip() or (request.client.host if request.client else None),
+    })
+    app_url = os.environ.get("APP_URL", "https://cortexiaoptical.com")
+    reset_link = f"{app_url.rstrip('/')}/reset-password?token={token}"
+    html = render_password_reset(name=user.get("name", "Usuario"), reset_link=reset_link)
+    await send_email(email, "[Cortexia] Restablece tu contrasena", html, tag="password_reset")
+    await log_audit("PASSWORD_RESET_REQUESTED", actor_id=str(user["_id"]), actor_email=email,
+                    actor_role=user.get("role"), request=request)
+    return neutral_response
+
+
+@router.post("/reset-password")
+@limiter.limit("5/minute")
+async def reset_password(data: ResetPassword, request: Request):
+    """Aplica el reset usando el token recibido por email."""
+    from auth_utils import validate_password_strength
+    is_valid, msg = validate_password_strength(data.new_password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=msg)
+    reset = await db.password_resets.find_one({"token": data.token})
+    if not reset:
+        raise HTTPException(status_code=400, detail="Token invalido o ya utilizado")
+    if reset.get("used"):
+        raise HTTPException(status_code=400, detail="Token ya fue utilizado")
+    expires = reset.get("expires_at")
+    if expires and expires.replace(tzinfo=timezone.utc) if expires.tzinfo is None else expires < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Token expirado. Solicita un nuevo enlace.")
+    user = await db.users.find_one({"_id": reset["user_id"]})
+    if not user:
+        raise HTTPException(status_code=400, detail="Usuario no encontrado")
+    # Aplicar nuevo password + invalidar tokens existentes
+    now_ts = int(datetime.now(timezone.utc).timestamp()) + 1
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"password_hash": hash_password(data.new_password), "password_changed_at": now_ts}}
+    )
+    await db.password_resets.update_one({"_id": reset["_id"]}, {"$set": {"used": True, "used_at": datetime.now(timezone.utc)}})
+    await log_audit("PASSWORD_RESET_COMPLETED", actor_id=str(user["_id"]), actor_email=user.get("email"),
+                    actor_role=user.get("role"), company_id=str(user.get("company_id")) if user.get("company_id") else None,
+                    request=request)
+    # Alerta por email
+    app_url = os.environ.get("APP_URL", "https://cortexiaoptical.com")
+    html = render_security_alert(
+        name=user.get("name", "Usuario"),
+        event_title="Contrasena restablecida exitosamente",
+        event_description="Acabas de restablecer la contrasena de tu cuenta usando el enlace que recibiste por email. Ya puedes ingresar con la nueva contrasena.",
+        event_meta={
+            "Email": user.get("email"),
+            "IP": (request.headers.get("X-Forwarded-For", "") or "").split(",")[0].strip() or (request.client.host if request.client else "n/a"),
+            "Fecha": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        },
+        app_url=app_url,
+    )
+    await send_email(user["email"], "[Cortexia] Contrasena restablecida", html, tag="security_alert")
+    return {"message": "Contrasena restablecida correctamente. Ya puedes iniciar sesion."}
 
 @router.post("/refresh")
 @limiter.limit("30/minute")

@@ -30,6 +30,13 @@ class ChangePassword(BaseModel):
     current_password: str
     new_password: str
 
+class ForgotPassword(BaseModel):
+    email: EmailStr
+
+class ResetPassword(BaseModel):
+    token: str
+    new_password: str
+
 class CompanyCreate(BaseModel):
     name: str
     legal_name: str = ""
