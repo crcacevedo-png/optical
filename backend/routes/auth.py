@@ -11,6 +11,7 @@ from auth_utils import (
 )
 from models import UserRegister, UserLogin, ChangePassword
 from rate_limiter import limiter
+from audit import log_audit
 import jwt
 
 router = APIRouter(prefix="/auth", tags=["Autenticacion"])
@@ -65,6 +66,7 @@ async def login(data: UserLogin, response: Response, request: Request):
     user = await db.users.find_one({"email": email})
     if not user:
         await increment_login_attempts(identifier)
+        await log_audit("LOGIN_FAILED", actor_email=email, metadata={"reason": "user_not_found"}, request=request)
         raise HTTPException(status_code=401, detail="Credenciales invalidas")
     
     # Verify password safely
@@ -72,6 +74,8 @@ async def login(data: UserLogin, response: Response, request: Request):
         pw_hash = user.get("password_hash", "")
         if not pw_hash or not verify_password(data.password, pw_hash):
             await increment_login_attempts(identifier)
+            await log_audit("LOGIN_FAILED", actor_id=str(user["_id"]), actor_email=email,
+                            metadata={"reason": "wrong_password"}, request=request)
             raise HTTPException(status_code=401, detail="Credenciales invalidas")
     except HTTPException:
         raise
@@ -80,6 +84,8 @@ async def login(data: UserLogin, response: Response, request: Request):
         raise HTTPException(status_code=401, detail="Credenciales invalidas")
     
     if not user.get("is_active", True):
+        await log_audit("LOGIN_FAILED", actor_id=str(user["_id"]), actor_email=email,
+                        metadata={"reason": "account_disabled"}, request=request)
         raise HTTPException(status_code=403, detail="Cuenta desactivada")
     
     try:
@@ -93,6 +99,8 @@ async def login(data: UserLogin, response: Response, request: Request):
     refresh_token = create_refresh_token(user_id)
     
     _set_auth_cookies(response, access_token, refresh_token)
+    await log_audit("LOGIN_SUCCESS", actor_id=user_id, actor_email=email,
+                    actor_role=user["role"], company_id=company_id, request=request)
     
     result = {
         "_id": user_id, "email": user["email"], "name": user["name"], "role": user["role"],
@@ -135,7 +143,33 @@ async def increment_login_attempts(identifier: str):
         await db.login_attempts.insert_one({"identifier": identifier, "count": 1})
 
 @router.post("/logout")
-async def logout(response: Response):
+async def logout(request: Request, response: Response):
+    # Intentar identificar al usuario (sin requerir auth para que /logout siempre funcione)
+    user_id = None
+    email = None
+    role = None
+    try:
+        token = request.cookies.get("access_token")
+        if token:
+            payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM], options={"verify_exp": False})
+            user_id = payload.get("sub")
+            email = payload.get("email")
+            role = payload.get("role")
+    except Exception:
+        pass
+    # Invalida TODOS los tokens del usuario incrementando password_changed_at
+    # (efectivamente revoca access + refresh tokens emitidos antes de este momento)
+    # Usamos +1s para garantizar que cualquier token con iat <= now sea invalidado
+    if user_id:
+        try:
+            now_ts = int(datetime.now(timezone.utc).timestamp()) + 1
+            await db.users.update_one(
+                {"_id": ObjectId(user_id)},
+                {"$set": {"password_changed_at": now_ts}}
+            )
+        except Exception:
+            pass
+        await log_audit("LOGOUT", actor_id=user_id, actor_email=email, actor_role=role, request=request)
     _clear_auth_cookies(response)
     return {"message": "Sesion cerrada"}
 
@@ -178,8 +212,8 @@ async def change_password(data: ChangePassword, request: Request, user: dict = D
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     if not verify_password(data.current_password, db_user.get("password_hash", "")):
         raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
-    # Revoca todos los tokens emitidos antes de este momento
-    now_ts = int(datetime.now(timezone.utc).timestamp())
+    # Revoca todos los tokens emitidos antes de este momento (+1s para tokens del mismo segundo)
+    now_ts = int(datetime.now(timezone.utc).timestamp()) + 1
     await db.users.update_one(
         {"_id": ObjectId(user["_id"])},
         {"$set": {
@@ -187,6 +221,8 @@ async def change_password(data: ChangePassword, request: Request, user: dict = D
             "password_changed_at": now_ts,
         }}
     )
+    await log_audit("PASSWORD_CHANGED", actor_id=user["_id"], actor_email=user.get("email"),
+                    actor_role=user.get("role"), company_id=user.get("company_id"), request=request)
     return {"message": "Contraseña actualizada correctamente"}
 
 @router.post("/refresh")

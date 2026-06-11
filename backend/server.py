@@ -16,7 +16,7 @@ from routes import (
     auth, companies, settings, branches, patients, appointments,
     prescriptions, inventory, sales, quotations, consultations,
     finance, reports, users, suppliers, plans, superadmin, announcements,
-    notifications, security, data_export
+    notifications, security, data_export, audit_log
 )
 
 app = FastAPI(title="Cortexia Optical API")
@@ -47,6 +47,7 @@ api_router.include_router(announcements.router)
 api_router.include_router(notifications.router)
 api_router.include_router(security.router)
 api_router.include_router(data_export.router)
+api_router.include_router(audit_log.router)
 
 # Global search
 @api_router.get("/search")
@@ -78,6 +79,22 @@ async def global_search(q: str = Query(..., min_length=2), user: dict = Depends(
 
 app.include_router(api_router)
 
+# Security headers middleware (HSTS, CSP, X-Frame-Options, etc.)
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    # Solo en HTTPS / produccion - HSTS forza HTTPS por 1 año
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    # Previene clickjacking (no permitir embeber en iframes externos)
+    response.headers["X-Frame-Options"] = "DENY"
+    # Previene MIME sniffing
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    # Solo enviar referrer al mismo origen
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Restringe que features del browser pueden usarse
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+    return response
+
 # No-cache middleware
 @app.middleware("http")
 async def add_no_cache_headers(request: Request, call_next):
@@ -88,12 +105,20 @@ async def add_no_cache_headers(request: Request, call_next):
     return response
 
 # CORS - Strict whitelist + reflect allowed origins for credentials support
-ALLOWED_ORIGINS = {
+# Lee de CORS_ORIGINS env (comma-separated) o usa defaults conocidos
+_DEFAULT_ORIGINS = {
     "https://cortexiaoptical.com",
     "https://www.cortexiaoptical.com",
     "https://eyecare-erp.preview.emergentagent.com",
 }
-# Optional: allow extra origins via env (comma-separated)
+ALLOWED_ORIGINS = set(_DEFAULT_ORIGINS)
+_cors_env = os.environ.get("CORS_ORIGINS", "").strip()
+if _cors_env and _cors_env != "*":
+    for o in _cors_env.split(","):
+        o = o.strip()
+        if o:
+            ALLOWED_ORIGINS.add(o)
+# Backward-compat: EXTRA_CORS_ORIGINS tambien funciona
 _extra = os.environ.get("EXTRA_CORS_ORIGINS", "").strip()
 if _extra:
     for o in _extra.split(","):
@@ -137,6 +162,9 @@ logger = logging.getLogger(__name__)
 async def startup():
     await db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
+    await db.audit_log.create_index([("created_at", -1)])
+    await db.audit_log.create_index([("action", 1), ("created_at", -1)])
+    await db.audit_log.create_index([("company_id", 1), ("created_at", -1)])
     await db.patients.create_index([("company_id", 1), ("last_name", 1)])
     await db.patients.create_index([("company_id", 1), ("phone", 1)])
     await db.appointments.create_index([("company_id", 1), ("date", 1)])

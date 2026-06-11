@@ -1,5 +1,5 @@
 """Exportacion completa de base de datos por empresa (admin de cada optica)."""
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
 from bson import ObjectId
 from datetime import datetime, timezone
@@ -10,6 +10,7 @@ from openpyxl.styles import Font, PatternFill, Alignment
 
 from db import db
 from auth_utils import get_current_user
+from audit import log_audit
 
 router = APIRouter(prefix="/data-export", tags=["Exportacion Datos"])
 
@@ -289,7 +290,7 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
 
 
 @router.get("/full-database")
-async def export_full_database(user: dict = Depends(get_current_user)):
+async def export_full_database(request: Request, user: dict = Depends(get_current_user)):
     """Permite al admin de una optica descargar TODA su base de datos en Excel."""
     if user["role"] not in ["admin", "superadmin"]:
         raise HTTPException(status_code=403, detail="Solo administradores pueden exportar la base de datos")
@@ -306,6 +307,10 @@ async def export_full_database(user: dict = Depends(get_current_user)):
     safe_name = "".join(c if c.isalnum() else "_" for c in company_name)[:40]
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     filename = f"Cortexia_Export_{safe_name}_{timestamp}.xlsx"
+
+    await log_audit("DATABASE_EXPORTED", actor_id=user["_id"], actor_email=user.get("email"),
+                    actor_role=user["role"], company_id=user["company_id"],
+                    metadata={"company_name": company_name, "filename": filename}, request=request)
 
     return StreamingResponse(
         buffer,

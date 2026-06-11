@@ -23,6 +23,7 @@ import SuppliersPage from './pages/SuppliersPage';
 import PlansPage from './pages/PlansPage';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import AnnouncementsPage from './pages/AnnouncementsPage';
+import AuditLogPage from './pages/AuditLogPage';
 import './App.css';
 
 function App() {
@@ -52,6 +53,7 @@ function App() {
             <Route path="admin/planes" element={<PlansPage />} />
             <Route path="admin/dashboard" element={<SuperAdminDashboard />} />
             <Route path="admin/comunicacion" element={<AnnouncementsPage />} />
+            <Route path="admin/audit" element={<AuditLogPage />} />
             <Route path="finance" element={<FinancePage />} />
             <Route path="branches" element={<BranchesPage />} />
             <Route path="users" element={<UsersPage />} />
