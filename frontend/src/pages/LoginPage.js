@@ -206,22 +206,12 @@ export default function LoginPage() {
         className="hidden lg:flex login-right relative overflow-hidden items-center justify-start"
         data-testid="login-right-panel"
       >
-        {/* Background blurred fill - rellena espacios laterales con la misma imagen difuminada */}
-        <img
-          src={OPTICAL_STORE_IMG}
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ filter: 'blur(40px)', transform: 'scale(1.15)' }}
-          draggable="false"
-        />
-
-        {/* Background image: optical store - imagen completa sin recortar */}
+        {/* Background image: optical store - llena todo el panel */}
         <img
           src={OPTICAL_STORE_IMG}
           alt="Óptica Cortexia"
-          className="absolute inset-0 w-full h-full object-contain"
-          style={{ objectPosition: 'center center' }}
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ objectPosition: 'center 55%' }}
           draggable="false"
         />
 
