@@ -211,7 +211,7 @@ export default function LoginPage() {
           src={OPTICAL_STORE_IMG}
           alt="Óptica Cortexia"
           className="absolute inset-0 w-full h-full object-cover"
-          style={{ objectPosition: 'center right' }}
+          style={{ objectPosition: '50% 62%' }}
           draggable="false"
         />
 
