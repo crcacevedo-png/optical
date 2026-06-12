@@ -8,9 +8,8 @@ import os
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
-# Test credentials
-ADMIN_EMAIL = "admin@cortexia.gt"
-ADMIN_PASSWORD = "Demo123!"
+# Test credentials - lee de env vars con defaults seguros
+from _credentials import ADMIN_EMAIL, ADMIN_PASSWORD
 
 
 class TestBranchFiltering:

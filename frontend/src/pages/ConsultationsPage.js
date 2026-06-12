@@ -80,7 +80,7 @@ export default function ConsultationsPage() {
   // Medical Rx from consultation
   const [showMedicalRx, setShowMedicalRx] = useState(false);
   const [medicalForm, setMedicalForm] = useState({
-    diagnosis: '', medications: [{ name: '', dosage: '', frequency: '', duration: '' }], instructions: ''
+    diagnosis: '', medications: [{ _uid: crypto.randomUUID(), name: '', dosage: '', frequency: '', duration: '' }], instructions: ''
   });
 
   const loadData = useCallback(async () => {
@@ -232,7 +232,7 @@ export default function ConsultationsPage() {
   };
 
   const addMedication = () => {
-    setMedicalForm(f => ({ ...f, medications: [...f.medications, { name: '', dosage: '', frequency: '', duration: '' }] }));
+    setMedicalForm(f => ({ ...f, medications: [...f.medications, { _uid: crypto.randomUUID(), name: '', dosage: '', frequency: '', duration: '' }] }));
   };
 
   const updateMedication = (idx, field, value) => {
@@ -722,19 +722,19 @@ export default function ConsultationsPage() {
               {((c.eyeglass_prescriptions?.length || 0) + (c.medical_prescriptions?.length || 0) + (c.contact_prescriptions?.length || 0)) > 0 && (
                 <div className="pt-3 border-t">
                   <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Recetas Generadas</p>
-                  {(c.eyeglass_prescriptions || []).map((rx, i) => (
+                  {(c.eyeglass_prescriptions || []).map((rx) => (
                     <div key={rx._id} className="flex items-center gap-2 text-sm py-1">
                       <FileText className="w-3.5 h-3.5 text-blue-500" />
                       <span>Anteojos ({formatDate(rx.created_at)})</span>
                     </div>
                   ))}
-                  {(c.contact_prescriptions || []).map((rx, i) => (
+                  {(c.contact_prescriptions || []).map((rx) => (
                     <div key={rx._id} className="flex items-center gap-2 text-sm py-1">
                       <FileText className="w-3.5 h-3.5 text-teal-500" />
                       <span>Lentes de contacto ({formatDate(rx.created_at)})</span>
                     </div>
                   ))}
-                  {(c.medical_prescriptions || []).map((rx, i) => (
+                  {(c.medical_prescriptions || []).map((rx) => (
                     <div key={rx._id} className="flex items-center gap-2 text-sm py-1">
                       <Pill className="w-3.5 h-3.5 text-purple-500" />
                       <span>Medica ({formatDate(rx.created_at)})</span>
@@ -946,7 +946,7 @@ export default function ConsultationsPage() {
                 </Button>
               </div>
               {medicalForm.medications.map((med, idx) => (
-                <div key={idx} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 mb-2 items-end">
+                <div key={med._uid || idx} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 mb-2 items-end">
                   <div className="space-y-1">
                     <Label className="text-[10px]">Medicamento</Label>
                     <Input className="h-8 text-sm" value={med.name} onChange={(e) => updateMedication(idx, 'name', e.target.value)} />

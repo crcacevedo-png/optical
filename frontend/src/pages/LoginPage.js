@@ -247,7 +247,7 @@ export default function LoginPage() {
           const c = nodeColor(i);
           return (
             <div
-              key={i}
+              key={`node-${node.x}-${node.y}-${node.s}`}
               className="absolute rounded-full login-node"
               style={{
                 left: `${node.x}%`,

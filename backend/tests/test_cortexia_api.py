@@ -9,11 +9,8 @@ from datetime import datetime, timedelta
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
-# Test credentials from test_credentials.md
-ADMIN_EMAIL = "admin@cortexia.gt"
-ADMIN_PASSWORD = "Demo123!"
-SUPERADMIN_EMAIL = "superadmin@cortexia.com"
-SUPERADMIN_PASSWORD = "Admin123!"
+# Test credentials - lee de env vars con defaults seguros
+from _credentials import ADMIN_EMAIL, ADMIN_PASSWORD, SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD
 
 class TestAuth:
     """Authentication endpoint tests"""

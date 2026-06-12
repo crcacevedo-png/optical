@@ -104,7 +104,7 @@ export default function PatientsPage() {
   });
   const [showMedicalRx, setShowMedicalRx] = useState(false);
   const [medicalForm, setMedicalForm] = useState({
-    diagnosis: '', medications: [{ name: '', dosage: '', frequency: '', duration: '' }], instructions: ''
+    diagnosis: '', medications: [{ _uid: crypto.randomUUID(), name: '', dosage: '', frequency: '', duration: '' }], instructions: ''
   });
   const [showEditPatient, setShowEditPatient] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -259,7 +259,7 @@ export default function PatientsPage() {
   };
 
   const addMedication = () => {
-    setMedicalForm(f => ({ ...f, medications: [...f.medications, { name: '', dosage: '', frequency: '', duration: '' }] }));
+    setMedicalForm(f => ({ ...f, medications: [...f.medications, { _uid: crypto.randomUUID(), name: '', dosage: '', frequency: '', duration: '' }] }));
   };
   const updateMedication = (idx, field, value) => {
     const meds = [...medicalForm.medications];
@@ -694,7 +694,7 @@ export default function PatientsPage() {
                             )}
                             <div className="space-y-1">
                               {rx.medications?.map((med, idx) => (
-                                <p key={idx} className="text-sm">
+                                <p key={`med-${idx}-${med.name || ''}`} className="text-sm">
                                   • {med.name} - {med.dosage} ({med.duration})
                                 </p>
                               ))}
@@ -1443,7 +1443,7 @@ export default function PatientsPage() {
                 </Button>
               </div>
               {medicalForm.medications.map((med, idx) => (
-                <div key={idx} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 mb-2 items-end">
+                <div key={med._uid || idx} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 mb-2 items-end">
                   <div className="space-y-1">
                     <Label className="text-[10px]">Medicamento</Label>
                     <Input className="h-8 text-sm" value={med.name} onChange={(e) => updateMedication(idx, 'name', e.target.value)} />

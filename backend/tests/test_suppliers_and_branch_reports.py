@@ -9,8 +9,7 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "admin@cortexia.gt"
-ADMIN_PASSWORD = "Demo123!"
+from _credentials import ADMIN_EMAIL, ADMIN_PASSWORD
 
 
 # ---------- Fixtures ----------

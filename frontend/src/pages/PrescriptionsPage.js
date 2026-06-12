@@ -32,7 +32,7 @@ export default function PrescriptionsPage() {
   const [medicalForm, setMedicalForm] = useState({
     patient_id: '',
     diagnosis: '',
-    medications: [{ name: '', dosage: '', duration: '' }],
+    medications: [{ _uid: crypto.randomUUID(), name: '', dosage: '', duration: '' }],
     instructions: ''
   });
 
@@ -104,7 +104,7 @@ export default function PrescriptionsPage() {
       setShowMedicalDialog(false);
       setMedicalForm({
         patient_id: '', diagnosis: '',
-        medications: [{ name: '', dosage: '', duration: '' }],
+        medications: [{ _uid: crypto.randomUUID(), name: '', dosage: '', duration: '' }],
         instructions: ''
       });
       fetchData();
@@ -149,7 +149,7 @@ export default function PrescriptionsPage() {
   const addMedication = () => {
     setMedicalForm({
       ...medicalForm,
-      medications: [...medicalForm.medications, { name: '', dosage: '', duration: '' }]
+      medications: [...medicalForm.medications, { _uid: crypto.randomUUID(), name: '', dosage: '', duration: '' }]
     });
   };
 
@@ -575,7 +575,7 @@ export default function PrescriptionsPage() {
                         <Button type="button" size="sm" variant="outline" onClick={addMedication}><Plus className="w-4 h-4 mr-1" /> Agregar</Button>
                       </div>
                       {medicalForm.medications.map((med, idx) => (
-                        <div key={idx} className="flex gap-2 items-start">
+                        <div key={med._uid || idx} className="flex gap-2 items-start">
                           <Input placeholder="Medicamento" value={med.name} onChange={(e) => updateMedication(idx, 'name', e.target.value)} className="flex-1" />
                           <Input placeholder="Dosis" value={med.dosage} onChange={(e) => updateMedication(idx, 'dosage', e.target.value)} className="w-28" />
                           <Input placeholder="Duración" value={med.duration} onChange={(e) => updateMedication(idx, 'duration', e.target.value)} className="w-28" />

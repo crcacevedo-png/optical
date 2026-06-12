@@ -180,8 +180,8 @@ async def startup():
     # Seed superadmin - lee credenciales SOLO de env vars. Si no estan presentes,
     # NO crea ni resetea el SuperAdmin (evita hardcodear secretos en el repo).
     # IMPORTANTE: En el panel de Emergent Deployments, configura las variables:
-    #   ADMIN_EMAIL='superadmin@cortexia.com'
-    #   ADMIN_PASSWORD='TuPasswordSegura'  <-- usa comillas simples para evitar shell expansion de $
+    #   ADMIN_EMAIL (email del superadmin)
+    #   ADMIN_PASSWORD (minimo 8 chars, entre comillas simples si contiene $)
     admin_email = (os.environ.get("ADMIN_EMAIL", "") or "").strip()
     admin_password = (os.environ.get("ADMIN_PASSWORD", "") or "").strip()
     if admin_email and admin_password and len(admin_password) >= 8:

@@ -16,11 +16,8 @@ import time
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
-# Test credentials
-SUPERADMIN_EMAIL = "superadmin@cortexia.com"
-SUPERADMIN_PASSWORD = "Admin123!"
-ADMIN_EMAIL = "admin@cortexia.gt"
-ADMIN_PASSWORD = "Demo123!"
+# Test credentials - lee de env vars con defaults seguros
+from _credentials import SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD
 
 
 class TestSuperAdminAuth:

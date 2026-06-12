@@ -447,7 +447,7 @@ export default function AnnouncementsPage() {
                   <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Opticas que descartaron ({metricsData.dismissals_count})</p>
                   <div className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1">
                     {metricsData.dismiss_details.map((d, i) => (
-                      <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-amber-50/50 border border-amber-100" data-testid={`dismiss-detail-${i}`}>
+                      <div key={`dismiss-${d.company_name}-${d.date}`} className="flex items-center justify-between p-2 rounded-lg bg-amber-50/50 border border-amber-100" data-testid={`dismiss-detail-${i}`}>
                         <div>
                           <p className="text-sm font-medium text-slate-800">{d.company_name}</p>
                           <p className="text-[10px] text-slate-500">{d.user_name}</p>

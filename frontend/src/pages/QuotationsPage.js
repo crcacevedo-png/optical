@@ -434,7 +434,7 @@ export default function QuotationsPage() {
                     </TableHeader>
                     <TableBody>
                       {cart.map((item, idx) => (
-                        <TableRow key={idx}>
+                        <TableRow key={item.product_id || `cart-${idx}`}>
                           <TableCell className="text-sm font-medium">{item.name}</TableCell>
                           <TableCell>
                             <Input
@@ -601,7 +601,7 @@ export default function QuotationsPage() {
                       </TableHeader>
                       <TableBody>
                         {(selectedQuotation.items || []).map((item, idx) => (
-                          <TableRow key={idx}>
+                          <TableRow key={item.product_id || `item-${idx}`}>
                             <TableCell className="font-medium text-sm">{item.name}</TableCell>
                             <TableCell className="text-center">{item.quantity}</TableCell>
                             <TableCell className="text-right">{formatCurrency(item.unit_price)}</TableCell>
