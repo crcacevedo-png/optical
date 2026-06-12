@@ -3,43 +3,20 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth, formatApiErrorDetail } from '../context/AuthContext';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Eye, EyeOff, Users, Package, Calendar, FileText, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Users, Package, Calendar, FileText, ShoppingCart } from 'lucide-react';
 
 const LOGO_URL = 'https://customer-assets.emergentagent.com/job_eyecare-erp/artifacts/80lobcqc_logo%20cortexia%20optical%20transparente.png';
 
-const NODES = [
-  { x: 12, y: 8, s: 4, d: 0 }, { x: 28, y: 14, s: 3, d: 0.5 },
-  { x: 48, y: 6, s: 5, d: 1.2 }, { x: 72, y: 10, s: 3, d: 1.8 },
-  { x: 88, y: 18, s: 4, d: 0.3 }, { x: 8, y: 32, s: 3, d: 0.8 },
-  { x: 32, y: 28, s: 5, d: 1.5 }, { x: 55, y: 24, s: 4, d: 0.6 },
-  { x: 78, y: 30, s: 3, d: 2.0 }, { x: 92, y: 40, s: 4, d: 0.4 },
-  { x: 18, y: 48, s: 4, d: 1.1 }, { x: 42, y: 44, s: 5, d: 0.7 },
-  { x: 62, y: 50, s: 3, d: 1.4 }, { x: 82, y: 46, s: 4, d: 0.2 },
-  { x: 10, y: 64, s: 3, d: 1.6 }, { x: 35, y: 60, s: 4, d: 0.9 },
-  { x: 52, y: 68, s: 5, d: 1.3 }, { x: 75, y: 62, s: 3, d: 0.5 },
-  { x: 90, y: 58, s: 4, d: 1.7 }, { x: 22, y: 78, s: 3, d: 0.1 },
-  { x: 48, y: 82, s: 4, d: 1.0 }, { x: 68, y: 76, s: 3, d: 0.6 },
-  { x: 85, y: 72, s: 4, d: 1.9 }, { x: 15, y: 90, s: 3, d: 0.8 },
-  { x: 58, y: 92, s: 4, d: 1.2 }, { x: 80, y: 88, s: 3, d: 0.4 },
-];
+// Imagen de óptica de fondo (lentes en estantes + lentes en mostrador)
+const OPTICAL_STORE_IMG = 'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?auto=format&fit=crop&w=1600&q=80';
 
-const CONNECTIONS = [
-  [0,1],[1,2],[2,3],[3,4],[5,6],[6,7],[7,8],[8,9],
-  [10,11],[11,12],[12,13],[14,15],[15,16],[16,17],[17,18],
-  [19,20],[20,21],[21,22],[23,24],[24,25],
-  [1,6],[2,7],[3,8],[6,11],[7,12],[8,13],
-  [10,15],[11,16],[12,17],[14,19],[15,20],[16,21],
-  [17,22],[19,23],[20,24],[21,25],
-  [0,5],[5,10],[10,14],[14,19],[19,23],
-  [4,9],[9,13],[13,18],[18,22],[22,25],
-];
-
+// Tarjetas de features que aparecen sobre la imagen
 const FEATURES = [
-  { icon: Users, label: 'Pacientes' },
-  { icon: Package, label: 'Inventario' },
-  { icon: FileText, label: 'Recetas' },
-  { icon: Calendar, label: 'Agenda' },
-  { icon: ShieldCheck, label: 'Seguridad' },
+  { icon: Calendar, label: 'Citas', color: 'purple' },
+  { icon: Package, label: 'Inventario', color: 'teal' },
+  { icon: FileText, label: 'Recetas', color: 'purple' },
+  { icon: ShoppingCart, label: 'Ventas', color: 'teal' },
+  { icon: Users, label: 'Clientes', color: 'purple' },
 ];
 
 export default function LoginPage() {
@@ -73,12 +50,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const nodeColor = (i) => {
-    if (i % 3 === 0) return { bg: 'rgba(26,188,156,0.7)', shadow: '0 0 10px rgba(26,188,156,0.4)' };
-    if (i % 3 === 1) return { bg: 'rgba(90,45,130,0.6)', shadow: '0 0 10px rgba(90,45,130,0.3)' };
-    return { bg: 'rgba(255,255,255,0.45)', shadow: '0 0 8px rgba(255,255,255,0.2)' };
   };
 
   return (
@@ -192,117 +163,81 @@ export default function LoginPage() {
               </Link>
             </div>
           </form>
-
-          {/* Demo credentials */}
-          <div className="mt-8 login-stagger-4">
-            <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-100">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-3">
-                Credenciales Demo
-              </p>
-              <div className="space-y-2 text-[13px]">
-                <div className="flex items-center gap-2 text-slate-500">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#5A2D82] shrink-0" />
-                  <span className="font-semibold text-slate-600">Admin:</span>
-                  <span className="text-slate-400">admin@cortexia.gt / Demo123!</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-500">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#1ABC9C] shrink-0" />
-                  <span className="font-semibold text-slate-600">Usuario:</span>
-                  <span className="text-slate-400">vendedor@cortexia.gt / Demo123!</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* ═══════ RIGHT PANEL — Abstract Tech ═══════ */}
+      {/* ═══════ RIGHT PANEL — Optical Store Hero ═══════ */}
       <div
-        className="hidden lg:flex relative overflow-hidden items-center justify-center"
-        style={{ background: 'linear-gradient(160deg, #1B2A49 0%, #162240 40%, #1B2A49 100%)' }}
+        className="hidden lg:flex relative overflow-hidden items-center justify-center bg-slate-100"
         data-testid="login-right-panel"
       >
-        {/* Gradient Orbs */}
-        <div className="login-orb login-orb-purple" />
-        <div className="login-orb login-orb-teal" />
-        <div className="login-orb login-orb-purple-secondary" />
+        {/* Imagen de fondo de optica */}
+        <img
+          src={OPTICAL_STORE_IMG}
+          alt="Optica Cortexia"
+          className="absolute inset-0 w-full h-full object-cover"
+          draggable="false"
+        />
+        {/* Overlay claro tipo wash blanco con tinte ligero */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: 'linear-gradient(120deg, rgba(255,255,255,0.85) 0%, rgba(248,250,252,0.65) 45%, rgba(255,255,255,0.45) 100%)',
+          }}
+        />
+        {/* Acento decorativo morado-teal en esquinas (curvas suaves) */}
+        <div
+          className="absolute -bottom-32 -right-24 w-[420px] h-[420px] rounded-full opacity-40 pointer-events-none"
+          style={{
+            background: 'radial-gradient(circle, rgba(26,188,156,0.5) 0%, rgba(90,45,130,0.2) 50%, transparent 75%)',
+            filter: 'blur(40px)',
+          }}
+        />
+        <div
+          className="absolute -top-20 -left-16 w-[320px] h-[320px] rounded-full opacity-30 pointer-events-none"
+          style={{
+            background: 'radial-gradient(circle, rgba(90,45,130,0.4) 0%, transparent 70%)',
+            filter: 'blur(50px)',
+          }}
+        />
 
-        {/* SVG Connection Lines */}
-        <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }}>
-          {CONNECTIONS.map(([a, b], i) => (
-            <line
-              key={`conn-${a}-${b}`}
-              x1={`${NODES[a].x}%`} y1={`${NODES[a].y}%`}
-              x2={`${NODES[b].x}%`} y2={`${NODES[b].y}%`}
-              stroke="rgba(26,188,156,0.1)"
-              strokeWidth="1"
-              className="login-line"
-              style={{ animationDelay: `${i * 0.04}s` }}
-            />
-          ))}
-        </svg>
-
-        {/* Neural Network Nodes */}
-        {NODES.map((node, i) => {
-          const c = nodeColor(i);
-          return (
-            <div
-              key={`node-${node.x}-${node.y}-${node.s}`}
-              className="absolute rounded-full login-node"
+        {/* Contenido principal */}
+        <div className="relative z-10 max-w-[560px] mx-12 px-4 login-glass-card">
+          <h2 className="font-heading text-4xl xl:text-5xl font-bold leading-[1.15] text-slate-900 tracking-tight mb-3">
+            Gestione su óptica
+          </h2>
+          <h2 className="font-heading text-4xl xl:text-5xl font-bold leading-[1.15] tracking-tight mb-6">
+            <span className="text-slate-900">de manera </span>
+            <span
               style={{
-                left: `${node.x}%`,
-                top: `${node.y}%`,
-                width: `${node.s}px`,
-                height: `${node.s}px`,
-                background: c.bg,
-                boxShadow: c.shadow,
-                animationDelay: `${node.d}s`,
-                zIndex: 2,
-              }}
-            />
-          );
-        })}
-
-        {/* Glassmorphism Central Card */}
-        <div className="relative z-10 max-w-[420px] mx-8 login-glass-card">
-          <div
-            className="p-9 rounded-2xl"
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              backdropFilter: 'blur(24px)',
-              WebkitBackdropFilter: 'blur(24px)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              boxShadow: '0 8px 40px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.05)',
-            }}
-            data-testid="login-glass-card"
-          >
-            <h2
-              className="font-heading text-3xl sm:text-[2.1rem] font-bold leading-tight mb-4"
-              style={{
-                background: 'linear-gradient(135deg, #FFFFFF 0%, #1ABC9C 100%)',
+                background: 'linear-gradient(135deg, #5A2D82 0%, #1ABC9C 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
               }}
             >
-              Gestione su óptica de manera eficiente
-            </h2>
-            <p className="text-white/40 text-sm leading-relaxed mb-7">
-              Control total de pacientes, inventario, ventas y finanzas en una sola plataforma diseñada para ópticas en Latinoamérica.
-            </p>
+              eficiente
+            </span>
+          </h2>
+          <p className="text-slate-600 text-[15px] leading-relaxed mb-10 max-w-[460px]">
+            Control total de pacientes, inventario, ventas y finanzas en una sola plataforma diseñada para ópticas en Latinoamérica.
+          </p>
 
-            {/* Feature Tags */}
-            <div className="flex flex-wrap gap-2">
-              {FEATURES.map(({ icon: Icon, label }) => (
-                <span
+          {/* Feature Cards - tarjetas blancas con icono */}
+          <div className="flex flex-wrap gap-3 max-w-[520px]" data-testid="login-features">
+            {FEATURES.map(({ icon: Icon, label, color }) => {
+              const iconColor = color === 'teal' ? '#1ABC9C' : '#5A2D82';
+              return (
+                <div
                   key={label}
-                  className="login-feature-tag inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/95 border border-slate-200/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                  data-testid={`feature-${label.toLowerCase()}`}
                 >
-                  <Icon className="w-3 h-3" />
-                  {label}
-                </span>
-              ))}
-            </div>
+                  <Icon className="w-4 h-4" style={{ color: iconColor }} strokeWidth={2.2} />
+                  <span className="text-sm font-semibold text-slate-700">{label}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
