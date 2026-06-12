@@ -5,8 +5,8 @@ import { Mail, Lock, Eye, EyeOff, Users, Package, Calendar, FileText, ShoppingCa
 
 const LOGO_URL = 'https://customer-assets.emergentagent.com/job_eyecare-erp/artifacts/80lobcqc_logo%20cortexia%20optical%20transparente.png';
 
-// OPCION E: Abstracta minimalista con bokeh suave (sin lentes específicos)
-const OPTICAL_STORE_IMG = 'https://images.unsplash.com/photo-1557682250-33bd709cbe85?auto=format&fit=crop&w=1800&q=85';
+// Imagen oficial provista por el usuario (mantener proporción completa)
+const OPTICAL_STORE_IMG = 'https://customer-assets.emergentagent.com/job_eyecare-erp/artifacts/a56thl1o_Captura%20de%20pantalla%202026-06-11%20212336.png';
 
 // Chips de funcionalidades con iconos alternados violeta / teal
 const FEATURES = [
@@ -206,20 +206,20 @@ export default function LoginPage() {
         className="hidden lg:flex login-right relative overflow-hidden items-center justify-start"
         data-testid="login-right-panel"
       >
-        {/* Background image: optical store */}
+        {/* Background image: optical store - imagen completa sin recortar */}
         <img
           src={OPTICAL_STORE_IMG}
           alt="Óptica Cortexia"
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-contain"
           style={{ objectPosition: 'center center' }}
           draggable="false"
         />
 
         {/* Light wash overlay - sutil para mantener detalles de la imagen */}
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 pointer-events-none"
           style={{
-            background: 'linear-gradient(110deg, rgba(255,255,255,0.78) 0%, rgba(248,250,255,0.55) 40%, rgba(255,255,255,0.20) 75%, rgba(255,255,255,0.05) 100%)',
+            background: 'linear-gradient(110deg, rgba(255,255,255,0.55) 0%, rgba(248,250,255,0.30) 40%, rgba(255,255,255,0.10) 75%, rgba(255,255,255,0.05) 100%)',
           }}
         />
 

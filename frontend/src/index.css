@@ -334,7 +334,7 @@ input:focus, select:focus, textarea:focus, button:focus {
 
 /* Right hero panel */
 .login-right {
-    background: #F8FAFE;
+    background: linear-gradient(160deg, #FAFBFE 0%, #F4F7FC 100%);
 }
 
 .login-hero-title {
