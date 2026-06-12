@@ -5,8 +5,8 @@ import { Mail, Lock, Eye, EyeOff, Users, Package, Calendar, FileText, ShoppingCa
 
 const LOGO_URL = 'https://customer-assets.emergentagent.com/job_eyecare-erp/artifacts/80lobcqc_logo%20cortexia%20optical%20transparente.png';
 
-// Imagen premium real de interior de óptica con monturas reales (Unsplash, Sven Mieke)
-const OPTICAL_STORE_IMG = 'https://images.unsplash.com/photo-1577744486770-020ab432da65?auto=format&fit=crop&w=1800&q=85';
+// OPCION E: Abstracta minimalista con bokeh suave (sin lentes específicos)
+const OPTICAL_STORE_IMG = 'https://images.unsplash.com/photo-1557682250-33bd709cbe85?auto=format&fit=crop&w=1800&q=85';
 
 // Chips de funcionalidades con iconos alternados violeta / teal
 const FEATURES = [
