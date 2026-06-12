@@ -46,15 +46,48 @@ export default function LoginPage() {
 
       {/* ═══════ LEFT PANEL — Form ═══════ */}
       <div className="login-left relative flex items-center justify-center px-6 py-10 sm:px-12 overflow-hidden">
-        {/* Subtle decorative blurs in corners */}
-        <div
-          className="absolute -bottom-44 -left-32 w-[460px] h-[460px] rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(109,53,216,0.10) 0%, transparent 70%)' }}
-        />
-        <div
-          className="absolute -top-32 -right-28 w-[340px] h-[340px] rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(19,184,176,0.07) 0%, transparent 70%)' }}
-        />
+        {/* Decorative curve - top left */}
+        <svg
+          className="absolute -top-32 -left-32 w-[420px] h-[420px] pointer-events-none"
+          viewBox="0 0 400 400"
+          fill="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="curveLeftTop" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#6D35D8" stopOpacity="0.16" />
+              <stop offset="100%" stopColor="#13B8B0" stopOpacity="0.04" />
+            </linearGradient>
+            <filter id="curveLeftBlur" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="18" />
+            </filter>
+          </defs>
+          <path
+            d="M0,0 C140,20 260,60 340,140 C400,210 380,300 320,340 C260,380 160,360 80,300 C20,250 -20,160 0,0 Z"
+            fill="url(#curveLeftTop)"
+            filter="url(#curveLeftBlur)"
+          />
+        </svg>
+
+        {/* Decorative curve - bottom left (sutil acento secundario) */}
+        <svg
+          className="absolute -bottom-40 -left-24 w-[360px] h-[360px] pointer-events-none opacity-70"
+          viewBox="0 0 400 400"
+          fill="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="curveLeftBottom" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#13B8B0" stopOpacity="0.12" />
+              <stop offset="100%" stopColor="#6D35D8" stopOpacity="0.05" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M0,400 C20,280 80,180 180,140 C280,100 380,160 400,260 C400,360 320,400 220,400 C140,400 60,400 0,400 Z"
+            fill="url(#curveLeftBottom)"
+            style={{ filter: 'blur(24px)' }}
+          />
+        </svg>
 
         <div className="w-full max-w-[420px] relative z-10">
           {/* Logo — INTACTO */}
@@ -189,21 +222,49 @@ export default function LoginPage() {
           }}
         />
 
-        {/* Corner accent shapes (curva decorativa) */}
-        <div
-          className="absolute -bottom-32 -right-24 w-[560px] h-[560px] rounded-full pointer-events-none"
-          style={{
-            background: 'radial-gradient(circle, rgba(19,184,176,0.32) 0%, rgba(109,53,216,0.18) 50%, transparent 75%)',
-            filter: 'blur(30px)',
-          }}
-        />
-        <div
-          className="absolute -top-24 -left-16 w-[320px] h-[320px] rounded-full opacity-40 pointer-events-none"
-          style={{
-            background: 'radial-gradient(circle, rgba(109,53,216,0.25) 0%, transparent 70%)',
-            filter: 'blur(40px)',
-          }}
-        />
+        {/* Decorative curve - bottom right (forma curva prominente) */}
+        <svg
+          className="absolute -bottom-32 -right-24 w-[640px] h-[640px] pointer-events-none"
+          viewBox="0 0 600 600"
+          fill="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="curveRightBottom" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#13B8B0" stopOpacity="0.42" />
+              <stop offset="55%" stopColor="#6D35D8" stopOpacity="0.28" />
+              <stop offset="100%" stopColor="#6D35D8" stopOpacity="0.08" />
+            </linearGradient>
+            <filter id="curveRightBlur" x="-10%" y="-10%" width="120%" height="120%">
+              <feGaussianBlur stdDeviation="22" />
+            </filter>
+          </defs>
+          <path
+            d="M600,200 C600,420 480,580 280,600 C140,600 40,520 0,360 C40,260 120,180 240,140 C360,100 480,120 560,160 C580,170 600,185 600,200 Z"
+            fill="url(#curveRightBottom)"
+            filter="url(#curveRightBlur)"
+          />
+        </svg>
+
+        {/* Decorative curve - top left of right panel (acento violeta) */}
+        <svg
+          className="absolute -top-28 -left-20 w-[400px] h-[400px] pointer-events-none"
+          viewBox="0 0 400 400"
+          fill="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="curveRightTop" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#6D35D8" stopOpacity="0.28" />
+              <stop offset="100%" stopColor="#13B8B0" stopOpacity="0.10" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M0,0 C160,10 280,50 360,140 C420,220 400,310 320,360 C240,400 140,380 70,320 C10,260 -20,140 0,0 Z"
+            fill="url(#curveRightTop)"
+            style={{ filter: 'blur(28px)' }}
+          />
+        </svg>
 
         {/* Hero content */}
         <div className="relative z-10 max-w-[560px] px-10 xl:px-16 login-glass-card">
