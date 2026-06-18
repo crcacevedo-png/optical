@@ -59,10 +59,10 @@ export default function MainLayout() {
     ...(hasModule('proveedores') ? [{ path: '/suppliers', icon: Truck, label: 'Proveedores' }] : []),
     ...(hasModule('finanzas') ? [{ path: '/finance', icon: DollarSign, label: 'Finanzas' }] : []),
     ...(isAdmin ? [
-      { path: '/onboarding', icon: Rocket, label: 'Inicio rapido' },
       { path: '/branches', icon: Building2, label: 'Sucursales' },
       { path: '/users', icon: UserCog, label: 'Usuarios' },
       { path: '/reports', icon: BarChart3, label: 'Reportes' },
+      { path: '/onboarding', icon: Rocket, label: 'Inicio rapido' },
       { path: '/settings', icon: Settings, label: 'Configuracion' },
     ] : []),
   ];

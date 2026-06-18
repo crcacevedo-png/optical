@@ -8,6 +8,7 @@ import {
   AlertTriangle, Clock, DollarSign, ShoppingBag, CreditCard, X, Info, Sparkles, Megaphone, ShieldCheck
 } from 'lucide-react';
 import { BranchFilter } from '../components/BranchFilter';
+import { OnboardingWidget } from '../components/OnboardingWidget';
 import { Link } from 'react-router-dom';
 
 const ANNOUNCEMENT_STYLES = {
@@ -159,6 +160,9 @@ export default function DashboardPage() {
         </div>
         <BranchFilter value={branchId} onChange={setBranchId} />
       </div>
+
+      {/* Onboarding Widget (solo admins con progreso < 100%) */}
+      <OnboardingWidget userRole={user?.role} />
 
       {/* Announcement Banners */}
       {visibleAnnouncements.length > 0 && (

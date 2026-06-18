@@ -50,6 +50,12 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 ### Modulo de Comunicacion
 - Anuncios segmentados por plan/ciudad con metricas de visualizacion
 
+### Onboarding "Inicio Rápido" (Feb 2026)
+- Página interactiva `/onboarding` con 7 pasos checklist (datos óptica, sucursales, equipo, inventario, primer paciente, primera venta, cambio password) + barra de progreso animada.
+- Backend: `GET/PUT /api/onboarding/status` y `POST /api/onboarding/dismiss` con persistencia por usuario (`onboarding_progress`, `onboarding_dismissed`).
+- Menú lateral: ítem "Inicio rápido" colocado entre Reportes y Configuración (admins).
+- **Widget Dashboard (Feb 2026):** Card gradient (#6D35D8 → #13B8B0) visible solo para admins con progreso < 100% y no descartado. Muestra "X de 7 pasos completados", % progreso, CTA "Continuar" → `/onboarding`, y botón X para descartar (persistente vía `/api/onboarding/dismiss`).
+
 ### Sistema de Planes, Exportacion Excel, Reportes por Sucursal
 
 ### Modulos Funcionales

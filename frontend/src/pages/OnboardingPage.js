@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const STEPS = [
+export const STEPS = [
   {
     id: 'change_password',
     icon: Lock,
