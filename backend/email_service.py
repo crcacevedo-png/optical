@@ -59,15 +59,11 @@ def _wrapper(content: str, heading: str = "Cortexia Optical") -> str:
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#F1F5F9;padding:32px 16px;">
     <tr><td align="center">
       <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background-color:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04);max-width:600px;">
-        <tr><td style="background-color:{BRAND_DARK};padding:24px 32px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-            <tr>
-              <td style="vertical-align:middle;">
-                <div style="display:inline-block;width:36px;height:36px;background-color:{BRAND_TEAL};border-radius:50%;text-align:center;line-height:36px;color:#1B2A49;font-weight:bold;font-size:18px;font-family:Helvetica,Arial,sans-serif;">C</div>
-                <span style="color:#FFFFFF;font-size:18px;font-weight:bold;margin-left:12px;letter-spacing:0.5px;">CORTEXIA OPTICAL</span>
-              </td>
-            </tr>
-          </table>
+        <tr><td style="background-color:{BRAND_DARK};padding:20px 32px;text-align:left;">
+          <img src="https://customer-assets.emergentagent.com/job_eyecare-erp/artifacts/80lobcqc_logo%20cortexia%20optical%20transparente.png"
+               alt="Cortexia Optical"
+               width="160"
+               style="display:inline-block;height:auto;max-height:64px;border:0;outline:none;text-decoration:none;" />
         </td></tr>
         <tr><td style="padding:36px 36px 16px 36px;">
           <h1 style="color:{BRAND_DARK};margin:0 0 24px 0;font-size:22px;font-weight:bold;line-height:1.3;">{heading}</h1>
@@ -139,6 +135,25 @@ def render_welcome_company(admin_name: str, company_name: str, admin_email: str,
         </p>
       </div>
       {_button("Ingresar a Cortexia", login_link, BRAND_EMERALD)}
+
+      <div style="background:linear-gradient(135deg,#6D35D8 0%,#13B8B0 100%);border-radius:10px;padding:20px 22px;margin:28px 0 8px 0;">
+        <p style="color:#FFFFFF;font-size:13px;margin:0 0 4px 0;font-weight:bold;text-transform:uppercase;letter-spacing:0.6px;opacity:0.85;">&#x1F680; Inicio rapido recomendado</p>
+        <p style="color:#FFFFFF;font-size:15px;line-height:1.5;margin:0 0 14px 0;font-weight:600;">
+          Completa la configuracion inicial en 7 pasos guiados para dejar tu optica 100% operativa.
+        </p>
+        <p style="color:#FFFFFF;font-size:13px;line-height:1.6;margin:0 0 14px 0;opacity:0.9;">
+          Al iniciar sesion, dirigete al menu lateral &rarr; <strong style="color:#FFFFFF;">Inicio rapido</strong>,
+          o haz clic en el boton de abajo para ir directamente. Veras el progreso en tu Dashboard.
+        </p>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+          <td style="background-color:#FFFFFF;border-radius:8px;">
+            <a href="{login_link}/onboarding" style="display:inline-block;padding:11px 22px;color:#0F172A;text-decoration:none;font-size:14px;font-weight:bold;font-family:Helvetica,Arial,sans-serif;">
+              Ir al Inicio rapido &rarr;
+            </a>
+          </td>
+        </tr></table>
+      </div>
+
       <h3 style="color:{BRAND_DARK};font-size:16px;margin:32px 0 12px 0;">Primeros pasos recomendados</h3>
       <ol style="color:#475569;font-size:14px;line-height:1.8;margin:0;padding-left:20px;">
         <li>Configura los datos de tu optica (logo, direccion, telefono) en <em>Configuracion</em>.</li>
