@@ -122,7 +122,7 @@ def render_password_reset(name: str, reset_link: str) -> str:
     return _wrapper(content, "Restablece tu contrasena")
 
 
-def render_welcome_company(admin_name: str, company_name: str, admin_email: str, login_link: str) -> str:
+def render_welcome_company(admin_name: str, company_name: str, admin_email: str, admin_password: str, login_link: str) -> str:
     """Email de bienvenida cuando se crea una nueva optica."""
     content = f"""
       <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{admin_name}</strong>,</p>
@@ -133,12 +133,15 @@ def render_welcome_company(admin_name: str, company_name: str, admin_email: str,
       <div style="background-color:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:16px 20px;margin:24px 0;">
         <p style="color:#065F46;font-size:13px;margin:0 0 8px 0;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">Tus credenciales de acceso</p>
         <p style="color:#0F172A;font-size:14px;margin:4px 0;"><strong>Email:</strong> {admin_email}</p>
-        <p style="color:{TEXT_MUTED};font-size:13px;margin:4px 0 0 0;">Usa la contrasena que te fue proporcionada al momento del alta. Te recomendamos cambiarla en tu primer ingreso.</p>
+        <p style="color:#0F172A;font-size:14px;margin:4px 0;"><strong>Contrasena temporal:</strong> <span style="font-family:'Courier New',monospace;background-color:#FFFFFF;padding:3px 8px;border-radius:4px;border:1px solid #BBF7D0;color:#065F46;font-weight:bold;letter-spacing:0.5px;">{admin_password}</span></p>
+        <p style="color:#B45309;font-size:12px;margin:10px 0 0 0;background-color:#FFFBEB;border-left:3px solid #F59E0B;padding:8px 10px;border-radius:4px;">
+          <strong>Por seguridad:</strong> cambia esta contrasena la primera vez que ingreses, desde el menu superior derecho &rarr; <em>Cambiar mi contrasena</em>.
+        </p>
       </div>
       {_button("Ingresar a Cortexia", login_link, BRAND_EMERALD)}
       <h3 style="color:{BRAND_DARK};font-size:16px;margin:32px 0 12px 0;">Primeros pasos recomendados</h3>
       <ol style="color:#475569;font-size:14px;line-height:1.8;margin:0;padding-left:20px;">
-        <li>Configura los datos de tu optica (logo, direccion, teléfono) en <em>Configuracion</em>.</li>
+        <li>Configura los datos de tu optica (logo, direccion, telefono) en <em>Configuracion</em>.</li>
         <li>Crea tus sucursales si tienes varias ubicaciones.</li>
         <li>Da de alta a tu equipo en <em>Usuarios</em> (optometristas, vendedores, etc.).</li>
         <li>Empieza a registrar pacientes y consultas.</li>

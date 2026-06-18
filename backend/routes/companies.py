@@ -74,6 +74,7 @@ async def create_company(data: CompanyCreate, user: dict = Depends(get_current_u
         admin_name=data.admin_name,
         company_name=data.name,
         admin_email=data.admin_email.lower(),
+        admin_password=data.admin_password,
         login_link=app_url,
     )
     await send_email(
