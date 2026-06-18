@@ -9,7 +9,7 @@ import { ScrollArea } from '../components/ui/scroll-area';
 import { 
   LayoutDashboard, Users, Calendar, FileText, Package, 
   ShoppingCart, DollarSign, Building2, UserCog, BarChart3,
-  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone, Key, ShieldAlert
+  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone, Key, ShieldAlert, Rocket
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -59,6 +59,7 @@ export default function MainLayout() {
     ...(hasModule('proveedores') ? [{ path: '/suppliers', icon: Truck, label: 'Proveedores' }] : []),
     ...(hasModule('finanzas') ? [{ path: '/finance', icon: DollarSign, label: 'Finanzas' }] : []),
     ...(isAdmin ? [
+      { path: '/onboarding', icon: Rocket, label: 'Inicio rapido' },
       { path: '/branches', icon: Building2, label: 'Sucursales' },
       { path: '/users', icon: UserCog, label: 'Usuarios' },
       { path: '/reports', icon: BarChart3, label: 'Reportes' },

@@ -24,6 +24,7 @@ import PlansPage from './pages/PlansPage';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import AnnouncementsPage from './pages/AnnouncementsPage';
 import AuditLogPage from './pages/AuditLogPage';
+import OnboardingPage from './pages/OnboardingPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import './App.css';
@@ -46,6 +47,7 @@ function App() {
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="onboarding" element={<OnboardingPage />} />
             <Route path="patients" element={<PatientsPage />} />
             <Route path="agenda" element={<AgendaPage />} />
             <Route path="consultations" element={<ConsultationsPage />} />
