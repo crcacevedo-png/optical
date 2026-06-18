@@ -130,6 +130,41 @@ Ve a **Configuración** (`/settings`) y completa:
 
 ## 4. Flujos Complementarios
 
+### Página interactiva "Inicio rápido" (`/onboarding`)
+
+A partir de Feb 2026, los administradores cuentan con una **guía interactiva persistente** accesible desde el menú lateral en **Inicio rápido** (entre "Reportes" y "Configuración").
+
+- Muestra los 7 pasos (cambiar password, datos óptica, sucursales, equipo, inventario, primer paciente, primera venta) como un checklist con barra de progreso.
+- Cada paso tiene su propio botón **"Ir a..."** que navega al módulo correspondiente.
+- El estado de cada paso se guarda por usuario en MongoDB (`users.onboarding_progress`).
+- Al completar los 7 pasos aparece un mensaje de felicitación.
+- Botón **"Cerrar guía"** persiste la decisión (`users.onboarding_dismissed = true`).
+
+**Endpoints involucrados**:
+- `GET /api/onboarding/status` → `{ progress: { step_id: bool }, dismissed: bool }`
+- `PUT /api/onboarding/status` con `{ step_id, completed }` → actualiza un paso
+- `POST /api/onboarding/dismiss` → marca la guía como cerrada
+
+### Widget "Configuración inicial pendiente" en el Dashboard
+
+Card destacada (gradient morado → turquesa) visible en `/dashboard` para recordar al admin completar el onboarding.
+
+**Reglas de visibilidad**:
+- Solo se muestra si `user.role === 'admin'`
+- Solo si el progreso es `< 100%` (algún paso pendiente)
+- Solo si el usuario no la ha cerrado (`onboarding_dismissed !== true`)
+
+**Contenido**:
+- Contador "Llevas X de 7 pasos completados" + porcentaje
+- Barra de progreso animada
+- CTA **"Continuar →"** que lleva a `/onboarding`
+- Botón **X** que dispara `POST /api/onboarding/dismiss` y oculta el widget permanentemente para ese usuario
+
+**Archivos**:
+- Frontend: `/app/frontend/src/components/OnboardingWidget.js`
+- Página completa: `/app/frontend/src/pages/OnboardingPage.js` (exporta `STEPS` reutilizado por el widget)
+- Backend: `/app/backend/routes/onboarding.py`
+
 ### Restablecer contraseña (cualquier usuario)
 
 1. En el login, clic en **"¿Olvidaste tu contraseña?"**
@@ -183,4 +218,4 @@ Al terminar, el admin debe tener:
 
 ---
 
-_Versión del documento: 1.0 — Junio 2026_
+_Versión del documento: 1.1 — Febrero 2026_
