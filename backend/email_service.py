@@ -59,12 +59,13 @@ def _wrapper(content: str, heading: str = "Cortexia Optical") -> str:
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#F1F5F9;padding:32px 16px;">
     <tr><td align="center">
       <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background-color:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04);max-width:600px;">
-        <tr><td style="background-color:{BRAND_DARK};padding:20px 32px;text-align:left;">
+        <tr><td style="background-color:#FFFFFF;padding:28px 32px 20px 32px;text-align:center;border-bottom:1px solid #E2E8F0;">
           <img src="https://customer-assets.emergentagent.com/job_eyecare-erp/artifacts/80lobcqc_logo%20cortexia%20optical%20transparente.png"
                alt="Cortexia Optical"
-               width="160"
-               style="display:inline-block;height:auto;max-height:64px;border:0;outline:none;text-decoration:none;" />
+               width="180"
+               style="display:block;margin:0 auto;height:auto;max-height:90px;border:0;outline:none;text-decoration:none;" />
         </td></tr>
+        <tr><td style="height:4px;background:linear-gradient(90deg,{BRAND_DARK} 0%,{BRAND_TEAL} 100%);line-height:4px;font-size:0;">&nbsp;</td></tr>
         <tr><td style="padding:36px 36px 16px 36px;">
           <h1 style="color:{BRAND_DARK};margin:0 0 24px 0;font-size:22px;font-weight:bold;line-height:1.3;">{heading}</h1>
           {content}
