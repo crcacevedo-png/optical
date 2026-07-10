@@ -25,6 +25,7 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import AnnouncementsPage from './pages/AnnouncementsPage';
 import AuditLogPage from './pages/AuditLogPage';
 import OnboardingPage from './pages/OnboardingPage';
+import HealthMetricsPage from './pages/HealthMetricsPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import './App.css';
@@ -60,6 +61,7 @@ function App() {
             <Route path="admin/dashboard" element={<SuperAdminDashboard />} />
             <Route path="admin/comunicacion" element={<AnnouncementsPage />} />
             <Route path="admin/audit" element={<AuditLogPage />} />
+            <Route path="admin/health" element={<HealthMetricsPage />} />
             <Route path="finance" element={<FinancePage />} />
             <Route path="branches" element={<BranchesPage />} />
             <Route path="users" element={<UsersPage />} />
