@@ -48,6 +48,15 @@ async def send_email(to: str, subject: str, html: str, *, tag: Optional[str] = N
         return False
 
 
+def queue_email(to: str, subject: str, html: str, *, tag: Optional[str] = None) -> None:
+    """Encola un email en background sin bloquear la respuesta HTTP.
+    Fire-and-forget: errores se loggean pero NO se propagan al request.
+    Uso: reemplazar `await send_email(...)` por `queue_email(...)` en flujos
+    donde el usuario no necesita saber si el email se envio (welcome, alertas).
+    """
+    asyncio.create_task(send_email(to, subject, html, tag=tag))
+
+
 # ─────────────────────────────────── TEMPLATES ───────────────────────────────────
 
 def _wrapper(content: str, heading: str = "Cortexia Optical") -> str:

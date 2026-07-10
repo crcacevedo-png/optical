@@ -6,15 +6,22 @@ from db import db, serialize_doc
 from auth_utils import get_current_user
 from models import PlanCreate, PlanUpdate
 from routes.notifications import create_notification
+from cache import plans_cache
 
 router = APIRouter(prefix="/plans", tags=["Planes"])
 
-@router.get("")
-async def list_plans(user: dict = Depends(get_current_user)):
+
+async def _load_plans_from_db():
     plans = await db.plans.find({}).sort("price", 1).to_list(50)
     for p in plans:
         serialize_doc(p)
     return plans
+
+
+@router.get("")
+async def list_plans(user: dict = Depends(get_current_user)):
+    # Cache 5 min: los planes son casi estaticos (SuperAdmin edita ocasionalmente)
+    return await plans_cache.get_or_load("all_plans", _load_plans_from_db)
 
 @router.post("")
 async def create_plan(data: PlanCreate, user: dict = Depends(get_current_user)):
@@ -25,6 +32,7 @@ async def create_plan(data: PlanCreate, user: dict = Depends(get_current_user)):
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     result = await db.plans.insert_one(plan_doc)
+    plans_cache.invalidate("all_plans")
     return {"_id": str(result.inserted_id), "message": "Plan creado"}
 
 @router.put("/{plan_id}")
@@ -40,6 +48,7 @@ async def update_plan(plan_id: str, data: PlanUpdate, user: dict = Depends(get_c
     update_data = data.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.plans.update_one({"_id": ObjectId(plan_id)}, {"$set": update_data})
+    plans_cache.invalidate("all_plans")
     return {"message": "Plan actualizado"}
 
 @router.delete("/{plan_id}")
@@ -54,6 +63,7 @@ async def delete_plan(plan_id: str, user: dict = Depends(get_current_user)):
     if companies_using > 0:
         raise HTTPException(status_code=400, detail=f"No se puede eliminar: {companies_using} empresa(s) usan este plan")
     await db.plans.delete_one({"_id": oid})
+    plans_cache.invalidate("all_plans")
     return {"message": "Plan eliminado"}
 
 @router.put("/assign/{company_id}")

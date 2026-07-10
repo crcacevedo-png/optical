@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query
 from fastapi.responses import FileResponse
 from bson import ObjectId
 from datetime import datetime, timezone
@@ -7,28 +7,59 @@ from db import db, serialize_doc, UPLOADS_DIR
 from auth_utils import get_current_user, hash_password
 from models import CompanyCreate, CompanyUpdate
 from routes.notifications import create_notification
-from email_service import send_email, render_welcome_company
+from email_service import queue_email, render_welcome_company
 import os
 
 router = APIRouter(prefix="/companies", tags=["Empresas"])
 
 @router.get("")
-async def list_companies(user: dict = Depends(get_current_user)):
+async def list_companies(
+    user: dict = Depends(get_current_user),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(500, ge=1, le=1000),
+    search: str = Query("", max_length=100),
+):
     if user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
-    companies = await db.companies.find({}).to_list(1000)
-    # Batch load plans
+
+    query = {}
+    if search:
+        query = {"$or": [
+            {"name": {"$regex": search, "$options": "i"}},
+            {"email": {"$regex": search, "$options": "i"}},
+            {"tax_id": {"$regex": search, "$options": "i"}},
+        ]}
+
+    companies = await db.companies.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    if not companies:
+        return []
+
+    cids = [c["_id"] for c in companies]
+
+    # Batch load planes referenciados
     plan_ids = list({c["plan_id"] for c in companies if c.get("plan_id")})
     plan_map = {}
     if plan_ids:
         plans = await db.plans.find({"_id": {"$in": plan_ids}}).to_list(len(plan_ids))
         plan_map = {str(p["_id"]): p for p in plans}
+
+    # Batch counts via aggregation (elimina el N+1: 3 queries totales sin importar N companies)
+    async def _counts_by_company(collection, match_extra=None):
+        pipeline = [{"$match": {"company_id": {"$in": cids}, **(match_extra or {})}},
+                    {"$group": {"_id": "$company_id", "count": {"$sum": 1}}}]
+        rows = await collection.aggregate(pipeline).to_list(len(cids))
+        return {str(r["_id"]): r["count"] for r in rows}
+
+    branches_counts = await _counts_by_company(db.branches)
+    users_counts = await _counts_by_company(db.users)
+    patients_counts = await _counts_by_company(db.patients, {"is_deleted": {"$ne": True}})
+
     for c in companies:
         serialize_doc(c)
-        cid = ObjectId(c["_id"])
-        c["branches_count"] = await db.branches.count_documents({"company_id": cid})
-        c["users_count"] = await db.users.count_documents({"company_id": cid})
-        c["patients_count"] = await db.patients.count_documents({"company_id": cid, "is_deleted": {"$ne": True}})
+        cid_str = c["_id"]
+        c["branches_count"] = branches_counts.get(cid_str, 0)
+        c["users_count"] = users_counts.get(cid_str, 0)
+        c["patients_count"] = patients_counts.get(cid_str, 0)
         plan = plan_map.get(c.get("plan_id"))
         if plan:
             c["plan_name"] = plan["name"]
@@ -38,6 +69,7 @@ async def list_companies(user: dict = Depends(get_current_user)):
             c["branches_warning"] = plan.get("max_branches", 0) > 0 and c["branches_count"] >= plan["max_branches"] * 0.8
         else:
             c["plan_name"] = "Sin plan"
+
     return companies
 
 @router.post("")
@@ -77,7 +109,7 @@ async def create_company(data: CompanyCreate, user: dict = Depends(get_current_u
         admin_password=data.admin_password,
         login_link=app_url,
     )
-    await send_email(
+    queue_email(
         data.admin_email.lower(),
         f"Bienvenido a Cortexia Optical - {data.name}",
         welcome_html,

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, Depends, Query, Request, Response
+from fastapi.middleware.gzip import GZipMiddleware
 from bson import ObjectId
 from pathlib import Path
 from datetime import datetime, timezone
@@ -22,6 +23,9 @@ from routes import (
 app = FastAPI(title="Cortexia Optical API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Gzip compression para responses > 500 bytes (grande impacto en listados y JSON)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 api_router = APIRouter(prefix="/api")
 
@@ -161,22 +165,93 @@ logger = logging.getLogger(__name__)
 
 @app.on_event("startup")
 async def startup():
+    # ═══════════════════════════════════════════════════════════════════
+    # ÍNDICES MongoDB — critico para escalar a miles de opticas
+    # Todos los indexes son idempotentes (create_index no falla si existen)
+    # ═══════════════════════════════════════════════════════════════════
+
+    # --- Users ---
     await db.users.create_index("email", unique=True)
+    await db.users.create_index([("company_id", 1), ("is_active", 1)])
+    await db.users.create_index([("company_id", 1), ("role", 1)])
+
+    # --- Login attempts (brute-force protection) ---
     await db.login_attempts.create_index("identifier")
+    await db.login_attempts.create_index("created_at", expireAfterSeconds=86400)  # 24h TTL
+
+    # --- Audit log (TTL: 180 dias) ---
     await db.audit_log.create_index([("created_at", -1)])
     await db.audit_log.create_index([("action", 1), ("created_at", -1)])
     await db.audit_log.create_index([("company_id", 1), ("created_at", -1)])
+    await db.audit_log.create_index([("user_email", 1), ("created_at", -1)])
+    # TTL: elimina automaticamente registros > 180 dias
+    try:
+        await db.audit_log.create_index("created_at", expireAfterSeconds=15552000, name="audit_ttl")
+    except Exception as e:
+        logger.debug(f"audit_log TTL index already present: {e}")
+
+    # --- Companies ---
+    await db.companies.create_index([("is_active", 1)])
+    await db.companies.create_index([("plan_id", 1)])
+    await db.companies.create_index("email")
+
+    # --- Patients ---
     await db.patients.create_index([("company_id", 1), ("last_name", 1)])
     await db.patients.create_index([("company_id", 1), ("phone", 1)])
+    await db.patients.create_index([("company_id", 1), ("dpi", 1)])
+    await db.patients.create_index([("company_id", 1), ("is_deleted", 1), ("created_at", -1)])
+    await db.patients.create_index([("company_id", 1), ("branch_id", 1)])
+
+    # --- Appointments ---
     await db.appointments.create_index([("company_id", 1), ("date", 1)])
+    await db.appointments.create_index([("company_id", 1), ("patient_id", 1)])
+    await db.appointments.create_index([("company_id", 1), ("status", 1), ("date", 1)])
+
+    # --- Products / Stock / Inventory ---
+    await db.products.create_index([("company_id", 1), ("is_active", 1)])
+    await db.products.create_index([("company_id", 1), ("sku", 1)])
+    await db.products.create_index([("company_id", 1), ("category", 1)])
     await db.stock.create_index([("company_id", 1), ("branch_id", 1), ("product_id", 1)], unique=True)
+    await db.stock.create_index([("company_id", 1), ("product_id", 1)])
     await db.inventory_movements.create_index([("company_id", 1), ("created_at", -1)])
+    await db.inventory_movements.create_index([("company_id", 1), ("product_id", 1), ("created_at", -1)])
+
+    # --- Sales ---
     await db.sales.create_index([("company_id", 1), ("created_at", -1)])
+    await db.sales.create_index([("company_id", 1), ("branch_id", 1), ("created_at", -1)])
+    await db.sales.create_index([("company_id", 1), ("patient_id", 1)])
+    await db.sales.create_index([("company_id", 1), ("status", 1)])
+
+    # --- Finance ---
     await db.finance_entries.create_index([("company_id", 1), ("date", -1)])
+    await db.finance_entries.create_index([("company_id", 1), ("type", 1), ("date", -1)])
+
+    # --- Quotations ---
     await db.quotations.create_index([("company_id", 1), ("created_at", -1)])
     await db.quotations.create_index([("company_id", 1), ("status", 1)])
-    await db.optical_consultations.create_index([("company_id", 1), ("patient_id", 1)])
+    await db.quotations.create_index([("company_id", 1), ("patient_id", 1)])
+
+    # --- Consultations & Prescriptions ---
+    await db.optical_consultations.create_index([("company_id", 1), ("patient_id", 1), ("created_at", -1)])
     await db.optical_consultations.create_index([("company_id", 1), ("created_at", -1)])
+    await db.eyeglass_prescriptions.create_index([("company_id", 1), ("patient_id", 1), ("created_at", -1)])
+    await db.contact_lens_prescriptions.create_index([("company_id", 1), ("patient_id", 1), ("created_at", -1)])
+    await db.medical_prescriptions.create_index([("company_id", 1), ("patient_id", 1), ("created_at", -1)])
+
+    # --- Branches ---
+    await db.branches.create_index([("company_id", 1), ("is_active", 1)])
+
+    # --- Suppliers ---
+    await db.suppliers.create_index([("company_id", 1), ("is_active", 1)])
+
+    # --- Notifications (SuperAdmin) ---
+    await db.notifications.create_index([("read", 1), ("created_at", -1)])
+    await db.notifications.create_index([("created_at", -1)])
+
+    # --- Announcements ---
+    await db.announcements.create_index([("is_active", 1), ("starts_at", 1), ("ends_at", 1)])
+
+    logger.info("MongoDB indexes verified/created OK")
     
     # Seed superadmin - lee credenciales SOLO de env vars. Si no estan presentes,
     # NO crea ni resetea el SuperAdmin (evita hardcodear secretos en el repo).
