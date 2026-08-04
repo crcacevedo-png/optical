@@ -10,6 +10,12 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 
 ## Lo Implementado
 
+### Caja embebida en modulo Ventas (Feb 2026)
+- Componente `SalesCashBar` integrado en `SalesPage.js`: muestra estado de caja (abierta/cerrada) con acciones para abrir/cerrar sin salir del modulo.
+- Business rule: `Nueva Venta` queda **deshabilitado** cuando la caja esta cerrada (tooltip "Abre la caja para poder registrar ventas") y el dialog no se abre.
+- Sincronizacion: cada apertura/cierre de caja refresca la lista de ventas.
+
+
 ### Hardening de Seguridad P1 (Junio 2026)
 - **#5 Revocacion de tokens:** Campo `password_changed_at` en users. `get_current_user` y `/refresh` invalidan tokens emitidos antes del ultimo cambio de password (JWT `iat` < `password_changed_at` -> 401). Aplica tambien cuando admin resetea pw a otro usuario.
 - **#6 Refresh + me con cuenta desactivada:** `/api/auth/me` y `/api/auth/refresh` verifican `is_active`. Usuario desactivado recibe 401 inmediatamente sin esperar expiracion.

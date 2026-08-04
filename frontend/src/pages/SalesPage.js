@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { BranchFilter } from '../components/BranchFilter';
 import { PaymentLinesEditor, paymentMethodLabel } from '../components/PaymentLinesEditor';
 import { AddPaymentDialog } from '../components/AddPaymentDialog';
+import { SalesCashBar } from '../components/SalesCashBar';
 
 export default function SalesPage() {
   const { user } = useAuth();
@@ -42,6 +43,8 @@ export default function SalesPage() {
   });
   // Nuevo: array dinamico de pagos [{method, amount, note}]
   const [payments, setPayments] = useState([{ method: 'cash', amount: 0, note: '' }]);
+  // Estado de la caja: bloquea nueva venta si esta cerrada
+  const [cashOpen, setCashOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -196,9 +199,20 @@ export default function SalesPage() {
         </div>
         <div className="flex items-center gap-3">
           <BranchFilter value={branchId} onChange={setBranchId} />
-          <Dialog open={showSaleDialog} onOpenChange={setShowSaleDialog}>
+          <Dialog open={showSaleDialog} onOpenChange={(o) => {
+            if (o && !cashOpen) {
+              toast.error('Debes abrir la caja antes de registrar una venta.');
+              return;
+            }
+            setShowSaleDialog(o);
+          }}>
           <DialogTrigger asChild>
-            <Button className="bg-pine-900 hover:bg-pine-700" data-testid="new-sale-btn">
+            <Button
+              className="bg-pine-900 hover:bg-pine-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              data-testid="new-sale-btn"
+              disabled={!cashOpen}
+              title={!cashOpen ? 'Abre la caja para poder registrar ventas' : ''}
+            >
               <ShoppingCart className="w-4 h-4 mr-2" /> Nueva Venta
             </Button>
           </DialogTrigger>
@@ -339,6 +353,12 @@ export default function SalesPage() {
         </Dialog>
         </div>
       </div>
+
+      {/* Cash Register Bar */}
+      <SalesCashBar
+        onStateChange={(isOpen) => setCashOpen(isOpen)}
+        onCashChange={fetchData}
+      />
 
       {/* Sales History */}
       <Card className="border-slate-200/80">

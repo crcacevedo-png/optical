@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 
 const fmt = (n) => `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export function SalesCashBar({ onCashChange }) {
+export function SalesCashBar({ onCashChange, onStateChange }) {
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState(null);
   const [showOpen, setShowOpen] = useState(false);
@@ -30,13 +30,16 @@ export function SalesCashBar({ onCashChange }) {
     try {
       setLoading(true);
       const { data } = await api.get('/api/cash-register/current');
-      setCurrent(data?.register || null);
+      const reg = data?.register || null;
+      setCurrent(reg);
+      onStateChange?.(!!reg, reg);
     } catch {
       setCurrent(null);
+      onStateChange?.(false, null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onStateChange]);
 
   useEffect(() => { load(); }, [load]);
 
