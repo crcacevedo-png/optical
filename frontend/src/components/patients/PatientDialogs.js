@@ -13,6 +13,82 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Glasses, Eye, Pill, Pencil, Trash2, Save, Plus } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
+// PatientFormFields — campos compartidos entre Add y Edit
+// ═══════════════════════════════════════════════════════════════════
+export function PatientFormFields({ form, setForm, testIdPrefix = 'patient-', requiredContact = false, spacing = 'space-y-2' }) {
+  const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3">
+        <div className={spacing}>
+          <Label className="text-xs">Nombre *</Label>
+          <Input value={form.first_name || ''} onChange={(e) => update('first_name', e.target.value)}
+            required={requiredContact} data-testid={`${testIdPrefix}first-name`} />
+        </div>
+        <div className={spacing}>
+          <Label className="text-xs">Apellido *</Label>
+          <Input value={form.last_name || ''} onChange={(e) => update('last_name', e.target.value)}
+            required={requiredContact} data-testid={`${testIdPrefix}last-name`} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className={spacing}>
+          <Label className="text-xs">DPI</Label>
+          <Input value={form.dpi || ''} onChange={(e) => update('dpi', e.target.value)} data-testid={`${testIdPrefix}dpi`} />
+        </div>
+        <div className={spacing}>
+          <Label className="text-xs">Telefono {requiredContact ? '*' : ''}</Label>
+          <Input value={form.phone || ''} onChange={(e) => update('phone', e.target.value)}
+            required={requiredContact} data-testid={`${testIdPrefix}phone`} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className={spacing}>
+          <Label className="text-xs">Fecha de Nacimiento</Label>
+          <Input type="date" value={form.birth_date || ''} onChange={(e) => update('birth_date', e.target.value)}
+            data-testid={`${testIdPrefix}birthdate`} />
+        </div>
+        <div className={spacing}>
+          <Label className="text-xs">Genero</Label>
+          <Select value={form.gender || 'none'} onValueChange={(v) => update('gender', v === 'none' ? '' : v)}>
+            <SelectTrigger data-testid={`${testIdPrefix}gender`}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Sin especificar</SelectItem>
+              <SelectItem value="M">Masculino</SelectItem>
+              <SelectItem value="F">Femenino</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className={spacing}>
+        <Label className="text-xs">Email</Label>
+        <Input type="email" value={form.email || ''} onChange={(e) => update('email', e.target.value)}
+          data-testid={`${testIdPrefix}email`} />
+      </div>
+      <div className={spacing}>
+        <Label className="text-xs">Direccion</Label>
+        <Input value={form.address || ''} onChange={(e) => update('address', e.target.value)}
+          data-testid={`${testIdPrefix}address`} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className={spacing}>
+          <Label className="text-xs">Contacto Emergencia</Label>
+          <Input value={form.emergency_contact || ''} onChange={(e) => update('emergency_contact', e.target.value)} />
+        </div>
+        <div className={spacing}>
+          <Label className="text-xs">Tel. Emergencia</Label>
+          <Input value={form.emergency_phone || ''} onChange={(e) => update('emergency_phone', e.target.value)} />
+        </div>
+      </div>
+      <div className={spacing}>
+        <Label className="text-xs">Notas</Label>
+        <Textarea value={form.notes || ''} onChange={(e) => update('notes', e.target.value)} rows={2} />
+      </div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // Eyeglass Rx Dialog
 // ═══════════════════════════════════════════════════════════════════
 export function EyeglassRxDialog({ open, onOpenChange, form, setForm, onSubmit, testIdPrefix = 'p-' }) {
@@ -215,65 +291,7 @@ export function PatientEditDialog({ open, onOpenChange, form, setForm, onSubmit 
           <DialogTitle className="flex items-center gap-2"><Pencil className="w-5 h-5 text-pine-700" /> Editar Paciente</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Nombre *</Label>
-              <Input value={form.first_name} onChange={(e) => setForm(f => ({ ...f, first_name: e.target.value }))} data-testid="edit-first-name" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Apellido *</Label>
-              <Input value={form.last_name} onChange={(e) => setForm(f => ({ ...f, last_name: e.target.value }))} data-testid="edit-last-name" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">DPI</Label>
-              <Input value={form.dpi} onChange={(e) => setForm(f => ({ ...f, dpi: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Genero</Label>
-              <Select value={form.gender || 'none'} onValueChange={(v) => setForm(f => ({ ...f, gender: v === 'none' ? '' : v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin especificar</SelectItem>
-                  <SelectItem value="M">Masculino</SelectItem>
-                  <SelectItem value="F">Femenino</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Fecha de Nacimiento</Label>
-              <Input type="date" value={form.birth_date} onChange={(e) => setForm(f => ({ ...f, birth_date: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Telefono</Label>
-              <Input value={form.phone} onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))} data-testid="edit-phone" />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Email</Label>
-            <Input type="email" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Direccion</Label>
-            <Input value={form.address} onChange={(e) => setForm(f => ({ ...f, address: e.target.value }))} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Contacto Emergencia</Label>
-              <Input value={form.emergency_contact} onChange={(e) => setForm(f => ({ ...f, emergency_contact: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Tel. Emergencia</Label>
-              <Input value={form.emergency_phone} onChange={(e) => setForm(f => ({ ...f, emergency_phone: e.target.value }))} />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Notas</Label>
-            <Textarea value={form.notes} onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} />
-          </div>
+          <PatientFormFields form={form} setForm={setForm} testIdPrefix="edit-" spacing="space-y-1" />
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button
@@ -302,64 +320,7 @@ export function PatientAddDialog({ open, onOpenChange, form, setForm, onSubmit }
           <DialogTitle className="font-heading">Nuevo Paciente</DialogTitle>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Nombre *</Label>
-              <Input value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} required data-testid="patient-first-name" />
-            </div>
-            <div className="space-y-2">
-              <Label>Apellido *</Label>
-              <Input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} required data-testid="patient-last-name" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>DPI</Label>
-              <Input value={form.dpi} onChange={(e) => setForm({ ...form, dpi: e.target.value })} data-testid="patient-dpi" />
-            </div>
-            <div className="space-y-2">
-              <Label>Telefono *</Label>
-              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required data-testid="patient-phone" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Fecha de Nacimiento</Label>
-              <Input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} data-testid="patient-birthdate" />
-            </div>
-            <div className="space-y-2">
-              <Label>Genero</Label>
-              <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
-                <SelectTrigger data-testid="patient-gender"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="M">Masculino</SelectItem>
-                  <SelectItem value="F">Femenino</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Correo Electronico</Label>
-            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="patient-email" />
-          </div>
-          <div className="space-y-2">
-            <Label>Direccion</Label>
-            <Textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} rows={2} data-testid="patient-address" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Contacto de Emergencia</Label>
-              <Input value={form.emergency_contact} onChange={(e) => setForm({ ...form, emergency_contact: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Telefono de Emergencia</Label>
-              <Input value={form.emergency_phone} onChange={(e) => setForm({ ...form, emergency_phone: e.target.value })} />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Notas</Label>
-            <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
-          </div>
+          <PatientFormFields form={form} setForm={setForm} testIdPrefix="patient-" requiredContact spacing="space-y-2" />
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button type="submit" className="bg-pine-900 hover:bg-pine-700" data-testid="save-patient-btn">

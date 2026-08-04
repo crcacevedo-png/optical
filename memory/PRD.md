@@ -56,6 +56,7 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - **`AdminOpticasPage.js`: 802 → 562 lineas (-30%)** — 4 dialogos en `components/admin/AdminOpticasDialogs.js`.
 - **`QuotationsPage.js`: 743 → 559 lineas (-24.8%)** — 2 dialogos (detalle + convertir a venta) en `components/quotations/QuotationDialogs.js`.
 - Total: **13 componentes reutilizables, -1,351 lineas eliminadas de las paginas principales (-32.9%)**.
+- **Bonus DRY**: `PatientFormFields` compartido entre `PatientAddDialog` y `PatientEditDialog` (elimina ~40 lineas duplicadas dentro de `PatientDialogs.js`, ahora 397 -> 357 lineas). Config via props: `testIdPrefix`, `requiredContact`, `spacing`.
 - Diseno: props explicitos. Estado permanece en pagina padre. Cero cambios de comportamiento. Data-testids preservados 1:1 gracias al `testIdPrefix` opcional.
 
 ### Permisos por Rol + Rename Rol (Feb 2026)
