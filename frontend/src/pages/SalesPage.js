@@ -7,12 +7,13 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { 
-  Plus, ShoppingCart, Trash2, User, CreditCard, 
-  Banknote, Smartphone, Receipt, Eye
+import {
+  Plus, ShoppingCart, Trash2, User, Receipt, Eye, HandCoins
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BranchFilter } from '../components/BranchFilter';
+import { PaymentLinesEditor, paymentMethodLabel } from '../components/PaymentLinesEditor';
+import { AddPaymentDialog } from '../components/AddPaymentDialog';
 
 export default function SalesPage() {
   const [sales, setSales] = useState([]);
@@ -23,21 +24,16 @@ export default function SalesPage() {
   const [branchId, setBranchId] = useState('');
   const [showSaleDialog, setShowSaleDialog] = useState(false);
   const [detailSale, setDetailSale] = useState(null);
+  const [paymentSale, setPaymentSale] = useState(null);
 
   const [cart, setCart] = useState([]);
   const [saleForm, setSaleForm] = useState({
     patient_id: '',
-    payment_method: 'cash',
     discount: 0,
-    amount_paid: 0,
     notes: ''
   });
-
-  const paymentMethods = [
-    { value: 'cash', label: 'Efectivo', icon: Banknote },
-    { value: 'card', label: 'Tarjeta', icon: CreditCard },
-    { value: 'transfer', label: 'Transferencia', icon: Smartphone }
-  ];
+  // Nuevo: array dinamico de pagos [{method, amount, note}]
+  const [payments, setPayments] = useState([{ method: 'cash', amount: 0, note: '' }]);
 
   useEffect(() => {
     fetchData();
@@ -124,6 +120,10 @@ export default function SalesPage() {
     }
 
     try {
+      const validPayments = payments
+        .filter((p) => Number(p.amount) > 0)
+        .map((p) => ({ method: p.method, amount: Number(p.amount), note: p.note || '' }));
+
       await api.post('/api/sales', {
         patient_id: saleForm.patient_id || null,
         items: cart,
@@ -131,14 +131,19 @@ export default function SalesPage() {
         discount,
         tax: 0,
         total,
-        payment_method: saleForm.payment_method,
-        amount_paid: parseFloat(saleForm.amount_paid) || total,
+        payments: validPayments,
         notes: saleForm.notes
       });
-      toast.success('Venta registrada exitosamente');
+      const paidSum = validPayments.reduce((s, p) => s + p.amount, 0);
+      if (paidSum < total) {
+        toast.success(`Venta registrada. Saldo pendiente Q${(total - paidSum).toFixed(2)} agregado a Cuentas por Cobrar.`);
+      } else {
+        toast.success('Venta registrada exitosamente');
+      }
       setShowSaleDialog(false);
       setCart([]);
-      setSaleForm({ patient_id: '', payment_method: 'cash', discount: 0, amount_paid: 0, notes: '' });
+      setSaleForm({ patient_id: '', discount: 0, notes: '' });
+      setPayments([{ method: 'cash', amount: 0, note: '' }]);
       fetchData();
     } catch (error) {
       toast.error(formatApiErrorDetail(error.response?.data?.detail));
@@ -287,44 +292,13 @@ export default function SalesPage() {
                     </div>
                   </div>
 
-                  {/* Payment */}
-                  <div className="space-y-2">
-                    <Label>Método de Pago</Label>
-                    <div className="flex gap-2">
-                      {paymentMethods.map((pm) => (
-                        <button
-                          key={pm.value}
-                          type="button"
-                          onClick={() => setSaleForm({...saleForm, payment_method: pm.value})}
-                          className={`flex-1 p-3 rounded-lg border flex items-center justify-center gap-2 transition-colors ${
-                            saleForm.payment_method === pm.value
-                              ? 'border-pine-500 bg-pine-50 text-pine-700'
-                              : 'border-slate-200 hover:border-slate-300'
-                          }`}
-                          data-testid={`payment-${pm.value}`}
-                        >
-                          <pm.icon className="w-4 h-4" />
-                          <span className="text-sm font-medium">{pm.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Monto Pagado</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={saleForm.amount_paid || total}
-                      onChange={(e) => setSaleForm({...saleForm, amount_paid: e.target.value})}
-                      data-testid="amount-paid"
-                    />
-                    {parseFloat(saleForm.amount_paid || total) < total && (
-                      <p className="text-sm text-amber-600">
-                        Saldo pendiente: {formatCurrency(total - parseFloat(saleForm.amount_paid || 0))}
-                      </p>
-                    )}
-                  </div>
+                  {/* Multi-payment editor */}
+                  <PaymentLinesEditor
+                    payments={payments}
+                    onChange={setPayments}
+                    total={total}
+                    testIdPrefix="new-sale"
+                  />
                 </div>
               </div>
 
@@ -439,7 +413,9 @@ export default function SalesPage() {
                 <div>
                   <span className="text-slate-400">Metodo:</span>
                   <span className="ml-2 font-medium">
-                    {{'cash': 'Efectivo', 'card': 'Tarjeta', 'transfer': 'Transferencia'}[detailSale.payment_method] || detailSale.payment_method}
+                    {detailSale.payments && detailSale.payments.length > 1
+                      ? `${detailSale.payments.length} pagos`
+                      : paymentMethodLabel(detailSale.payment_method)}
                   </span>
                 </div>
               </div>
@@ -471,6 +447,35 @@ export default function SalesPage() {
                 </div>
               </div>
 
+              {/* Payments history */}
+              {detailSale.payments && detailSale.payments.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Historial de pagos</p>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 text-xs text-slate-500">
+                          <th className="text-left p-2.5 font-medium">Fecha</th>
+                          <th className="text-left p-2.5 font-medium">Metodo</th>
+                          <th className="text-right p-2.5 font-medium">Monto</th>
+                          <th className="text-left p-2.5 font-medium">Nota</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detailSale.payments.map((p, idx) => (
+                          <tr key={idx} className="border-t border-slate-100">
+                            <td className="p-2.5 text-slate-600">{(p.created_at || '').slice(0, 10)}</td>
+                            <td className="p-2.5 text-slate-800">{paymentMethodLabel(p.method)}</td>
+                            <td className="p-2.5 text-right font-medium">{formatCurrency(p.amount)}</td>
+                            <td className="p-2.5 text-slate-500 text-xs">{p.note || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* Totals */}
               <div className="border-t pt-3 space-y-1.5 text-sm">
                 <div className="flex justify-between">
@@ -499,6 +504,17 @@ export default function SalesPage() {
                 )}
               </div>
 
+              {detailSale.balance > 0 && (
+                <Button
+                  type="button"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => setPaymentSale(detailSale)}
+                  data-testid="detail-add-payment-btn"
+                >
+                  <HandCoins className="w-4 h-4 mr-2" /> Registrar abono
+                </Button>
+              )}
+
               {detailSale.notes && (
                 <div className="text-sm">
                   <span className="text-slate-400">Notas:</span>
@@ -509,6 +525,24 @@ export default function SalesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Add Payment Dialog */}
+      <AddPaymentDialog
+        sale={paymentSale}
+        open={!!paymentSale}
+        onOpenChange={(o) => !o && setPaymentSale(null)}
+        onSuccess={async () => {
+          setPaymentSale(null);
+          // Refresh detail modal + list
+          if (detailSale?._id) {
+            try {
+              const { data } = await api.get(`/api/sales/${detailSale._id}`);
+              setDetailSale(data);
+            } catch {} // eslint-disable-line no-empty
+          }
+          fetchData();
+        }}
+      />
     </div>
   );
 }

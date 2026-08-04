@@ -9,6 +9,13 @@ from models import SaleCreate
 
 router = APIRouter(prefix="/sales", tags=["Ventas"])
 
+
+def _serialize_payments(sale: dict) -> None:
+    """Convierte ObjectIds dentro del array payments a strings."""
+    for p in sale.get("payments", []) or []:
+        if isinstance(p.get("created_by"), ObjectId):
+            p["created_by"] = str(p["created_by"])
+
 @router.get("")
 async def list_sales(
     user: dict = Depends(get_current_user),
@@ -32,6 +39,7 @@ async def list_sales(
     sales = await db.sales.find(query).sort("created_at", -1).limit(limit).to_list(limit)
     for s in sales:
         serialize_doc(s)
+        _serialize_payments(s)
         if s.get("patient_id"):
             patient = await db.patients.find_one({"_id": ObjectId(s["patient_id"])}, {"first_name": 1, "last_name": 1})
             if patient:
@@ -46,24 +54,58 @@ async def list_sales(
 async def create_sale(data: SaleCreate, user: dict = Depends(get_current_user)):
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
-    
+
     branch_id = ObjectId(user["branch_id"]) if user.get("branch_id") else None
-    
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # ─── Normalizar pagos: array de {method, amount, note, created_at, created_by} ───
+    payments = []
+    if data.payments:
+        for p in data.payments:
+            amt = float(p.amount or 0)
+            if amt <= 0:
+                continue
+            payments.append({
+                "method": p.method,
+                "amount": amt,
+                "note": p.note or "",
+                "created_at": now_iso,
+                "created_by": ObjectId(user["_id"]),
+            })
+    elif data.amount_paid and data.amount_paid > 0:
+        # Legacy path: un solo pago
+        payments.append({
+            "method": data.payment_method or "cash",
+            "amount": float(data.amount_paid),
+            "note": "",
+            "created_at": now_iso,
+            "created_by": ObjectId(user["_id"]),
+        })
+
+    total_paid = round(sum(p["amount"] for p in payments), 2)
+    balance = round(data.total - total_paid, 2)
+    # Metodo principal para displays legacy (el primero registrado)
+    primary_method = payments[0]["method"] if payments else "cash"
+
     sale_doc = {
         "company_id": ObjectId(user["company_id"]),
         "branch_id": branch_id,
         "patient_id": ObjectId(data.patient_id) if data.patient_id else None,
+        "patient_name_override": data.patient_name_override,
         "items": data.items,
         "subtotal": data.subtotal, "discount": data.discount, "tax": data.tax, "total": data.total,
-        "payment_method": data.payment_method, "amount_paid": data.amount_paid,
-        "balance": data.total - data.amount_paid,
-        "status": "completada" if data.amount_paid >= data.total else "pendiente",
+        "payment_method": primary_method,
+        "payments": payments,
+        "amount_paid": total_paid,
+        "balance": max(0, balance),
+        "status": "completada" if balance <= 0 else "pendiente",
         "notes": data.notes,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": now_iso,
         "created_by": ObjectId(user["_id"])
     }
     result = await db.sales.insert_one(sale_doc)
-    
+
+    # ─── Descontar stock ───
     for item in data.items:
         if item.get("product_id"):
             stock_query = {"product_id": ObjectId(item["product_id"]), "company_id": ObjectId(user["company_id"])}
@@ -84,26 +126,95 @@ async def create_sale(data: SaleCreate, user: dict = Depends(get_current_user)):
                     "quantity": item.get("quantity", 1),
                     "notes": f"Venta #{str(result.inserted_id)[-6:]}",
                     "reference": str(result.inserted_id),
-                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "created_at": now_iso,
                     "created_by": ObjectId(user["_id"])
                 })
-    
-    finance_doc = {
+
+    # ─── Registrar cada pago en finanzas (uno por metodo, para trazabilidad) ───
+    for p in payments:
+        await db.finance_entries.insert_one({
+            "company_id": ObjectId(user["company_id"]),
+            "branch_id": branch_id,
+            "type": "ingreso",
+            "category": "ventas",
+            "amount": p["amount"],
+            "description": f"Venta #{str(result.inserted_id)[-6:]} ({p['method']})",
+            "reference_id": result.inserted_id,
+            "reference_type": "sale",
+            "payment_method": p["method"],
+            "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "created_at": now_iso,
+            "created_by": ObjectId(user["_id"])
+        })
+
+    return {"_id": str(result.inserted_id), "message": "Venta registrada", "balance": max(0, balance)}
+
+@router.get("/receivables")
+async def list_receivables(
+    user: dict = Depends(get_current_user),
+    branch_id: Optional[str] = None,
+    limit: int = 200
+):
+    """Ventas con saldo pendiente (cuentas por cobrar). Solo admin/vendedor."""
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+
+    query = {
         "company_id": ObjectId(user["company_id"]),
-        "branch_id": branch_id,
-        "type": "ingreso",
-        "category": "ventas",
-        "amount": data.amount_paid,
-        "description": f"Venta #{str(result.inserted_id)[-6:]}",
-        "reference_id": result.inserted_id,
-        "reference_type": "sale",
-        "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "created_by": ObjectId(user["_id"])
+        "balance": {"$gt": 0},
+        "status": {"$ne": "cancelada"},
     }
-    await db.finance_entries.insert_one(finance_doc)
-    
-    return {"_id": str(result.inserted_id), "message": "Venta registrada"}
+    if branch_id:
+        query["branch_id"] = ObjectId(branch_id)
+    elif user.get("branch_id"):
+        query["branch_id"] = ObjectId(user["branch_id"])
+
+    sales = await db.sales.find(query).sort("created_at", 1).limit(limit).to_list(limit)
+    if not sales:
+        return {"items": [], "total_pending": 0.0, "count": 0}
+
+    # Batch load patient + seller
+    patient_ids = list({s["patient_id"] for s in sales if s.get("patient_id")})
+    seller_ids = list({s["created_by"] for s in sales if s.get("created_by")})
+    patients_map = {}
+    if patient_ids:
+        docs = await db.patients.find({"_id": {"$in": patient_ids}}, {"first_name": 1, "last_name": 1, "phone": 1}).to_list(len(patient_ids))
+        patients_map = {str(p["_id"]): p for p in docs}
+    sellers_map = {}
+    if seller_ids:
+        docs = await db.users.find({"_id": {"$in": seller_ids}}, {"name": 1}).to_list(len(seller_ids))
+        sellers_map = {str(u["_id"]): u.get("name", "") for u in docs}
+
+    total_pending = 0.0
+    for s in sales:
+        serialize_doc(s)
+        _serialize_payments(s)
+        pid = s.get("patient_id")
+        if pid:
+            p = patients_map.get(pid)
+            if p:
+                s["patient_name"] = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
+                s["patient_phone"] = p.get("phone", "")
+        else:
+            s["patient_name"] = s.get("patient_name_override") or "Consumidor final"
+            s["patient_phone"] = ""
+        cb = s.get("created_by")
+        if cb:
+            s["seller_name"] = sellers_map.get(cb, "")
+        # Days since sale
+        try:
+            created = datetime.fromisoformat(s["created_at"].replace("Z", "+00:00"))
+            s["days_pending"] = (datetime.now(timezone.utc) - created).days
+        except Exception:
+            s["days_pending"] = 0
+        total_pending += float(s.get("balance", 0) or 0)
+
+    return {
+        "items": sales,
+        "total_pending": round(total_pending, 2),
+        "count": len(sales),
+    }
+
 
 @router.get("/{sale_id}")
 async def get_sale(sale_id: str, user: dict = Depends(get_current_user)):
@@ -111,6 +222,7 @@ async def get_sale(sale_id: str, user: dict = Depends(get_current_user)):
     if not sale or str(sale["company_id"]) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
     serialize_doc(sale)
+    _serialize_payments(sale)
     if sale.get("patient_id"):
         patient = await db.patients.find_one({"_id": ObjectId(sale["patient_id"])}, {"first_name": 1, "last_name": 1})
         if patient:
@@ -118,33 +230,53 @@ async def get_sale(sale_id: str, user: dict = Depends(get_current_user)):
     return sale
 
 @router.post("/{sale_id}/payment")
-async def add_payment(sale_id: str, amount: float = Query(...), user: dict = Depends(get_current_user)):
+async def add_payment(
+    sale_id: str,
+    amount: float = Query(..., gt=0),
+    method: str = Query("cash"),
+    note: str = Query(""),
+    user: dict = Depends(get_current_user)
+):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+
     sale = await db.sales.find_one({"_id": ObjectId(sale_id)})
     if not sale or str(sale["company_id"]) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
-    
-    new_paid = sale.get("amount_paid", 0) + amount
-    new_balance = sale["total"] - new_paid
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    payment_entry = {
+        "method": method,
+        "amount": float(amount),
+        "note": note or "",
+        "created_at": now_iso,
+        "created_by": ObjectId(user["_id"]),
+    }
+    new_paid = round(float(sale.get("amount_paid", 0) or 0) + float(amount), 2)
+    new_balance = round(float(sale["total"]) - new_paid, 2)
     status = "completada" if new_balance <= 0 else "pendiente"
-    
+
     await db.sales.update_one(
         {"_id": ObjectId(sale_id)},
-        {"$set": {"amount_paid": new_paid, "balance": max(0, new_balance), "status": status}}
+        {
+            "$push": {"payments": payment_entry},
+            "$set": {"amount_paid": new_paid, "balance": max(0, new_balance), "status": status}
+        }
     )
-    
-    finance_doc = {
+
+    await db.finance_entries.insert_one({
         "company_id": ObjectId(user["company_id"]),
         "branch_id": sale.get("branch_id"),
         "type": "ingreso",
         "category": "ventas",
-        "amount": amount,
-        "description": f"Abono venta #{sale_id[-6:]}",
+        "amount": float(amount),
+        "description": f"Abono venta #{sale_id[-6:]} ({method})",
         "reference_id": ObjectId(sale_id),
         "reference_type": "sale_payment",
+        "payment_method": method,
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": now_iso,
         "created_by": ObjectId(user["_id"])
-    }
-    await db.finance_entries.insert_one(finance_doc)
-    
-    return {"message": "Pago registrado", "new_balance": max(0, new_balance)}
+    })
+
+    return {"message": "Pago registrado", "new_balance": max(0, new_balance), "status": status}

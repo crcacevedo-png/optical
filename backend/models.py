@@ -212,15 +212,24 @@ class InventoryMovement(BaseModel):
     notes: Optional[str] = None
     reference: Optional[str] = None
 
+class SalePayment(BaseModel):
+    method: str  # 'cash' | 'card' | 'transfer' | 'other'
+    amount: float
+    note: Optional[str] = None
+
+
 class SaleCreate(BaseModel):
     patient_id: Optional[str] = None
+    patient_name_override: Optional[str] = None  # Para consumidor final o pacientes sin registro
     items: List[dict]
     subtotal: float
     discount: float = 0
     tax: float = 0
     total: float
-    payment_method: str
-    amount_paid: float
+    # Nuevo: lista de pagos con multiples metodos. Si viene vacia, se usa payment_method+amount_paid (legacy).
+    payments: Optional[List[SalePayment]] = None
+    payment_method: Optional[str] = None  # legacy
+    amount_paid: float = 0
     notes: Optional[str] = None
 
 class FinanceEntryCreate(BaseModel):
