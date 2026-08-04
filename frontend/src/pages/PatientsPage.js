@@ -18,7 +18,7 @@ import {
 import { toast } from 'sonner';
 import {
   EyeglassRxDialog, ContactRxDialog, MedicalRxDialog,
-  PatientEditDialog, PatientDeleteDialog
+  PatientAddDialog, PatientEditDialog, PatientDeleteDialog
 } from '../components/patients/PatientDialogs';
 import { ConsultationViewDialog } from '../components/patients/ConsultationViewDialog';
 
@@ -354,132 +354,16 @@ export default function PatientsPage() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="font-heading text-lg">Pacientes</CardTitle>
-            <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="bg-pine-900 hover:bg-pine-700" data-testid="add-patient-btn">
-                  <Plus className="w-4 h-4 mr-1" /> Nuevo
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="font-heading">Nuevo Paciente</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Nombre *</Label>
-                      <Input
-                        value={formData.first_name}
-                        onChange={(e) => setFormData({...formData, first_name: e.target.value})}
-                        required
-                        data-testid="patient-first-name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Apellido *</Label>
-                      <Input
-                        value={formData.last_name}
-                        onChange={(e) => setFormData({...formData, last_name: e.target.value})}
-                        required
-                        data-testid="patient-last-name"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>DPI</Label>
-                      <Input
-                        value={formData.dpi}
-                        onChange={(e) => setFormData({...formData, dpi: e.target.value})}
-                        data-testid="patient-dpi"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Teléfono *</Label>
-                      <Input
-                        value={formData.phone}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                        required
-                        data-testid="patient-phone"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Fecha de Nacimiento</Label>
-                      <Input
-                        type="date"
-                        value={formData.birth_date}
-                        onChange={(e) => setFormData({...formData, birth_date: e.target.value})}
-                        data-testid="patient-birthdate"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Género</Label>
-                      <Select value={formData.gender} onValueChange={(v) => setFormData({...formData, gender: v})}>
-                        <SelectTrigger data-testid="patient-gender">
-                          <SelectValue placeholder="Seleccionar" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="M">Masculino</SelectItem>
-                          <SelectItem value="F">Femenino</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Correo Electrónico</Label>
-                    <Input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
-                      data-testid="patient-email"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Dirección</Label>
-                    <Textarea
-                      value={formData.address}
-                      onChange={(e) => setFormData({...formData, address: e.target.value})}
-                      rows={2}
-                      data-testid="patient-address"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Contacto de Emergencia</Label>
-                      <Input
-                        value={formData.emergency_contact}
-                        onChange={(e) => setFormData({...formData, emergency_contact: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Teléfono de Emergencia</Label>
-                      <Input
-                        value={formData.emergency_phone}
-                        onChange={(e) => setFormData({...formData, emergency_phone: e.target.value})}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Notas</Label>
-                    <Textarea
-                      value={formData.notes}
-                      onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                      rows={2}
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setShowAddDialog(false)}>
-                      Cancelar
-                    </Button>
-                    <Button type="submit" className="bg-pine-900 hover:bg-pine-700" data-testid="save-patient-btn">
-                      Guardar Paciente
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <PatientAddDialog
+              open={showAddDialog}
+              onOpenChange={setShowAddDialog}
+              form={formData}
+              setForm={setFormData}
+              onSubmit={handleSubmit}
+            />
+            <Button size="sm" className="bg-pine-900 hover:bg-pine-700" data-testid="add-patient-btn" onClick={() => setShowAddDialog(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Nuevo
+            </Button>
           </div>
           <div className="relative mt-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />

@@ -15,7 +15,7 @@ import { Glasses, Eye, Pill, Pencil, Trash2, Save, Plus } from 'lucide-react';
 // ═══════════════════════════════════════════════════════════════════
 // Eyeglass Rx Dialog
 // ═══════════════════════════════════════════════════════════════════
-export function EyeglassRxDialog({ open, onOpenChange, form, setForm, onSubmit }) {
+export function EyeglassRxDialog({ open, onOpenChange, form, setForm, onSubmit, testIdPrefix = 'p-' }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -40,7 +40,7 @@ export function EyeglassRxDialog({ open, onOpenChange, form, setForm, onSubmit }
                         className="h-8 text-sm"
                         value={form[`${side}_${f}`]}
                         onChange={(e) => setForm(p => ({ ...p, [`${side}_${f}`]: e.target.value }))}
-                        data-testid={`p-rx-${side}-${f}`}
+                        data-testid={`${testIdPrefix}rx-${side}-${f}`}
                       />
                     </div>
                   ))}
@@ -64,7 +64,7 @@ export function EyeglassRxDialog({ open, onOpenChange, form, setForm, onSubmit }
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button className="bg-blue-600 hover:bg-blue-700" onClick={onSubmit} data-testid="p-save-eyeglass-rx-btn">
+            <Button className="bg-blue-600 hover:bg-blue-700" onClick={onSubmit} data-testid={`${testIdPrefix}save-eyeglass-rx-btn`}>
               <Save className="w-4 h-4 mr-2" /> Guardar Receta
             </Button>
           </div>
@@ -145,7 +145,7 @@ export function ContactRxDialog({ open, onOpenChange, form, setForm, onSubmit })
 // ═══════════════════════════════════════════════════════════════════
 // Medical Rx Dialog
 // ═══════════════════════════════════════════════════════════════════
-export function MedicalRxDialog({ open, onOpenChange, form, setForm, onSubmit, addMedication, updateMedication, removeMedication }) {
+export function MedicalRxDialog({ open, onOpenChange, form, setForm, onSubmit, addMedication, updateMedication, removeMedication, testIdPrefix = 'p-' }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
@@ -155,12 +155,12 @@ export function MedicalRxDialog({ open, onOpenChange, form, setForm, onSubmit, a
         <div className="space-y-4">
           <div className="space-y-1">
             <Label>Diagnostico</Label>
-            <Input value={form.diagnosis} onChange={(e) => setForm(f => ({ ...f, diagnosis: e.target.value }))} data-testid="p-med-rx-diagnosis" />
+            <Input value={form.diagnosis} onChange={(e) => setForm(f => ({ ...f, diagnosis: e.target.value }))} data-testid={`${testIdPrefix}med-rx-diagnosis`} />
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
               <Label>Medicamentos</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addMedication} data-testid="p-add-medication-btn">
+              <Button type="button" variant="outline" size="sm" onClick={addMedication} data-testid={`${testIdPrefix}add-medication-btn`}>
                 <Plus className="w-3 h-3 mr-1" /> Agregar
               </Button>
             </div>
@@ -190,11 +190,11 @@ export function MedicalRxDialog({ open, onOpenChange, form, setForm, onSubmit, a
           </div>
           <div className="space-y-1">
             <Label>Instrucciones</Label>
-            <Textarea value={form.instructions} onChange={(e) => setForm(f => ({ ...f, instructions: e.target.value }))} rows={2} data-testid="p-med-rx-instructions" />
+            <Textarea value={form.instructions} onChange={(e) => setForm(f => ({ ...f, instructions: e.target.value }))} rows={2} data-testid={`${testIdPrefix}med-rx-instructions`} />
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button className="bg-purple-600 hover:bg-purple-700" onClick={onSubmit} data-testid="p-save-medical-rx-btn">
+            <Button className="bg-purple-600 hover:bg-purple-700" onClick={onSubmit} data-testid={`${testIdPrefix}save-medical-rx-btn`}>
               <Save className="w-4 h-4 mr-2" /> Guardar Receta
             </Button>
           </div>
@@ -292,9 +292,89 @@ export function PatientEditDialog({ open, onOpenChange, form, setForm, onSubmit 
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Delete Patient Confirm Dialog
+// Add (New) Patient Dialog
+// ═══════════════════════════════════════════════════════════════════
+export function PatientAddDialog({ open, onOpenChange, form, setForm, onSubmit }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="font-heading">Nuevo Paciente</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Nombre *</Label>
+              <Input value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} required data-testid="patient-first-name" />
+            </div>
+            <div className="space-y-2">
+              <Label>Apellido *</Label>
+              <Input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} required data-testid="patient-last-name" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>DPI</Label>
+              <Input value={form.dpi} onChange={(e) => setForm({ ...form, dpi: e.target.value })} data-testid="patient-dpi" />
+            </div>
+            <div className="space-y-2">
+              <Label>Telefono *</Label>
+              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required data-testid="patient-phone" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Fecha de Nacimiento</Label>
+              <Input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} data-testid="patient-birthdate" />
+            </div>
+            <div className="space-y-2">
+              <Label>Genero</Label>
+              <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
+                <SelectTrigger data-testid="patient-gender"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="M">Masculino</SelectItem>
+                  <SelectItem value="F">Femenino</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Correo Electronico</Label>
+            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="patient-email" />
+          </div>
+          <div className="space-y-2">
+            <Label>Direccion</Label>
+            <Textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} rows={2} data-testid="patient-address" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Contacto de Emergencia</Label>
+              <Input value={form.emergency_contact} onChange={(e) => setForm({ ...form, emergency_contact: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Telefono de Emergencia</Label>
+              <Input value={form.emergency_phone} onChange={(e) => setForm({ ...form, emergency_phone: e.target.value })} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Notas</Label>
+            <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button type="submit" className="bg-pine-900 hover:bg-pine-700" data-testid="save-patient-btn">
+              Guardar Paciente
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════
 export function PatientDeleteDialog({ open, onOpenChange, patient, onConfirm }) {
+  // Confirmation dialog for hard-delete a patient (irreversible)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm" data-testid="delete-patient-dialog">

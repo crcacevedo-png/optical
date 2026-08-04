@@ -48,12 +48,12 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Alertas de limite, Cambios de plan recientes
 
 ### Refactorizacion React (Feb 2026)
-- **`PatientsPage.js` reducido de 1,578 → 1,160 lineas (-26.5%)** extrayendo 6 dialogos a componentes reutilizables:
-  - `/app/frontend/src/components/patients/PatientDialogs.js` — exports: `EyeglassRxDialog`, `ContactRxDialog`, `MedicalRxDialog`, `PatientEditDialog`, `PatientDeleteDialog`.
-  - `/app/frontend/src/components/patients/ConsultationViewDialog.js` — dialogo de vista de consulta (solo lectura).
-- Interface limpia con props explicitos (form, setForm, onSubmit) que preservan el estado en la pagina padre.
-- Cero regresiones: lint OK, screenshot confirma que la pagina y todos los dialogos funcionan.
-- Pendientes de futuras iteraciones: extraer "Nuevo Paciente" (Add) y "Nueva Consulta" dialogs — mas grandes y con dependencias cruzadas, requieren refactor cuidadoso.
+- **`PatientsPage.js`: 1,578 → 1,042 lineas (-34%)** — extrae 7 dialogos:
+  - `PatientAddDialog`, `PatientEditDialog`, `PatientDeleteDialog`, `EyeglassRxDialog`, `ContactRxDialog`, `MedicalRxDialog` en `components/patients/PatientDialogs.js`
+  - `ConsultationViewDialog` en `components/patients/ConsultationViewDialog.js`
+- **`ConsultationsPage.js`: 987 → 875 lineas (-11%)** — reutiliza `EyeglassRxDialog` y `MedicalRxDialog` con `testIdPrefix=""` (retrocompatible con test IDs previos).
+- Diseno: props explicitos (`open, onOpenChange, form, setForm, onSubmit`, etc.). Estado permanece en pagina padre. Cero cambios de comportamiento.
+- Data-testids preservados 1:1 gracias al `testIdPrefix` opcional.
 
 ### Permisos por Rol + Rename Rol (Feb 2026)
 - **Rename**: rol `user` cambia display de "Usuario" a "Atencion al Cliente" (badge en UsersPage, avatar en MainLayout, label en select de creacion, docs).
