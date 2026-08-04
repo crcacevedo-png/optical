@@ -48,15 +48,15 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Alertas de limite, Cambios de plan recientes
 
 ### Refactorizacion React (Feb 2026)
-- **`PatientsPage.js`: 1,578 → 1,042 lineas (-34%)** — extrae 7 dialogos:
+- **`PatientsPage.js`: 1,578 → 763 lineas (-51.6%)** — extrae 8 dialogos:
   - `PatientAddDialog`, `PatientEditDialog`, `PatientDeleteDialog`, `EyeglassRxDialog`, `ContactRxDialog`, `MedicalRxDialog` en `components/patients/PatientDialogs.js`
   - `ConsultationViewDialog` en `components/patients/ConsultationViewDialog.js`
-- **`ConsultationsPage.js`: 987 → 875 lineas (-11%)** — reutiliza `EyeglassRxDialog` y `MedicalRxDialog` con `testIdPrefix=""` (retrocompatible con test IDs previos).
-- **`AdminOpticasPage.js`: 802 → 562 lineas (-30%)** — extrae 4 dialogos a `components/admin/AdminOpticasDialogs.js`:
-  - `CreateCompanyDialog`, `CreateBranchDialog`, `CreateUserDialog`, `EditCompanyDialog`
-- Diseno: props explicitos (`open, onOpenChange, form, setForm, onSubmit`, etc.). Estado permanece en pagina padre. Cero cambios de comportamiento.
-- Data-testids preservados 1:1 gracias al `testIdPrefix` opcional.
-- Total: **11 componentes reutilizables, -888 lineas eliminadas de las paginas principales.**
+  - `ConsultationFormDialog` (formulario mas grande del sistema, 289 lineas) en `components/patients/ConsultationFormDialog.js` con 18 props
+- **`ConsultationsPage.js`: 987 → 875 lineas (-11%)** — reutiliza `EyeglassRxDialog` y `MedicalRxDialog` con `testIdPrefix=""`.
+- **`AdminOpticasPage.js`: 802 → 562 lineas (-30%)** — 4 dialogos en `components/admin/AdminOpticasDialogs.js`.
+- **`QuotationsPage.js`: 743 → 559 lineas (-24.8%)** — 2 dialogos (detalle + convertir a venta) en `components/quotations/QuotationDialogs.js`.
+- Total: **13 componentes reutilizables, -1,351 lineas eliminadas de las paginas principales (-32.9%)**.
+- Diseno: props explicitos. Estado permanece en pagina padre. Cero cambios de comportamiento. Data-testids preservados 1:1 gracias al `testIdPrefix` opcional.
 
 ### Permisos por Rol + Rename Rol (Feb 2026)
 - **Rename**: rol `user` cambia display de "Usuario" a "Atencion al Cliente" (badge en UsersPage, avatar en MainLayout, label en select de creacion, docs).

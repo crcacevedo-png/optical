@@ -15,6 +15,7 @@ import {
   XCircle, AlertTriangle, Package
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { QuotationDetailDialog, ConvertToSaleDialog } from '../components/quotations/QuotationDialogs';
 
 import { BranchFilter } from '../components/BranchFilter';
 
@@ -553,191 +554,28 @@ export default function QuotationsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ===== DETAIL DIALOG ===== */}
-      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          {selectedQuotation && (
-            <>
-              <DialogHeader>
-                <div className="flex items-center justify-between">
-                  <DialogTitle className="text-xl">
-                    Cotizacion {selectedQuotation.quotation_number}
-                  </DialogTitle>
-                  {(() => {
-                    const sc = statusConfig[selectedQuotation.status] || statusConfig.pendiente;
-                    const StatusIcon = sc.icon;
-                    return (
-                      <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium ${sc.color}`}>
-                        <StatusIcon className="w-4 h-4" /> {sc.label}
-                      </span>
-                    );
-                  })()}
-                </div>
-              </DialogHeader>
-
-              <div className="space-y-5">
-                {/* Patient info */}
-                <div className="bg-slate-50 p-4 rounded-lg">
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div><span className="text-slate-500">Paciente:</span> <span className="font-medium">{selectedQuotation.patient_name}</span></div>
-                    <div><span className="text-slate-500">Telefono:</span> {selectedQuotation.patient_phone}</div>
-                    <div><span className="text-slate-500">Fecha:</span> {selectedQuotation.created_at?.slice(0, 10)}</div>
-                    <div><span className="text-slate-500">Vigencia hasta:</span> {selectedQuotation.expiry_date}</div>
-                  </div>
-                </div>
-
-                {/* Items */}
-                <div>
-                  <Label className="font-semibold mb-2 block">Productos</Label>
-                  <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Producto</TableHead>
-                          <TableHead className="text-center">Cant</TableHead>
-                          <TableHead className="text-right">P. Unit.</TableHead>
-                          <TableHead className="text-right">Subtotal</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(selectedQuotation.items || []).map((item, idx) => (
-                          <TableRow key={item.product_id || `item-${idx}`}>
-                            <TableCell className="font-medium text-sm">{item.name}</TableCell>
-                            <TableCell className="text-center">{item.quantity}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(item.unit_price)}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(item.subtotal)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-
-                {/* Totals */}
-                <div className="flex justify-end">
-                  <div className="w-64 space-y-1.5">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Subtotal:</span>
-                      <span>{formatCurrency(selectedQuotation.subtotal)}</span>
-                    </div>
-                    {selectedQuotation.discount > 0 && (
-                      <div className="flex justify-between text-sm text-red-600">
-                        <span>Descuento:</span>
-                        <span>-{formatCurrency(selectedQuotation.discount)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between font-bold text-lg border-t pt-1.5">
-                      <span>Total:</span>
-                      <span className="text-pine-700">{formatCurrency(selectedQuotation.total)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Notes */}
-                {selectedQuotation.notes && (
-                  <div>
-                    <Label className="font-semibold text-sm text-slate-500">Notas</Label>
-                    <p className="text-sm mt-1">{selectedQuotation.notes}</p>
-                  </div>
-                )}
-                {selectedQuotation.payment_conditions && (
-                  <div>
-                    <Label className="font-semibold text-sm text-slate-500">Condiciones de Pago</Label>
-                    <p className="text-sm mt-1">{selectedQuotation.payment_conditions}</p>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex flex-wrap gap-2 pt-2 border-t">
-                  <Button variant="outline" size="sm" onClick={() => downloadPdf(selectedQuotation._id)} data-testid="detail-download-pdf">
-                    <Download className="w-4 h-4 mr-2" /> Descargar PDF
-                  </Button>
-
-                  {selectedQuotation.status === 'pendiente' && (
-                    <>
-                      <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => handleStatusChange(selectedQuotation._id, 'aceptada')} data-testid="accept-quotation-btn">
-                        <CheckCircle className="w-4 h-4 mr-2" /> Aceptar
-                      </Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleStatusChange(selectedQuotation._id, 'rechazada')} data-testid="reject-quotation-btn">
-                        <XCircle className="w-4 h-4 mr-2" /> Rechazar
-                      </Button>
-                    </>
-                  )}
-
-                  {(selectedQuotation.status === 'pendiente' || selectedQuotation.status === 'aceptada') && (
-                    <Button
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700"
-                      onClick={() => {
-                        setConvertForm({ payment_method: 'efectivo', amount_paid: selectedQuotation.total });
-                        setShowConvertDialog(true);
-                      }}
-                      data-testid="convert-to-sale-btn"
-                    >
-                      <ShoppingCart className="w-4 h-4 mr-2" /> Convertir a Venta
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* ===== CONVERT TO SALE DIALOG ===== */}
-      <Dialog open={showConvertDialog} onOpenChange={setShowConvertDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Convertir a Venta</DialogTitle>
-          </DialogHeader>
-          {selectedQuotation && (
-            <div className="space-y-4">
-              <div className="bg-green-50 p-4 rounded-lg text-center">
-                <p className="text-sm text-green-700">Total de la cotizacion</p>
-                <p className="text-2xl font-bold text-green-800">{formatCurrency(selectedQuotation.total)}</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Metodo de Pago</Label>
-                <Select value={convertForm.payment_method} onValueChange={(v) => setConvertForm({ ...convertForm, payment_method: v })}>
-                  <SelectTrigger data-testid="convert-payment-method">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="efectivo">Efectivo</SelectItem>
-                    <SelectItem value="tarjeta">Tarjeta</SelectItem>
-                    <SelectItem value="transferencia">Transferencia</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Monto a pagar</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={convertForm.amount_paid}
-                  onChange={(e) => setConvertForm({ ...convertForm, amount_paid: parseFloat(e.target.value) || 0 })}
-                  data-testid="convert-amount-paid"
-                />
-                {convertForm.amount_paid < selectedQuotation.total && (
-                  <p className="text-xs text-amber-600">
-                    Saldo pendiente: {formatCurrency(selectedQuotation.total - convertForm.amount_paid)}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <Button variant="outline" onClick={() => setShowConvertDialog(false)}>Cancelar</Button>
-                <Button className="bg-green-600 hover:bg-green-700" onClick={handleConvert} data-testid="confirm-convert-btn">
-                  <ShoppingCart className="w-4 h-4 mr-2" /> Confirmar Venta
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <QuotationDetailDialog
+        open={showDetailDialog}
+        onOpenChange={setShowDetailDialog}
+        quotation={selectedQuotation}
+        statusConfig={statusConfig}
+        onDownloadPdf={downloadPdf}
+        onStatusChange={handleStatusChange}
+        onOpenConvert={(q) => {
+          setConvertForm({ payment_method: 'efectivo', amount_paid: q.total });
+          setShowConvertDialog(true);
+        }}
+        formatCurrency={formatCurrency}
+      />
+      <ConvertToSaleDialog
+        open={showConvertDialog}
+        onOpenChange={setShowConvertDialog}
+        quotation={selectedQuotation}
+        form={convertForm}
+        setForm={setConvertForm}
+        onConfirm={handleConvert}
+        formatCurrency={formatCurrency}
+      />
     </div>
   );
 }
