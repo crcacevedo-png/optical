@@ -39,6 +39,10 @@ export default function MainLayout() {
   const hasPlanInfo = user?.plan_name !== undefined;
   const hasModule = (mod) => !hasPlanInfo || planModules.includes(mod);
 
+  // Permisos por rol (config del admin). null = sin restriccion (admin).
+  const allowedMenuItems = user?.allowed_menu_items;
+  const canAccess = (key) => !allowedMenuItems || allowedMenuItems.includes(key);
+
   const navItems = isSuperAdmin ? [
     { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/admin/opticas', icon: Store, label: 'Opticas' },
@@ -49,18 +53,18 @@ export default function MainLayout() {
     { path: '/users', icon: UserCog, label: 'Usuarios' },
     { path: '/settings', icon: Settings, label: 'Configuracion' },
   ] : [
-    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/patients', icon: Users, label: 'Pacientes' },
-    { path: '/consultations', icon: Eye, label: 'Consultas' },
-    { path: '/agenda', icon: Calendar, label: 'Agenda' },
-    { path: '/prescriptions', icon: FileText, label: 'Recetas' },
-    { path: '/quotations', icon: ClipboardList, label: 'Cotizaciones' },
-    ...(hasModule('inventario') ? [{ path: '/inventory', icon: Package, label: 'Inventario' }] : []),
-    ...(hasModule('ventas') ? [{ path: '/sales', icon: ShoppingCart, label: 'Ventas' }] : []),
-    ...(hasModule('ventas') ? [{ path: '/cash-register', icon: Landmark, label: 'Caja' }] : []),
-    ...(hasModule('ventas') ? [{ path: '/receivables', icon: HandCoins, label: 'Cuentas por Cobrar' }] : []),
-    ...(hasModule('proveedores') ? [{ path: '/suppliers', icon: Truck, label: 'Proveedores' }] : []),
-    ...(hasModule('finanzas') ? [{ path: '/finance', icon: DollarSign, label: 'Finanzas' }] : []),
+    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', key: 'dashboard' },
+    { path: '/patients', icon: Users, label: 'Pacientes', key: 'patients' },
+    { path: '/consultations', icon: Eye, label: 'Consultas', key: 'consultations' },
+    { path: '/agenda', icon: Calendar, label: 'Agenda', key: 'agenda' },
+    { path: '/prescriptions', icon: FileText, label: 'Recetas', key: 'prescriptions' },
+    { path: '/quotations', icon: ClipboardList, label: 'Cotizaciones', key: 'quotations' },
+    ...(hasModule('inventario') ? [{ path: '/inventory', icon: Package, label: 'Inventario', key: 'inventory' }] : []),
+    ...(hasModule('ventas') ? [{ path: '/sales', icon: ShoppingCart, label: 'Ventas', key: 'sales' }] : []),
+    ...(hasModule('ventas') ? [{ path: '/cash-register', icon: Landmark, label: 'Caja', key: 'cash-register' }] : []),
+    ...(hasModule('ventas') ? [{ path: '/receivables', icon: HandCoins, label: 'Cuentas por Cobrar', key: 'receivables' }] : []),
+    ...(hasModule('proveedores') ? [{ path: '/suppliers', icon: Truck, label: 'Proveedores', key: 'suppliers' }] : []),
+    ...(hasModule('finanzas') ? [{ path: '/finance', icon: DollarSign, label: 'Finanzas', key: 'finance' }] : []),
     ...(isAdmin ? [
       { path: '/branches', icon: Building2, label: 'Sucursales' },
       { path: '/users', icon: UserCog, label: 'Usuarios' },
@@ -68,7 +72,7 @@ export default function MainLayout() {
       { path: '/onboarding', icon: Rocket, label: 'Inicio rapido' },
       { path: '/settings', icon: Settings, label: 'Configuracion' },
     ] : []),
-  ];
+  ].filter(item => !item.key || canAccess(item.key));
 
   const NavLink = ({ item, mobile = false }) => {
     const isActive = location.pathname === item.path;
@@ -131,7 +135,7 @@ export default function MainLayout() {
             <DropdownMenuContent align="end" className="w-56">
               <div className="px-2 py-1.5">
                 <p className="text-xs text-slate-500">Sesión iniciada como</p>
-                <p className="text-sm font-medium">{user?.role === 'admin' ? 'Administrador' : user?.role === 'superadmin' ? 'Super Admin' : 'Usuario'}</p>
+                <p className="text-sm font-medium">{user?.role === 'admin' ? 'Administrador' : user?.role === 'superadmin' ? 'Super Admin' : 'Atencion al Cliente'}</p>
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setShowPasswordDialog(true)} className="cursor-pointer" data-testid="change-my-password-btn">

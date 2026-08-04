@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
 import { Settings, Building2, Upload, FileText, Save, ImageIcon, Glasses, Pill, ShieldCheck, Lock, KeyRound, Server, Users as UsersIcon, Activity, Database, Download } from 'lucide-react';
+import { RolePermissionsSection } from '../components/RolePermissionsSection';
 
 const PRESCRIPTION_FONTS = [
   { value: 'Helvetica', label: 'Helvetica (Moderno)' },
@@ -521,6 +522,9 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Permisos por Rol (admin only) */}
+        {user?.role === 'admin' && <RolePermissionsSection />}
 
         {/* Seguridad y Cumplimiento */}
         <Card className="border-slate-200/80" data-testid="security-compliance-card">

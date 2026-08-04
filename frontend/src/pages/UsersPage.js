@@ -80,7 +80,7 @@ export default function UsersPage() {
     const labels = {
       superadmin: 'Super Admin',
       admin: 'Administrador',
-      user: 'Usuario'
+      user: 'Atencion al Cliente'
     };
     return (
       <Badge className={styles[role] || styles.user}>
@@ -190,7 +190,7 @@ export default function UsersPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="user">Usuario</SelectItem>
+                        <SelectItem value="user">Atencion al Cliente</SelectItem>
                         <SelectItem value="admin">Administrador</SelectItem>
                       </SelectContent>
                     </Select>

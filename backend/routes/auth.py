@@ -13,6 +13,7 @@ from models import UserRegister, UserLogin, ChangePassword, ForgotPassword, Rese
 from rate_limiter import limiter
 from audit import log_audit
 from email_service import queue_email, render_password_reset, render_security_alert
+from routes.settings import get_role_permissions
 import jwt
 import secrets
 
@@ -146,6 +147,11 @@ async def login(data: UserLogin, response: Response, request: Request):
                     result["branches_warning"] = max_b > 0 and branches_count >= max_b * 0.8
                     result["patients_limit_reached"] = max_p > 0 and patients_count >= max_p
                     result["branches_limit_reached"] = max_b > 0 and branches_count >= max_b
+            # Permisos por rol (allowed_menu_items = null si admin)
+            try:
+                result["allowed_menu_items"] = await get_role_permissions(ObjectId(company_id), user["role"])
+            except Exception:
+                result["allowed_menu_items"] = None
         except Exception:
             pass
     return result
@@ -217,6 +223,11 @@ async def get_me(user: dict = Depends(get_current_user)):
                     user["branches_warning"] = max_b > 0 and branches_count >= max_b * 0.8
                     user["patients_limit_reached"] = max_p > 0 and patients_count >= max_p
                     user["branches_limit_reached"] = max_b > 0 and branches_count >= max_b
+            # Permisos por rol
+            try:
+                user["allowed_menu_items"] = await get_role_permissions(ObjectId(user["company_id"]), user["role"])
+            except Exception:
+                user["allowed_menu_items"] = None
         except Exception:
             pass
     return user

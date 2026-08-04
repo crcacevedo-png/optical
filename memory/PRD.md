@@ -47,6 +47,15 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Funnel de conversion Free->Basic->Enterprise con upgrades/downgrades
 - Alertas de limite, Cambios de plan recientes
 
+### Permisos por Rol + Rename Rol (Feb 2026)
+- **Rename**: rol `user` cambia display de "Usuario" a "Atencion al Cliente" (badge en UsersPage, avatar en MainLayout, label en select de creacion, docs).
+- **Permisos por Rol** (Admin only en Configuracion):
+  - Backend: `GET /api/settings/role-permissions` retorna `{permissions: {user: [...]}, available_modules: [...]}`; `PUT` persiste en `companies.role_permissions`.
+  - Login y `/api/auth/me` inyectan `allowed_menu_items` en la respuesta segun el rol del usuario (admin -> null / sin restriccion).
+  - Frontend `MainLayout`: filtra navItems por `key` cruzando con `user.allowed_menu_items`.
+  - Componente `RolePermissionsSection`: card con checkboxes para el rol "Atencion al Cliente" con badge "Modulo de plan" para modulos gated. Dashboard siempre bloqueado activo. Botones rapidos "Todo"/"Solo Dashboard".
+- 13 modulos configurables: dashboard, patients, consultations, agenda, prescriptions, quotations, inventory, sales, cash-register, receivables, suppliers, finance, reports.
+
 ### Caja (Abrir/Cerrar) + Referencia por Medio de Pago (Feb 2026)
 - **Feature 1: Numero de Autorizacion / Transferencia**: en `PaymentLinesEditor` y `AddPaymentDialog` el campo `note` ahora tiene label dinamico segun metodo — `card` → "N° de Autorizacion", `transfer` → "N° de Transferencia", `other` → "Referencia", `cash` → oculto. Sin cambios de modelo (usa `note` existente).
 - **Feature 2: Modulo de Caja** (`/cash-register`, sidebar "Caja"):
