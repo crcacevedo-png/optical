@@ -14,6 +14,22 @@ export const PAYMENT_METHODS = [
 export const paymentMethodLabel = (v) =>
   PAYMENT_METHODS.find((m) => m.value === v)?.label || v || '-';
 
+/** Label del campo de referencia segun el metodo de pago. */
+export const referenceLabelFor = (method) => {
+  if (method === 'card') return 'N° de Autorizacion';
+  if (method === 'transfer') return 'N° de Transferencia';
+  if (method === 'other') return 'Referencia';
+  return null; // cash -> sin campo
+};
+
+/** Placeholder segun el metodo. */
+export const referencePlaceholderFor = (method) => {
+  if (method === 'card') return 'Ej. 123456';
+  if (method === 'transfer') return 'Ej. TX20260804001';
+  if (method === 'other') return 'Detalle del pago';
+  return '';
+};
+
 const fmt = (n) =>
   `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -76,48 +92,66 @@ export function PaymentLinesEditor({ payments, onChange, total, testIdPrefix = '
         </div>
       )}
 
-      {payments.map((p, idx) => (
-        <div
-          key={idx}
-          className="grid grid-cols-[1fr_130px_36px] gap-2 items-center"
-          data-testid={`${testIdPrefix}-line-${idx}`}
-        >
-          <Select value={p.method} onValueChange={(v) => update(idx, { method: v })}>
-            <SelectTrigger className="h-9" data-testid={`${testIdPrefix}-method-${idx}`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PAYMENT_METHODS.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  <div className="flex items-center gap-2">
-                    <m.icon className="w-3.5 h-3.5" /> {m.label}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            value={p.amount}
-            onChange={(e) => update(idx, { amount: e.target.value })}
-            placeholder="0.00"
-            className="h-9 text-right"
-            data-testid={`${testIdPrefix}-amount-${idx}`}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 text-slate-400 hover:text-red-500"
-            onClick={() => remove(idx)}
-            data-testid={`${testIdPrefix}-remove-${idx}`}
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
-      ))}
+      {payments.map((p, idx) => {
+        const refLabel = referenceLabelFor(p.method);
+        const refPlaceholder = referencePlaceholderFor(p.method);
+        return (
+          <div key={idx} className="space-y-1.5" data-testid={`${testIdPrefix}-line-${idx}`}>
+            <div className="grid grid-cols-[1fr_130px_36px] gap-2 items-center">
+              <Select value={p.method} onValueChange={(v) => update(idx, { method: v })}>
+                <SelectTrigger className="h-9" data-testid={`${testIdPrefix}-method-${idx}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHODS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      <div className="flex items-center gap-2">
+                        <m.icon className="w-3.5 h-3.5" /> {m.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={p.amount}
+                onChange={(e) => update(idx, { amount: e.target.value })}
+                placeholder="0.00"
+                className="h-9 text-right"
+                data-testid={`${testIdPrefix}-amount-${idx}`}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-slate-400 hover:text-red-500"
+                onClick={() => remove(idx)}
+                data-testid={`${testIdPrefix}-remove-${idx}`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+            {refLabel && (
+              <div className="pl-1">
+                <Input
+                  type="text"
+                  value={p.note || ''}
+                  onChange={(e) => update(idx, { note: e.target.value })}
+                  placeholder={refPlaceholder}
+                  className="h-8 text-xs"
+                  maxLength={80}
+                  data-testid={`${testIdPrefix}-note-${idx}`}
+                />
+                <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wide font-semibold">
+                  {refLabel}
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {/* Summary */}
       <div className="rounded-lg bg-slate-50 px-3 py-2.5 text-sm border border-slate-100 space-y-1">

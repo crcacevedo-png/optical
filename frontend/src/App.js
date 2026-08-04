@@ -27,6 +27,7 @@ import AuditLogPage from './pages/AuditLogPage';
 import OnboardingPage from './pages/OnboardingPage';
 import HealthMetricsPage from './pages/HealthMetricsPage';
 import ReceivablesPage from './pages/ReceivablesPage';
+import CashRegisterPage from './pages/CashRegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import './App.css';
@@ -57,6 +58,7 @@ function App() {
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="sales" element={<SalesPage />} />
             <Route path="receivables" element={<ReceivablesPage />} />
+            <Route path="cash-register" element={<CashRegisterPage />} />
             <Route path="quotations" element={<QuotationsPage />} />
             <Route path="admin/opticas" element={<AdminOpticasPage />} />
             <Route path="admin/planes" element={<PlansPage />} />

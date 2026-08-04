@@ -9,7 +9,7 @@ import { ScrollArea } from '../components/ui/scroll-area';
 import { 
   LayoutDashboard, Users, Calendar, FileText, Package, 
   ShoppingCart, DollarSign, Building2, UserCog, BarChart3,
-  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone, Key, ShieldAlert, Rocket, Activity, HandCoins
+  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone, Key, ShieldAlert, Rocket, Activity, HandCoins, Landmark
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -57,6 +57,7 @@ export default function MainLayout() {
     { path: '/quotations', icon: ClipboardList, label: 'Cotizaciones' },
     ...(hasModule('inventario') ? [{ path: '/inventory', icon: Package, label: 'Inventario' }] : []),
     ...(hasModule('ventas') ? [{ path: '/sales', icon: ShoppingCart, label: 'Ventas' }] : []),
+    ...(hasModule('ventas') ? [{ path: '/cash-register', icon: Landmark, label: 'Caja' }] : []),
     ...(hasModule('ventas') ? [{ path: '/receivables', icon: HandCoins, label: 'Cuentas por Cobrar' }] : []),
     ...(hasModule('proveedores') ? [{ path: '/suppliers', icon: Truck, label: 'Proveedores' }] : []),
     ...(hasModule('finanzas') ? [{ path: '/finance', icon: DollarSign, label: 'Finanzas' }] : []),

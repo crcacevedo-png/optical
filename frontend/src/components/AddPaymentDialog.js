@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { PAYMENT_METHODS } from './PaymentLinesEditor';
+import { PAYMENT_METHODS, referenceLabelFor, referencePlaceholderFor } from './PaymentLinesEditor';
 import { HandCoins } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -103,12 +103,12 @@ export function AddPaymentDialog({ sale, open, onOpenChange, onSuccess }) {
             />
           </div>
           <div>
-            <Label>Nota (opcional)</Label>
+            <Label>{referenceLabelFor(method) || 'Nota (opcional)'}</Label>
             <Input
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Ej. Referencia de transferencia"
+              placeholder={referencePlaceholderFor(method) || 'Referencia o comentario'}
               maxLength={200}
               data-testid="add-pay-note"
             />
