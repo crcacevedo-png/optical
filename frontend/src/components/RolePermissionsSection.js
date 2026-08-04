@@ -26,19 +26,20 @@ const MODULE_META = {
 
 const ROLES = [
   { key: 'user', label: 'Atencion al Cliente', desc: 'Personal de piso, cajeros, vendedores' },
+  { key: 'doctor', label: 'Doctor', desc: 'Optometristas y medicos oftalmologos' },
 ];
 
 export function RolePermissionsSection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [permissions, setPermissions] = useState({ user: [] });
+  const [permissions, setPermissions] = useState({ user: [], doctor: [] });
   const [available, setAvailable] = useState([]);
 
   useEffect(() => {
     (async () => {
       try {
         const { data } = await api.get('/api/settings/role-permissions');
-        setPermissions(data.permissions || { user: [] });
+        setPermissions(data.permissions || { user: [], doctor: [] });
         setAvailable(data.available_modules || []);
       } catch (err) {
         toast.error(formatApiErrorDetail(err.response?.data?.detail));

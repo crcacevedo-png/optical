@@ -106,10 +106,12 @@ async def get_role_permissions_endpoint(user: dict = Depends(get_current_user)):
         {"_id": ObjectId(user["company_id"])},
         {"role_permissions": 1}
     )
-    permissions = (company or {}).get("role_permissions") or {"user": DEFAULT_USER_PERMISSIONS.copy()}
-    # Asegurar que 'user' este presente
+    permissions = (company or {}).get("role_permissions") or {"user": DEFAULT_USER_PERMISSIONS.copy(), "doctor": DEFAULT_USER_PERMISSIONS.copy()}
+    # Asegurar que ambos roles esten presentes
     if "user" not in permissions:
         permissions["user"] = DEFAULT_USER_PERMISSIONS.copy()
+    if "doctor" not in permissions:
+        permissions["doctor"] = DEFAULT_USER_PERMISSIONS.copy()
     return {
         "permissions": permissions,
         "available_modules": AVAILABLE_MENU_ITEMS,
@@ -121,7 +123,7 @@ async def update_role_permissions(data: RolePermissionsUpdate, user: dict = Depe
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
     # Validar que las keys sean roles conocidos y los modulos sean validos
-    ALLOWED_ROLES = {"user"}  # admin no es configurable
+    ALLOWED_ROLES = {"user", "doctor"}  # admin no es configurable
     filtered = {}
     for role, mods in data.permissions.items():
         if role not in ALLOWED_ROLES:

@@ -135,7 +135,7 @@ export default function MainLayout() {
             <DropdownMenuContent align="end" className="w-56">
               <div className="px-2 py-1.5">
                 <p className="text-xs text-slate-500">Sesión iniciada como</p>
-                <p className="text-sm font-medium">{user?.role === 'admin' ? 'Administrador' : user?.role === 'superadmin' ? 'Super Admin' : 'Atencion al Cliente'}</p>
+                <p className="text-sm font-medium">{user?.role === 'admin' ? 'Administrador' : user?.role === 'superadmin' ? 'Super Admin' : user?.role === 'doctor' ? 'Doctor' : 'Atencion al Cliente'}</p>
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setShowPasswordDialog(true)} className="cursor-pointer" data-testid="change-my-password-btn">

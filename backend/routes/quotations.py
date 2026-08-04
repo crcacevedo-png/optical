@@ -77,11 +77,12 @@ async def list_quotations(
             if isinstance(e.get("sent_by"), ObjectId):
                 e["sent_by"] = str(e["sent_by"])
         if q.get("patient_id"):
-            patient = await db.patients.find_one({"_id": ObjectId(q["patient_id"])}, {"first_name": 1, "last_name": 1, "phone": 1, "email": 1})
+            patient = await db.patients.find_one({"_id": ObjectId(q["patient_id"])}, {"first_name": 1, "last_name": 1, "phone": 1, "email": 1, "whatsapp": 1})
             if patient:
                 q["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
                 q["patient_phone"] = patient.get("phone", "")
                 q["patient_email"] = patient.get("email", "")
+                q["patient_whatsapp"] = patient.get("whatsapp", "")
         if q.get("created_by"):
             creator = await db.users.find_one({"_id": ObjectId(q["created_by"])}, {"name": 1})
             if creator:

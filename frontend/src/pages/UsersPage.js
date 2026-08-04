@@ -80,6 +80,7 @@ export default function UsersPage() {
     const labels = {
       superadmin: 'Super Admin',
       admin: 'Administrador',
+      doctor: 'Doctor',
       user: 'Atencion al Cliente'
     };
     return (
@@ -191,6 +192,7 @@ export default function UsersPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="user">Atencion al Cliente</SelectItem>
+                        <SelectItem value="doctor">Doctor</SelectItem>
                         <SelectItem value="admin">Administrador</SelectItem>
                       </SelectContent>
                     </Select>

@@ -10,7 +10,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { CheckCircle, XCircle, Download, ShoppingCart, Mail } from 'lucide-react';
+import { CheckCircle, XCircle, Download, ShoppingCart, Mail, MessageCircle } from 'lucide-react';
 
 export function QuotationDetailDialog({
   open, onOpenChange, quotation, statusConfig,
@@ -112,6 +112,21 @@ export function QuotationDetailDialog({
               >
                 <Mail className="w-4 h-4 mr-2" />
                 {sendingEmail ? 'Enviando...' : `Enviar a ${quotation.patient_email}`}
+              </Button>
+            )}
+            {(quotation.patient_whatsapp || quotation.patient_phone) && (
+              <Button
+                variant="outline" size="sm"
+                onClick={() => {
+                  const phone = (quotation.patient_whatsapp || quotation.patient_phone || '').replace(/\D/g, '');
+                  const total = formatCurrency(quotation.total);
+                  const msg = `Hola ${quotation.patient_name || ''}, aqui tienes tu cotizacion ${quotation.quotation_number} por ${total}, vigente hasta ${quotation.expiry_date}. Cualquier duda, con gusto te atendemos.`;
+                  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                }}
+                className="border-green-300 text-green-700 hover:bg-green-50"
+                data-testid="send-quotation-whatsapp-btn"
+              >
+                <MessageCircle className="w-4 h-4 mr-2" /> WhatsApp
               </Button>
             )}
             {quotation.status === 'pendiente' && (

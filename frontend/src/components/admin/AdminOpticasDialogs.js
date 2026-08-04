@@ -179,6 +179,7 @@ export function CreateUserDialog({ open, onOpenChange, form, setForm, onSubmit, 
                 <SelectTrigger data-testid="sa-user-role"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="user">Atencion al Cliente</SelectItem>
+                  <SelectItem value="doctor">Doctor</SelectItem>
                   <SelectItem value="admin">Administrador</SelectItem>
                 </SelectContent>
               </Select>
