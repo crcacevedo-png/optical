@@ -52,8 +52,11 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
   - `PatientAddDialog`, `PatientEditDialog`, `PatientDeleteDialog`, `EyeglassRxDialog`, `ContactRxDialog`, `MedicalRxDialog` en `components/patients/PatientDialogs.js`
   - `ConsultationViewDialog` en `components/patients/ConsultationViewDialog.js`
 - **`ConsultationsPage.js`: 987 → 875 lineas (-11%)** — reutiliza `EyeglassRxDialog` y `MedicalRxDialog` con `testIdPrefix=""` (retrocompatible con test IDs previos).
+- **`AdminOpticasPage.js`: 802 → 562 lineas (-30%)** — extrae 4 dialogos a `components/admin/AdminOpticasDialogs.js`:
+  - `CreateCompanyDialog`, `CreateBranchDialog`, `CreateUserDialog`, `EditCompanyDialog`
 - Diseno: props explicitos (`open, onOpenChange, form, setForm, onSubmit`, etc.). Estado permanece en pagina padre. Cero cambios de comportamiento.
 - Data-testids preservados 1:1 gracias al `testIdPrefix` opcional.
+- Total: **11 componentes reutilizables, -888 lineas eliminadas de las paginas principales.**
 
 ### Permisos por Rol + Rename Rol (Feb 2026)
 - **Rename**: rol `user` cambia display de "Usuario" a "Atencion al Cliente" (badge en UsersPage, avatar en MainLayout, label en select de creacion, docs).
