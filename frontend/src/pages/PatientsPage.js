@@ -16,6 +16,11 @@ import {
   ChevronLeft, Save, Pill, Glasses, Pencil, Download, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  EyeglassRxDialog, ContactRxDialog, MedicalRxDialog,
+  PatientEditDialog, PatientDeleteDialog
+} from '../components/patients/PatientDialogs';
+import { ConsultationViewDialog } from '../components/patients/ConsultationViewDialog';
 
 const VA_METHODS = ['Snellen', 'logMAR', 'ETDRS'];
 
@@ -1111,468 +1116,52 @@ export default function PatientsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Ver Consulta Dialog (solo lectura) */}
-      <Dialog open={showViewConsultation} onOpenChange={setShowViewConsultation}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="view-consultation-dialog">
-          {loadingConsultation ? (
-            <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pine-900"></div>
-            </div>
-          ) : viewConsultation ? (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 font-heading">
-                  <Eye className="w-5 h-5 text-pine-700" />
-                  Consulta del {viewConsultation.consultation_date?.slice(0, 10)}
-                  <span className="px-2 py-0.5 bg-pine-50 text-pine-700 text-xs rounded-full font-medium ml-1">
-                    {viewConsultation.consultation_type}
-                  </span>
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-2">
-                <div className="flex items-center justify-between text-sm text-slate-500 pb-3 border-b">
-                  <span>Hora: {viewConsultation.consultation_time || '-'}</span>
-                  <span>Profesional: {viewConsultation.professional_name || '-'}</span>
-                </div>
+      <ConsultationViewDialog
+        open={showViewConsultation}
+        onOpenChange={setShowViewConsultation}
+        loading={loadingConsultation}
+        consultation={viewConsultation}
+        downloadPdf={downloadPdf}
+      />
 
-                {/* I. Motivo */}
-                {viewConsultation.chief_complaint && (
-                  <div>
-                    <p className="text-xs font-semibold text-pine-700 uppercase mb-1">I. Motivo de Consulta</p>
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewConsultation.chief_complaint}</p>
-                  </div>
-                )}
-
-                {/* II. Historia Clinica */}
-                {(viewConsultation.wears_glasses || viewConsultation.diabetes || viewConsultation.hypertension || viewConsultation.autoimmune_disease || viewConsultation.ocular_surgeries || viewConsultation.family_glaucoma || viewConsultation.family_macular_degeneration || viewConsultation.family_high_myopia || viewConsultation.current_medications || viewConsultation.allergies) && (
-                  <div className="border rounded-lg p-3 space-y-3">
-                    <p className="text-xs font-semibold text-pine-700 uppercase">II. Historia Clinica</p>
-                    {(viewConsultation.wears_glasses || viewConsultation.ocular_surgeries || viewConsultation.ocular_trauma || viewConsultation.ocular_diseases) && (
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Antecedentes Oculares</p>
-                        <div className="text-sm space-y-0.5">
-                          {viewConsultation.wears_glasses && <p><span className="text-slate-500">Usa lentes:</span> Si{viewConsultation.glasses_since ? `, desde ${viewConsultation.glasses_since}` : ''}{viewConsultation.glasses_type ? ` (${viewConsultation.glasses_type})` : ''}</p>}
-                          {viewConsultation.ocular_surgeries && <p><span className="text-slate-500">Cirugias:</span> {viewConsultation.ocular_surgeries}</p>}
-                          {viewConsultation.ocular_trauma && <p><span className="text-slate-500">Traumatismos:</span> {viewConsultation.ocular_trauma}</p>}
-                          {viewConsultation.ocular_diseases && <p><span className="text-slate-500">Enfermedades:</span> {viewConsultation.ocular_diseases}</p>}
-                        </div>
-                      </div>
-                    )}
-                    {(viewConsultation.diabetes || viewConsultation.hypertension || viewConsultation.autoimmune_disease || viewConsultation.current_medications || viewConsultation.allergies) && (
-                      <div className="pt-2 border-t">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Antecedentes Sistemicos</p>
-                        <div className="flex flex-wrap gap-1.5 mb-1">
-                          {viewConsultation.diabetes && <span className="px-2 py-0.5 bg-amber-50 text-amber-800 rounded text-xs font-medium">Diabetes</span>}
-                          {viewConsultation.hypertension && <span className="px-2 py-0.5 bg-red-50 text-red-800 rounded text-xs font-medium">Hipertension</span>}
-                          {viewConsultation.autoimmune_disease && <span className="px-2 py-0.5 bg-purple-50 text-purple-800 rounded text-xs font-medium">Autoinmune: {viewConsultation.autoimmune_details || 'Si'}</span>}
-                        </div>
-                        <div className="text-sm space-y-0.5">
-                          {viewConsultation.current_medications && <p><span className="text-slate-500">Medicamentos:</span> {viewConsultation.current_medications}</p>}
-                          {viewConsultation.allergies && <p><span className="text-slate-500">Alergias:</span> {viewConsultation.allergies}</p>}
-                        </div>
-                      </div>
-                    )}
-                    {(viewConsultation.family_glaucoma || viewConsultation.family_macular_degeneration || viewConsultation.family_high_myopia || viewConsultation.family_other_history) && (
-                      <div className="pt-2 border-t">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Antecedentes Familiares</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {viewConsultation.family_glaucoma && <span className="px-2 py-0.5 bg-blue-50 text-blue-800 rounded text-xs font-medium">Glaucoma{viewConsultation.family_glaucoma_relationship ? ` (${viewConsultation.family_glaucoma_relationship})` : ''}</span>}
-                          {viewConsultation.family_macular_degeneration && <span className="px-2 py-0.5 bg-blue-50 text-blue-800 rounded text-xs font-medium">Deg. Macular{viewConsultation.family_macular_relationship ? ` (${viewConsultation.family_macular_relationship})` : ''}</span>}
-                          {viewConsultation.family_high_myopia && <span className="px-2 py-0.5 bg-blue-50 text-blue-800 rounded text-xs font-medium">Miopia Alta{viewConsultation.family_high_myopia_relationship ? ` (${viewConsultation.family_high_myopia_relationship})` : ''}</span>}
-                        </div>
-                        {viewConsultation.family_other_history && <p className="text-sm text-slate-600 mt-1">Otros: {viewConsultation.family_other_history}</p>}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* III. Agudeza Visual */}
-                {(viewConsultation.va_distance_without_rx_od || viewConsultation.va_distance_without_rx_oi || viewConsultation.va_distance_with_rx_od || viewConsultation.va_near_without_rx_od || viewConsultation.va_pinhole_od) && (
-                  <div className="border rounded-lg p-3">
-                    <p className="text-xs font-semibold text-pine-700 uppercase mb-2">III. Agudeza Visual {viewConsultation.visual_acuity_method ? `(${viewConsultation.visual_acuity_method})` : ''}</p>
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-1 text-xs text-slate-500 uppercase">Medicion</th>
-                          <th className="text-center py-1 text-xs text-blue-700 uppercase">OD</th>
-                          <th className="text-center py-1 text-xs text-green-700 uppercase">OI</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          { label: 'AV Lejos sin Rx', od: viewConsultation.va_distance_without_rx_od, oi: viewConsultation.va_distance_without_rx_oi },
-                          { label: 'AV Lejos con Rx', od: viewConsultation.va_distance_with_rx_od, oi: viewConsultation.va_distance_with_rx_oi },
-                          { label: 'AV Cerca sin Rx', od: viewConsultation.va_near_without_rx_od, oi: viewConsultation.va_near_without_rx_oi },
-                          { label: 'AV Cerca con Rx', od: viewConsultation.va_near_with_rx_od, oi: viewConsultation.va_near_with_rx_oi },
-                          { label: 'AV Estenopeico', od: viewConsultation.va_pinhole_od, oi: viewConsultation.va_pinhole_oi },
-                        ].filter(r => r.od || r.oi).map((r) => (
-                          <tr key={r.label} className="border-b last:border-0">
-                            <td className="py-1 text-slate-700">{r.label}</td>
-                            <td className="py-1 text-center font-mono">{r.od || '-'}</td>
-                            <td className="py-1 text-center font-mono">{r.oi || '-'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {/* IV. Hallazgos y Plan */}
-                {viewConsultation.anamnesis && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Historia / Anamnesis</p>
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewConsultation.anamnesis}</p>
-                  </div>
-                )}
-                {viewConsultation.findings && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Hallazgos</p>
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewConsultation.findings}</p>
-                  </div>
-                )}
-                {viewConsultation.diagnosis && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Diagnostico</p>
-                    <p className="text-sm font-medium text-pine-800 bg-pine-50/50 p-2 rounded whitespace-pre-wrap">{viewConsultation.diagnosis}</p>
-                  </div>
-                )}
-                {viewConsultation.treatment_plan && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Plan / Tratamiento</p>
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewConsultation.treatment_plan}</p>
-                  </div>
-                )}
-                {viewConsultation.recommendations && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Recomendaciones</p>
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewConsultation.recommendations}</p>
-                  </div>
-                )}
-                {viewConsultation.notes && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Observaciones</p>
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewConsultation.notes}</p>
-                  </div>
-                )}
-
-                {/* Recetas */}
-                {((viewConsultation.eyeglass_prescriptions?.length || 0) + (viewConsultation.contact_prescriptions?.length || 0) + (viewConsultation.medical_prescriptions?.length || 0)) > 0 && (
-                  <div className="pt-3 border-t">
-                    <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Recetas Vinculadas</p>
-                    {(viewConsultation.eyeglass_prescriptions || []).map((rx) => (
-                      <div key={rx._id} className="flex items-center justify-between py-1.5">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Glasses className="w-3.5 h-3.5 text-blue-500" />
-                          <span>Receta de Anteojos ({rx.created_at?.slice(0, 10)})</span>
-                        </div>
-                        <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-600 hover:text-blue-800"
-                          onClick={() => downloadPdf('eyeglass', rx._id)} data-testid={`view-rx-pdf-${rx._id}`}>
-                          <Download className="w-3 h-3 mr-1" /> PDF
-                        </Button>
-                      </div>
-                    ))}
-                    {(viewConsultation.contact_prescriptions || []).map((rx) => (
-                      <div key={rx._id} className="flex items-center justify-between py-1.5">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Eye className="w-3.5 h-3.5 text-teal-500" />
-                          <span>Lentes de Contacto ({rx.created_at?.slice(0, 10)})</span>
-                        </div>
-                        <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:text-teal-800"
-                          onClick={() => downloadPdf('contact-lens', rx._id)}>
-                          <Download className="w-3 h-3 mr-1" /> PDF
-                        </Button>
-                      </div>
-                    ))}
-                    {(viewConsultation.medical_prescriptions || []).map((rx) => (
-                      <div key={rx._id} className="flex items-center justify-between py-1.5">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Pill className="w-3.5 h-3.5 text-purple-500" />
-                          <span>Receta Medica ({rx.created_at?.slice(0, 10)})</span>
-                        </div>
-                        <Button size="sm" variant="ghost" className="h-7 text-xs text-purple-600 hover:text-purple-800"
-                          onClick={() => downloadPdf('medical', rx._id)}>
-                          <Download className="w-3 h-3 mr-1" /> PDF
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="flex justify-end pt-2">
-                  <Button variant="outline" onClick={() => setShowViewConsultation(false)}>Cerrar</Button>
-                </div>
-              </div>
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
-      {/* ===== EYEGLASS RX DIALOG ===== */}
-      <Dialog open={showEyeglassRx} onOpenChange={setShowEyeglassRx}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Glasses className="w-5 h-5 text-blue-600" /> Receta de Anteojos</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-3">
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-xs font-bold text-blue-700 mb-2">OJO DERECHO (OD)</p>
-                <div className="grid grid-cols-5 gap-2">
-                  {['sphere', 'cylinder', 'axis', 'addition', 'dp'].map(f => (
-                    <div key={f} className="space-y-1">
-                      <Label className="text-[10px] uppercase">{f === 'dp' ? 'DP' : f === 'sphere' ? 'Esfera' : f === 'cylinder' ? 'Cilindro' : f === 'axis' ? 'Eje' : 'Adicion'}</Label>
-                      <Input className="h-8 text-sm" value={eyeglassForm[`od_${f}`]}
-                        onChange={(e) => setEyeglassForm(p => ({ ...p, [`od_${f}`]: e.target.value }))} data-testid={`p-rx-od-${f}`} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="p-3 bg-green-50 rounded-lg">
-                <p className="text-xs font-bold text-green-700 mb-2">OJO IZQUIERDO (OI)</p>
-                <div className="grid grid-cols-5 gap-2">
-                  {['sphere', 'cylinder', 'axis', 'addition', 'dp'].map(f => (
-                    <div key={f} className="space-y-1">
-                      <Label className="text-[10px] uppercase">{f === 'dp' ? 'DP' : f === 'sphere' ? 'Esfera' : f === 'cylinder' ? 'Cilindro' : f === 'axis' ? 'Eje' : 'Adicion'}</Label>
-                      <Input className="h-8 text-sm" value={eyeglassForm[`oi_${f}`]}
-                        onChange={(e) => setEyeglassForm(p => ({ ...p, [`oi_${f}`]: e.target.value }))} data-testid={`p-rx-oi-${f}`} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label className="text-xs">Tipo de Lente</Label>
-                <Input value={eyeglassForm.lens_type} onChange={(e) => setEyeglassForm(p => ({ ...p, lens_type: e.target.value }))} placeholder="Monofocal, bifocal, progresivo..." />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Tipo de Armazon</Label>
-                <Input value={eyeglassForm.frame_type} onChange={(e) => setEyeglassForm(p => ({ ...p, frame_type: e.target.value }))} />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Observaciones</Label>
-              <Textarea value={eyeglassForm.observations} onChange={(e) => setEyeglassForm(p => ({ ...p, observations: e.target.value }))} rows={2} />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowEyeglassRx(false)}>Cancelar</Button>
-              <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleCreateEyeglassRx} data-testid="p-save-eyeglass-rx-btn">
-                <Save className="w-4 h-4 mr-2" /> Guardar Receta
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ===== CONTACT LENS RX DIALOG ===== */}
-      <Dialog open={showContactRx} onOpenChange={setShowContactRx}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Eye className="w-5 h-5 text-teal-600" /> Receta de Lentes de Contacto</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-3">
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-xs font-bold text-blue-700 mb-2">OJO DERECHO (OD)</p>
-                <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-                  {[{k:'power',l:'Poder'},{k:'bc',l:'CB'},{k:'dia',l:'DIA'},{k:'cylinder',l:'Cilindro'},{k:'axis',l:'Eje'},{k:'addition',l:'Adicion'}].map(({k,l}) => (
-                    <div key={k} className="space-y-1">
-                      <Label className="text-[10px] uppercase">{l}</Label>
-                      <Input className="h-8 text-sm" value={contactForm[`od_${k}`]}
-                        onChange={(e) => setContactForm(p => ({ ...p, [`od_${k}`]: e.target.value }))} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="p-3 bg-green-50 rounded-lg">
-                <p className="text-xs font-bold text-green-700 mb-2">OJO IZQUIERDO (OI)</p>
-                <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-                  {[{k:'power',l:'Poder'},{k:'bc',l:'CB'},{k:'dia',l:'DIA'},{k:'cylinder',l:'Cilindro'},{k:'axis',l:'Eje'},{k:'addition',l:'Adicion'}].map(({k,l}) => (
-                    <div key={k} className="space-y-1">
-                      <Label className="text-[10px] uppercase">{l}</Label>
-                      <Input className="h-8 text-sm" value={contactForm[`oi_${k}`]}
-                        onChange={(e) => setContactForm(p => ({ ...p, [`oi_${k}`]: e.target.value }))} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Marca</Label>
-                <Input value={contactForm.brand} onChange={(e) => setContactForm(p => ({ ...p, brand: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Tipo de Lente</Label>
-                <Input value={contactForm.lens_type} onChange={(e) => setContactForm(p => ({ ...p, lens_type: e.target.value }))} placeholder="Blanda, rigida..." />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Reemplazo</Label>
-                <Input value={contactForm.replacement} onChange={(e) => setContactForm(p => ({ ...p, replacement: e.target.value }))} placeholder="Mensual, quincenal..." />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Observaciones</Label>
-              <Textarea value={contactForm.observations} onChange={(e) => setContactForm(p => ({ ...p, observations: e.target.value }))} rows={2} />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowContactRx(false)}>Cancelar</Button>
-              <Button className="bg-teal-600 hover:bg-teal-700" onClick={handleCreateContactRx} data-testid="p-save-contact-rx-btn">
-                <Save className="w-4 h-4 mr-2" /> Guardar Receta
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ===== MEDICAL RX DIALOG ===== */}
-      <Dialog open={showMedicalRx} onOpenChange={setShowMedicalRx}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Pill className="w-5 h-5 text-purple-600" /> Receta Medica</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <Label>Diagnostico</Label>
-              <Input value={medicalForm.diagnosis} onChange={(e) => setMedicalForm(f => ({ ...f, diagnosis: e.target.value }))} data-testid="p-med-rx-diagnosis" />
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label>Medicamentos</Label>
-                <Button type="button" variant="outline" size="sm" onClick={addMedication} data-testid="p-add-medication-btn">
-                  <Plus className="w-3 h-3 mr-1" /> Agregar
-                </Button>
-              </div>
-              {medicalForm.medications.map((med, idx) => (
-                <div key={med._uid || idx} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 mb-2 items-end">
-                  <div className="space-y-1">
-                    <Label className="text-[10px]">Medicamento</Label>
-                    <Input className="h-8 text-sm" value={med.name} onChange={(e) => updateMedication(idx, 'name', e.target.value)} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px]">Dosis</Label>
-                    <Input className="h-8 text-sm w-20" value={med.dosage} onChange={(e) => updateMedication(idx, 'dosage', e.target.value)} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px]">Frecuencia</Label>
-                    <Input className="h-8 text-sm w-24" value={med.frequency} onChange={(e) => updateMedication(idx, 'frequency', e.target.value)} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px]">Duracion</Label>
-                    <Input className="h-8 text-sm w-20" value={med.duration} onChange={(e) => updateMedication(idx, 'duration', e.target.value)} />
-                  </div>
-                  {medicalForm.medications.length > 1 && (
-                    <Button variant="ghost" size="sm" className="text-red-500 h-8 w-8 p-0" onClick={() => removeMedication(idx)}>X</Button>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="space-y-1">
-              <Label>Instrucciones</Label>
-              <Textarea value={medicalForm.instructions} onChange={(e) => setMedicalForm(f => ({ ...f, instructions: e.target.value }))} rows={2} data-testid="p-med-rx-instructions" />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowMedicalRx(false)}>Cancelar</Button>
-              <Button className="bg-purple-600 hover:bg-purple-700" onClick={handleCreateMedicalRx} data-testid="p-save-medical-rx-btn">
-                <Save className="w-4 h-4 mr-2" /> Guardar Receta
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ===== EDIT PATIENT DIALOG ===== */}
-      <Dialog open={showEditPatient} onOpenChange={setShowEditPatient}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" data-testid="edit-patient-dialog">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Pencil className="w-5 h-5 text-pine-700" /> Editar Paciente</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Nombre *</Label>
-                <Input value={editForm.first_name} onChange={(e) => setEditForm(f => ({ ...f, first_name: e.target.value }))} data-testid="edit-first-name" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Apellido *</Label>
-                <Input value={editForm.last_name} onChange={(e) => setEditForm(f => ({ ...f, last_name: e.target.value }))} data-testid="edit-last-name" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">DPI</Label>
-                <Input value={editForm.dpi} onChange={(e) => setEditForm(f => ({ ...f, dpi: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Genero</Label>
-                <Select value={editForm.gender || 'none'} onValueChange={(v) => setEditForm(f => ({ ...f, gender: v === 'none' ? '' : v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin especificar</SelectItem>
-                    <SelectItem value="M">Masculino</SelectItem>
-                    <SelectItem value="F">Femenino</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Fecha de Nacimiento</Label>
-                <Input type="date" value={editForm.birth_date} onChange={(e) => setEditForm(f => ({ ...f, birth_date: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Telefono</Label>
-                <Input value={editForm.phone} onChange={(e) => setEditForm(f => ({ ...f, phone: e.target.value }))} data-testid="edit-phone" />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Email</Label>
-              <Input type="email" value={editForm.email} onChange={(e) => setEditForm(f => ({ ...f, email: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Direccion</Label>
-              <Input value={editForm.address} onChange={(e) => setEditForm(f => ({ ...f, address: e.target.value }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Contacto Emergencia</Label>
-                <Input value={editForm.emergency_contact} onChange={(e) => setEditForm(f => ({ ...f, emergency_contact: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Tel. Emergencia</Label>
-                <Input value={editForm.emergency_phone} onChange={(e) => setEditForm(f => ({ ...f, emergency_phone: e.target.value }))} />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Notas</Label>
-              <Textarea value={editForm.notes} onChange={(e) => setEditForm(f => ({ ...f, notes: e.target.value }))} rows={2} />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setShowEditPatient(false)}>Cancelar</Button>
-              <Button className="bg-pine-700 hover:bg-pine-800" onClick={handleUpdatePatient}
-                disabled={!editForm.first_name || !editForm.last_name} data-testid="save-edit-patient-btn">
-                <Save className="w-4 h-4 mr-2" /> Guardar Cambios
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <DialogContent className="max-w-sm" data-testid="delete-patient-dialog">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <Trash2 className="w-5 h-5" /> Eliminar Paciente
-            </DialogTitle>
-            <DialogDescription className="text-slate-500 pt-2">
-              Esta accion eliminara a <span className="font-semibold text-slate-700">{selectedPatient?.first_name} {selectedPatient?.last_name}</span> y no se puede deshacer.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} data-testid="cancel-delete-btn">Cancelar</Button>
-            <Button variant="destructive" onClick={handleDeletePatient} data-testid="confirm-delete-btn">Eliminar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* ===== Extracted dialogs (see components/patients/PatientDialogs.js) ===== */}
+      <EyeglassRxDialog
+        open={showEyeglassRx}
+        onOpenChange={setShowEyeglassRx}
+        form={eyeglassForm}
+        setForm={setEyeglassForm}
+        onSubmit={handleCreateEyeglassRx}
+      />
+      <ContactRxDialog
+        open={showContactRx}
+        onOpenChange={setShowContactRx}
+        form={contactForm}
+        setForm={setContactForm}
+        onSubmit={handleCreateContactRx}
+      />
+      <MedicalRxDialog
+        open={showMedicalRx}
+        onOpenChange={setShowMedicalRx}
+        form={medicalForm}
+        setForm={setMedicalForm}
+        onSubmit={handleCreateMedicalRx}
+        addMedication={addMedication}
+        updateMedication={updateMedication}
+        removeMedication={removeMedication}
+      />
+      <PatientEditDialog
+        open={showEditPatient}
+        onOpenChange={setShowEditPatient}
+        form={editForm}
+        setForm={setEditForm}
+        onSubmit={handleUpdatePatient}
+      />
+      <PatientDeleteDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        patient={selectedPatient}
+        onConfirm={handleDeletePatient}
+      />
     </div>
   );
 }
