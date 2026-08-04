@@ -7,7 +7,7 @@ import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { 
   BarChart3, TrendingUp, Users, ShoppingBag, 
-  Calendar, FileText, DollarSign, Package, Building2, Download
+  Calendar, FileText, DollarSign, Package, Building2, Download, Landmark, Banknote, CreditCard, Smartphone
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
@@ -16,6 +16,8 @@ export default function ReportsPage() {
   const { user } = useAuth();
   const [salesReport, setSalesReport] = useState(null);
   const [financeSummary, setFinanceSummary] = useState(null);
+  const [cashReport, setCashReport] = useState(null);
+  const [downloadingCash, setDownloadingCash] = useState(false);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [branches, setBranches] = useState([]);
@@ -43,12 +45,14 @@ export default function ReportsPage() {
       if (selectedBranch && selectedBranch !== 'all') {
         params.branch_id = selectedBranch;
       }
-      const [salesRes, financeRes] = await Promise.all([
+      const [salesRes, financeRes, cashRes] = await Promise.all([
         api.get('/api/reports/sales', { params }),
-        api.get('/api/finance/summary', { params })
+        api.get('/api/finance/summary', { params }),
+        api.get('/api/cash-register/report', { params })
       ]);
       setSalesReport(salesRes.data);
       setFinanceSummary(financeRes.data);
+      setCashReport(cashRes.data);
     } catch (error) {
       console.error('Error fetching reports:', error);
     } finally {
@@ -84,6 +88,30 @@ export default function ReportsPage() {
       toast.error('Error al exportar reporte');
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleExportCashPdf = async () => {
+    setDownloadingCash(true);
+    try {
+      const params = { date_from: dateRange.from, date_to: dateRange.to };
+      if (selectedBranch && selectedBranch !== 'all') {
+        params.branch_id = selectedBranch;
+      }
+      const response = await api.get('/api/cash-register/report/pdf', { params, responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `reporte_cierres_${dateRange.from}_${dateRange.to}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Reporte de cierres descargado');
+    } catch (error) {
+      toast.error('Error al descargar el reporte');
+    } finally {
+      setDownloadingCash(false);
     }
   };
 
@@ -364,6 +392,125 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Reporte de Cierres de Caja */}
+      <Card className="border-slate-200/80" data-testid="cash-report-card">
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <div>
+            <CardTitle className="font-heading text-lg flex items-center gap-2">
+              <Landmark className="w-5 h-5 text-emerald-600" /> Reporte de Cierres de Caja
+            </CardTitle>
+            <p className="text-xs text-slate-500 mt-1">
+              Resumen consolidado de cierres del periodo por metodo de pago.
+            </p>
+          </div>
+          <Button
+            onClick={handleExportCashPdf}
+            disabled={downloadingCash || !cashReport?.count}
+            className="bg-emerald-600 hover:bg-emerald-700"
+            data-testid="cash-report-pdf-btn"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            {downloadingCash ? 'Descargando...' : 'Descargar PDF'}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {!cashReport || cashReport.count === 0 ? (
+            <div className="text-center py-8 text-slate-500">
+              <Landmark className="w-12 h-12 mx-auto mb-2 opacity-30" />
+              <p>Sin cierres registrados en este periodo</p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {/* Method tiles */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3" data-testid="cash-report-tiles">
+                {[
+                  { key: 'cash', label: 'Efectivo', icon: Banknote, color: 'emerald' },
+                  { key: 'transfer', label: 'Transferencia', icon: Smartphone, color: 'violet' },
+                  { key: 'card', label: 'Tarjeta', icon: CreditCard, color: 'blue' },
+                  { key: 'check', label: 'Cheque', icon: FileText, color: 'amber' },
+                  { key: 'other', label: 'Otro', icon: DollarSign, color: 'slate' },
+                ].map(({ key, label, icon: Icon, color }) => {
+                  const bg = {
+                    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                    violet: 'bg-violet-50 text-violet-700 border-violet-200',
+                    blue: 'bg-blue-50 text-blue-700 border-blue-200',
+                    amber: 'bg-amber-50 text-amber-800 border-amber-200',
+                    slate: 'bg-slate-50 text-slate-700 border-slate-200',
+                  }[color];
+                  return (
+                    <div key={key} className={`border rounded-xl p-3 ${bg}`} data-testid={`cash-report-tile-${key}`}>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Icon className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
+                      </div>
+                      <p className="font-heading text-lg font-bold">{formatCurrency(cashReport.totals_by_method?.[key])}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Grand totals */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm bg-slate-50 border border-slate-100 rounded-lg p-4">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide">Cierres</p>
+                  <p className="font-heading text-xl font-bold text-slate-900">{cashReport.count}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide">Total recaudado</p>
+                  <p className="font-heading text-xl font-bold text-emerald-700">{formatCurrency(cashReport.grand_total_received)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide">Cuentas x cobrar</p>
+                  <p className="font-heading text-xl font-bold text-amber-700">{formatCurrency(cashReport.grand_receivables_total)}</p>
+                </div>
+                {cashReport.grand_cash_difference != null && (
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">Diferencia efectivo</p>
+                    <p className={`font-heading text-xl font-bold ${cashReport.grand_cash_difference === 0 ? 'text-emerald-700' : cashReport.grand_cash_difference > 0 ? 'text-blue-700' : 'text-red-600'}`}>
+                      {cashReport.grand_cash_difference > 0 ? '+' : ''}{formatCurrency(cashReport.grand_cash_difference)}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Rows table */}
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50">
+                    <tr className="text-xs text-slate-500 uppercase tracking-wider">
+                      <th className="text-left p-2.5 font-semibold">Cierre</th>
+                      <th className="text-left p-2.5 font-semibold">Sucursal</th>
+                      <th className="text-left p-2.5 font-semibold">Cerrada por</th>
+                      <th className="text-right p-2.5 font-semibold">Efectivo</th>
+                      <th className="text-right p-2.5 font-semibold">Transf.</th>
+                      <th className="text-right p-2.5 font-semibold">Tarjeta</th>
+                      <th className="text-right p-2.5 font-semibold">Cheque</th>
+                      <th className="text-right p-2.5 font-semibold">Total</th>
+                      <th className="text-right p-2.5 font-semibold">Cta x Cob</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cashReport.rows.map((r) => (
+                      <tr key={r._id} className="border-t border-slate-100 hover:bg-slate-50/60" data-testid={`cash-report-row-${r._id}`}>
+                        <td className="p-2.5 text-slate-700 text-xs">{(r.closed_at || '').slice(0, 16).replace('T', ' ')}</td>
+                        <td className="p-2.5 text-slate-700">{r.branch_name || '-'}</td>
+                        <td className="p-2.5 text-slate-700">{r.closed_by_name || '-'}</td>
+                        <td className="p-2.5 text-right">{formatCurrency(r.totals_by_method?.cash)}</td>
+                        <td className="p-2.5 text-right">{formatCurrency(r.totals_by_method?.transfer)}</td>
+                        <td className="p-2.5 text-right">{formatCurrency(r.totals_by_method?.card)}</td>
+                        <td className="p-2.5 text-right">{formatCurrency(r.totals_by_method?.check)}</td>
+                        <td className="p-2.5 text-right font-bold text-emerald-700">{formatCurrency(r.total_received)}</td>
+                        <td className="p-2.5 text-right text-amber-700">{formatCurrency(r.receivables_total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
