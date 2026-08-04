@@ -2,12 +2,13 @@ import React from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Plus, Trash2, Banknote, CreditCard, Smartphone, HandCoins } from 'lucide-react';
+import { Plus, Trash2, Banknote, CreditCard, Smartphone, HandCoins, FileText } from 'lucide-react';
 
 export const PAYMENT_METHODS = [
   { value: 'cash', label: 'Efectivo', icon: Banknote },
   { value: 'card', label: 'Tarjeta', icon: CreditCard },
   { value: 'transfer', label: 'Transferencia', icon: Smartphone },
+  { value: 'check', label: 'Cheque', icon: FileText },
   { value: 'other', label: 'Otro', icon: HandCoins },
 ];
 
@@ -18,6 +19,7 @@ export const paymentMethodLabel = (v) =>
 export const referenceLabelFor = (method) => {
   if (method === 'card') return 'N° de Autorizacion';
   if (method === 'transfer') return 'N° de Transferencia';
+  if (method === 'check') return 'N° de Cheque';
   if (method === 'other') return 'Referencia';
   return null; // cash -> sin campo
 };
@@ -26,6 +28,7 @@ export const referenceLabelFor = (method) => {
 export const referencePlaceholderFor = (method) => {
   if (method === 'card') return 'Ej. 123456';
   if (method === 'transfer') return 'Ej. TX20260804001';
+  if (method === 'check') return 'Ej. 0001234 - Banco Industrial';
   if (method === 'other') return 'Detalle del pago';
   return '';
 };

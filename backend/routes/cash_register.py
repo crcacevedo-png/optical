@@ -65,6 +65,63 @@ async def get_current_register(
     return {"register": reg}
 
 
+@router.get("/current/preview")
+async def get_current_preview(
+    branch_id: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Preview en vivo del cierre para la caja abierta.
+    Calcula totales por metodo de pago y ventas del turno sin cerrar la caja."""
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+
+    bid = await _get_branch_id_or_400(user, branch_id)
+    reg = await db.cash_registers.find_one({
+        "company_id": ObjectId(user["company_id"]),
+        "branch_id": bid,
+        "status": "open",
+    }, sort=[("opened_at", -1)])
+    if not reg:
+        raise HTTPException(status_code=404, detail="No hay caja abierta")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    totals = await _compute_close_totals(
+        ObjectId(user["company_id"]), bid, reg["opened_at"], now_iso
+    )
+    expected_cash = round(float(reg.get("opening_amount", 0) or 0) + totals["totals_by_method"].get("cash", 0), 2)
+
+    # Attach patient names to receivables (parity con GET /{id})
+    if totals.get("sales_in_window"):
+        pids = list({s["patient_id"] for s in totals["sales_in_window"] if s.get("patient_id")})
+        pmap = {}
+        if pids:
+            try:
+                docs = await db.patients.find(
+                    {"_id": {"$in": [ObjectId(p) for p in pids]}},
+                    {"first_name": 1, "last_name": 1}
+                ).to_list(len(pids))
+                pmap = {str(p["_id"]): f"{p.get('first_name','')} {p.get('last_name','')}".strip() for p in docs}
+            except Exception:
+                pass
+        for s in totals["sales_in_window"]:
+            s["patient_name"] = pmap.get(s.get("patient_id"), "Consumidor final")
+
+    _serialize(reg)
+    reg.update({
+        "expected_cash": expected_cash,
+        "totals_by_method": totals["totals_by_method"],
+        "total_received": totals["total_received"],
+        "payments_count": totals["payments_count"],
+        "sales_in_window_count": totals["sales_in_window_count"],
+        "receivables_count": totals["receivables_count"],
+        "receivables_total": totals["receivables_total"],
+        "payments_detail": totals["payments_detail"],
+        "sales_in_window": totals["sales_in_window"],
+        "is_preview": True,
+    })
+    return reg
+
+
 @router.post("/open")
 async def open_register(data: OpenCashRegister, request: Request, user: dict = Depends(get_current_user)):
     if user["role"] == "superadmin":
@@ -112,7 +169,7 @@ async def _compute_close_totals(company_id: ObjectId, branch_id: ObjectId, opene
         # No filtramos por sale.created_at para capturar tambien abonos a ventas viejas
     })
 
-    totals_by_method = {"cash": 0.0, "card": 0.0, "transfer": 0.0, "other": 0.0}
+    totals_by_method = {"cash": 0.0, "card": 0.0, "transfer": 0.0, "check": 0.0, "other": 0.0}
     payments_detail = []
     sales_in_window = []
     receivables_in_window = []
