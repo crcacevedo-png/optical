@@ -144,10 +144,39 @@ export default function QuotationsPage() {
     setPatientSearch('');
   };
 
+  const [sendingEmail, setSendingEmail] = useState(false);
+
+  const handleSendEmail = async (quotation) => {
+    if (!quotation?.patient_email) {
+      toast.error('El paciente no tiene email registrado');
+      return;
+    }
+    try {
+      setSendingEmail(true);
+      await api.post(`/api/quotations/${quotation._id}/send-email`);
+      toast.success(`Cotizacion enviada a ${quotation.patient_email}`);
+      loadData();
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err?.response?.data?.detail));
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   const handleStatusChange = async (id, status) => {
     try {
       await api.put(`/api/quotations/${id}/status`, { status });
       toast.success(`Cotizacion marcada como ${status}`);
+      // Al aceptar, sugerir enviar por email si el paciente tiene email
+      if (status === 'aceptada' && selectedQuotation?.patient_email) {
+        toast('¿Enviar copia de la cotizacion al paciente?', {
+          action: {
+            label: 'Enviar email',
+            onClick: () => handleSendEmail(selectedQuotation),
+          },
+          duration: 8000,
+        });
+      }
       loadData();
       setShowDetailDialog(false);
     } catch (err) {
@@ -368,6 +397,8 @@ export default function QuotationsPage() {
         statusConfig={statusConfig}
         onDownloadPdf={downloadPdf}
         onStatusChange={handleStatusChange}
+        onSendEmail={handleSendEmail}
+        sendingEmail={sendingEmail}
         onOpenConvert={(q) => {
           setConvertForm({ payment_method: 'efectivo', amount_paid: q.total });
           setShowConvertDialog(true);

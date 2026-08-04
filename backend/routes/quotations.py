@@ -72,11 +72,16 @@ async def list_quotations(
     quotations = await db.quotations.find(query).sort("created_at", -1).limit(limit).to_list(limit)
     for q in quotations:
         serialize_doc(q)
+        # Serializar ObjectIds dentro de emails_sent
+        for e in q.get("emails_sent", []) or []:
+            if isinstance(e.get("sent_by"), ObjectId):
+                e["sent_by"] = str(e["sent_by"])
         if q.get("patient_id"):
-            patient = await db.patients.find_one({"_id": ObjectId(q["patient_id"])}, {"first_name": 1, "last_name": 1, "phone": 1})
+            patient = await db.patients.find_one({"_id": ObjectId(q["patient_id"])}, {"first_name": 1, "last_name": 1, "phone": 1, "email": 1})
             if patient:
                 q["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
                 q["patient_phone"] = patient.get("phone", "")
+                q["patient_email"] = patient.get("email", "")
         if q.get("created_by"):
             creator = await db.users.find_one({"_id": ObjectId(q["created_by"])}, {"name": 1})
             if creator:
@@ -127,6 +132,9 @@ async def get_quotation(quotation_id: str, user: dict = Depends(get_current_user
     if not q or str(q["company_id"]) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Cotizacion no encontrada")
     serialize_doc(q)
+    for e in q.get("emails_sent", []) or []:
+        if isinstance(e.get("sent_by"), ObjectId):
+            e["sent_by"] = str(e["sent_by"])
     if q.get("patient_id"):
         patient = await db.patients.find_one({"_id": ObjectId(q["patient_id"])}, {"first_name": 1, "last_name": 1, "phone": 1, "email": 1, "whatsapp": 1})
         if patient:
@@ -207,20 +215,13 @@ async def convert_quotation_to_sale(quotation_id: str, payment_method: str = "ef
     )
     return {"_id": str(sale_result.inserted_id), "message": "Cotizacion convertida a venta exitosamente"}
 
-@router.get("/{quotation_id}/pdf")
-async def get_quotation_pdf(quotation_id: str, user: dict = Depends(get_current_user)):
-    q = await db.quotations.find_one({"_id": ObjectId(quotation_id)})
-    if not q or str(q["company_id"]) != user["company_id"]:
-        raise HTTPException(status_code=404, detail="Cotizacion no encontrada")
-    
-    patient = await db.patients.find_one({"_id": q["patient_id"]})
-    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
-    
+async def _build_quotation_pdf_bytes(q: dict, patient: Optional[dict], company: Optional[dict]) -> bytes:
+    """Construye el PDF de una cotizacion y retorna los bytes. Reusable entre GET /pdf y send-email."""
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
     draw_pdf_header(c, width, height, company, "COTIZACION")
-    
+
     c.setFont("Helvetica-Bold", 11)
     y = height - 2.1*inch
     c.drawString(1*inch, y, f"No: {q.get('quotation_number', '')}")
@@ -232,7 +233,7 @@ async def get_quotation_pdf(quotation_id: str, user: dict = Depends(get_current_
     y -= 0.2*inch
     if patient and patient.get("phone"):
         c.drawString(1*inch, y, f"Tel: {patient['phone']}")
-    
+
     y -= 0.5*inch
     c.setFillColor(colors.HexColor("#0F4C3A"))
     c.rect(0.8*inch, y - 0.05*inch, 6.4*inch, 0.35*inch, fill=True, stroke=False)
@@ -244,7 +245,7 @@ async def get_quotation_pdf(quotation_id: str, user: dict = Depends(get_current_
     c.drawString(col_x[2], y + 0.05*inch, "CANT")
     c.drawString(col_x[3], y + 0.05*inch, "PRECIO")
     c.drawString(col_x[4], y + 0.05*inch, "TOTAL")
-    
+
     c.setFillColor(colors.black)
     c.setFont("Helvetica", 10)
     y -= 0.4*inch
@@ -259,24 +260,24 @@ async def get_quotation_pdf(quotation_id: str, user: dict = Depends(get_current_
         y -= 0.3*inch
         c.setStrokeColor(colors.HexColor("#E2E8F0"))
         c.line(0.8*inch, y + 0.15*inch, 7.2*inch, y + 0.15*inch)
-    
+
     y -= 0.2*inch
     c.setFont("Helvetica", 11)
     c.drawRightString(6.2*inch, y, "Subtotal:")
     c.drawRightString(7.1*inch, y, f"Q{q.get('subtotal', 0):,.2f}")
-    
+
     if q.get("discount", 0) > 0:
         y -= 0.3*inch
         c.drawRightString(6.2*inch, y, "Descuento:")
         c.setFillColor(colors.HexColor("#DC2626"))
         c.drawRightString(7.1*inch, y, f"-Q{q.get('discount', 0):,.2f}")
         c.setFillColor(colors.black)
-    
+
     y -= 0.35*inch
     c.setFont("Helvetica-Bold", 13)
     c.drawRightString(6.2*inch, y, "TOTAL:")
     c.drawRightString(7.1*inch, y, f"Q{q.get('total', 0):,.2f}")
-    
+
     y -= 0.6*inch
     if q.get("notes"):
         c.setFont("Helvetica-Bold", 10)
@@ -286,7 +287,7 @@ async def get_quotation_pdf(quotation_id: str, user: dict = Depends(get_current_
         for line in q["notes"][:200].split("\n"):
             c.drawString(1*inch, y, line[:80])
             y -= 0.2*inch
-    
+
     if q.get("payment_conditions"):
         y -= 0.15*inch
         c.setFont("Helvetica-Bold", 10)
@@ -294,19 +295,89 @@ async def get_quotation_pdf(quotation_id: str, user: dict = Depends(get_current_
         c.setFont("Helvetica", 10)
         y -= 0.2*inch
         c.drawString(1*inch, y, q["payment_conditions"][:100])
-    
+
     y -= 0.5*inch
     c.setFont("Helvetica-Oblique", 9)
     c.setFillColor(colors.HexColor("#64748B"))
     c.drawString(1*inch, y, f"* Esta cotizacion es valida por {q.get('validity_days', 15)} dias hasta el {q.get('expiry_date', '')}.")
-    
+
     c.setFillColor(colors.HexColor("#0F4C3A"))
     c.rect(0, 0, width, 0.5*inch, fill=True, stroke=False)
     c.setFillColor(colors.white)
     c.setFont("Helvetica", 8)
     c.drawCentredString(width/2, 0.2*inch, f"{company['name'] if company else 'Cortexia Optical'} - {company.get('phone', '') if company else ''}")
-    
+
     c.save()
     buffer.seek(0)
-    return StreamingResponse(buffer, media_type="application/pdf",
-                           headers={"Content-Disposition": f"attachment; filename=cotizacion_{q.get('quotation_number', quotation_id)}.pdf"})
+    return buffer.getvalue()
+
+
+@router.get("/{quotation_id}/pdf")
+async def get_quotation_pdf(quotation_id: str, user: dict = Depends(get_current_user)):
+    q = await db.quotations.find_one({"_id": ObjectId(quotation_id)})
+    if not q or str(q["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Cotizacion no encontrada")
+    patient = await db.patients.find_one({"_id": q["patient_id"]})
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
+    pdf_bytes = await _build_quotation_pdf_bytes(q, patient, company)
+    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
+                             headers={"Content-Disposition": f"attachment; filename=cotizacion_{q.get('quotation_number', quotation_id)}.pdf"})
+
+
+@router.post("/{quotation_id}/send-email")
+async def send_quotation_email(quotation_id: str, user: dict = Depends(get_current_user)):
+    """Envia el PDF de la cotizacion al paciente via Resend."""
+    from email_service import send_email, render_quotation_email
+
+    q = await db.quotations.find_one({"_id": ObjectId(quotation_id)})
+    if not q or str(q["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Cotizacion no encontrada")
+
+    patient = await db.patients.find_one({"_id": q["patient_id"]})
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    if not patient.get("email"):
+        raise HTTPException(status_code=400, detail="El paciente no tiene email registrado")
+
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
+    pdf_bytes = await _build_quotation_pdf_bytes(q, patient, company)
+
+    quotation_number = q.get("quotation_number", str(q["_id"])[-6:])
+    total_str = f"Q{q.get('total', 0):,.2f}"
+    company_name = company.get("name", "Cortexia Optical") if company else "Cortexia Optical"
+
+    html = render_quotation_email(
+        patient_name=f"{patient['first_name']} {patient['last_name']}",
+        company_name=company_name,
+        quotation_number=quotation_number,
+        total_str=total_str,
+        expiry_date=q.get("expiry_date", ""),
+        notes=q.get("notes"),
+    )
+    ok = await send_email(
+        patient["email"],
+        f"Cotizacion {quotation_number} - {company_name}",
+        html,
+        tag="quotation",
+        attachments=[{
+            "filename": f"cotizacion_{quotation_number}.pdf",
+            "content": pdf_bytes,
+            "content_type": "application/pdf",
+        }],
+    )
+    if not ok:
+        raise HTTPException(status_code=502, detail="No se pudo enviar el email. Revisa el log del servidor.")
+
+    # Registrar el envio en la cotizacion
+    await db.quotations.update_one(
+        {"_id": q["_id"]},
+        {"$push": {"emails_sent": {
+            "to": patient["email"],
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "sent_by": ObjectId(user["_id"]),
+            "sent_by_name": user.get("name", ""),
+        }}}
+    )
+
+    return {"message": "Cotizacion enviada", "to": patient["email"]}
+

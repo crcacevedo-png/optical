@@ -24,8 +24,11 @@ def _get_config():
     return api_key, sender, app_url
 
 
-async def send_email(to: str, subject: str, html: str, *, tag: Optional[str] = None) -> bool:
-    """Envia un email no-bloqueante. Retorna True si exitoso, False si fallo (no lanza excepcion)."""
+async def send_email(to: str, subject: str, html: str, *, tag: Optional[str] = None, attachments: Optional[list] = None) -> bool:
+    """Envia un email no-bloqueante. Retorna True si exitoso, False si fallo (no lanza excepcion).
+
+    attachments: lista opcional de dicts {filename, content (bytes o base64 str)}.
+    """
     api_key, sender, _ = _get_config()
     if not api_key:
         logger.warning(f"RESEND_API_KEY no configurado. Email a {to} NO enviado.")
@@ -40,6 +43,19 @@ async def send_email(to: str, subject: str, html: str, *, tag: Optional[str] = N
         }
         if tag:
             params["tags"] = [{"name": "category", "value": tag}]
+        if attachments:
+            import base64
+            enc_atts = []
+            for att in attachments:
+                content = att.get("content")
+                if isinstance(content, (bytes, bytearray)):
+                    content = base64.b64encode(content).decode("ascii")
+                enc_atts.append({
+                    "filename": att["filename"],
+                    "content": content,
+                    **({"content_type": att["content_type"]} if att.get("content_type") else {}),
+                })
+            params["attachments"] = enc_atts
         result = await asyncio.to_thread(resend.Emails.send, params)
         logger.info(f"Email enviado: to={to} subject='{subject}' id={result.get('id') if isinstance(result, dict) else 'n/a'}")
         return True
@@ -100,6 +116,32 @@ def _button(text: str, href: str, color: str = BRAND_EMERALD) -> str:
     return f"""<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:24px 0;"><tr><td style="background-color:{color};border-radius:8px;">
         <a href="{href}" style="display:inline-block;padding:14px 28px;color:#FFFFFF;text-decoration:none;font-size:15px;font-weight:bold;font-family:Helvetica,Arial,sans-serif;">{text}</a>
     </td></tr></table>"""
+
+
+def render_quotation_email(patient_name: str, company_name: str, quotation_number: str, total_str: str, expiry_date: str, notes: Optional[str] = None) -> str:
+    """Email para enviar la cotizacion (con PDF adjunto) al paciente."""
+    notes_block = ""
+    if notes:
+        notes_block = f'<p style="color:#475569;font-size:14px;line-height:1.6;margin:16px 0 0 0;"><strong>Notas:</strong> {notes[:300]}</p>'
+    content = f"""
+      <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{patient_name}</strong>,</p>
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+        Adjuntamos la cotizacion <strong style="color:{BRAND_DARK};">{quotation_number}</strong> preparada especialmente para ti por <strong>{company_name}</strong>.
+      </p>
+      <div style="background-color:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:16px 20px;margin:20px 0;">
+        <p style="color:#065F46;font-size:13px;margin:0 0 4px 0;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">Resumen</p>
+        <p style="color:#0F172A;font-size:14px;margin:4px 0;"><strong>No. Cotizacion:</strong> {quotation_number}</p>
+        <p style="color:#0F172A;font-size:14px;margin:4px 0;"><strong>Total:</strong> {total_str}</p>
+        <p style="color:#0F172A;font-size:14px;margin:4px 0;"><strong>Vigencia hasta:</strong> {expiry_date}</p>
+      </div>
+      {notes_block}
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:24px 0 0 0;">
+        Encontraras el detalle completo en el archivo PDF adjunto.
+        Si tienes preguntas o deseas confirmar tu pedido, no dudes en contactarnos.
+      </p>
+      <p style="color:#475569;font-size:13px;line-height:1.6;margin:16px 0 0 0;color:{TEXT_MUTED};">Este correo fue enviado por {company_name} a traves de Cortexia Optical.</p>
+    """
+    return _wrapper(content, "Tu cotizacion esta lista")
 
 
 def render_password_reset(name: str, reset_link: str) -> str:

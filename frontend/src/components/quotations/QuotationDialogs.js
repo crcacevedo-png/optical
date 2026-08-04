@@ -10,11 +10,11 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { CheckCircle, XCircle, Download, ShoppingCart } from 'lucide-react';
+import { CheckCircle, XCircle, Download, ShoppingCart, Mail } from 'lucide-react';
 
 export function QuotationDetailDialog({
   open, onOpenChange, quotation, statusConfig,
-  onDownloadPdf, onStatusChange, onOpenConvert, formatCurrency,
+  onDownloadPdf, onStatusChange, onOpenConvert, onSendEmail, sendingEmail, formatCurrency,
 }) {
   if (!quotation) return null;
   const sc = statusConfig[quotation.status] || statusConfig.pendiente;
@@ -103,6 +103,17 @@ export function QuotationDetailDialog({
             <Button variant="outline" size="sm" onClick={() => onDownloadPdf(quotation._id)} data-testid="detail-download-pdf">
               <Download className="w-4 h-4 mr-2" /> Descargar PDF
             </Button>
+            {quotation.patient_email && onSendEmail && (
+              <Button
+                variant="outline" size="sm"
+                onClick={() => onSendEmail(quotation)}
+                disabled={sendingEmail}
+                data-testid="send-quotation-email-btn"
+              >
+                <Mail className="w-4 h-4 mr-2" />
+                {sendingEmail ? 'Enviando...' : `Enviar a ${quotation.patient_email}`}
+              </Button>
+            )}
             {quotation.status === 'pendiente' && (
               <>
                 <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => onStatusChange(quotation._id, 'aceptada')} data-testid="accept-quotation-btn">
