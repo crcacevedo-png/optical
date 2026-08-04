@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { api, formatApiErrorDetail } from '../context/AuthContext';
+import { api, formatApiErrorDetail, useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from '../components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import {
@@ -16,6 +20,8 @@ import { PaymentLinesEditor, paymentMethodLabel } from '../components/PaymentLin
 import { AddPaymentDialog } from '../components/AddPaymentDialog';
 
 export default function SalesPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [sales, setSales] = useState([]);
   const [patients, setPatients] = useState([]);
   const [products, setProducts] = useState([]);
@@ -25,6 +31,8 @@ export default function SalesPage() {
   const [showSaleDialog, setShowSaleDialog] = useState(false);
   const [detailSale, setDetailSale] = useState(null);
   const [paymentSale, setPaymentSale] = useState(null);
+  const [saleToDelete, setSaleToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [cart, setCart] = useState([]);
   const [saleForm, setSaleForm] = useState({
@@ -152,6 +160,22 @@ export default function SalesPage() {
 
   const formatCurrency = (amount) => {
     return `Q ${(amount || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`;
+  };
+
+  const handleDelete = async () => {
+    if (!saleToDelete) return;
+    try {
+      setDeleting(true);
+      const { data } = await api.delete(`/api/sales/${saleToDelete._id}`);
+      toast.success(`Venta eliminada. Stock restaurado: ${data.stock_restored} unidad(es).`);
+      setSaleToDelete(null);
+      setDetailSale(null);
+      fetchData();
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail));
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (loading) {
@@ -361,9 +385,23 @@ export default function SalesPage() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => setDetailSale(sale)} data-testid={`view-sale-${sale._id}`}>
-                      <Eye className="w-4 h-4 text-slate-500" />
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => setDetailSale(sale)} data-testid={`view-sale-${sale._id}`}>
+                        <Eye className="w-4 h-4 text-slate-500" />
+                      </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setSaleToDelete(sale)}
+                          className="text-slate-400 hover:text-red-500 hover:bg-red-50"
+                          data-testid={`delete-sale-${sale._id}`}
+                          title="Eliminar venta (solo administrador)"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -515,6 +553,18 @@ export default function SalesPage() {
                 </Button>
               )}
 
+              {isAdmin && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                  onClick={() => setSaleToDelete(detailSale)}
+                  data-testid="detail-delete-btn"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> Eliminar venta
+                </Button>
+              )}
+
               {detailSale.notes && (
                 <div className="text-sm">
                   <span className="text-slate-400">Notas:</span>
@@ -543,6 +593,47 @@ export default function SalesPage() {
           fetchData();
         }}
       />
+
+      {/* Delete confirmation (admin only) */}
+      <AlertDialog open={!!saleToDelete} onOpenChange={(o) => !o && setSaleToDelete(null)}>
+        <AlertDialogContent data-testid="delete-sale-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-600 flex items-center gap-2">
+              <Trash2 className="w-5 h-5" /> Eliminar venta
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-slate-600">
+                <p>Esta accion es <strong>irreversible</strong>. Al eliminar la venta:</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Se restaurara el stock de los productos vendidos.</li>
+                  <li>Se borraran los movimientos de inventario asociados.</li>
+                  <li>Se borraran las entradas de finanzas (venta y abonos).</li>
+                  <li>Se registrara el evento en el log de auditoria.</li>
+                </ul>
+                {saleToDelete && (
+                  <div className="mt-3 p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                    <p><span className="text-slate-500">Cliente:</span> <strong>{saleToDelete.patient_name || 'Consumidor final'}</strong></p>
+                    <p><span className="text-slate-500">Total:</span> <strong>{formatCurrency(saleToDelete.total)}</strong></p>
+                    <p><span className="text-slate-500">Pagado:</span> <strong>{formatCurrency(saleToDelete.amount_paid)}</strong></p>
+                    <p><span className="text-slate-500">Fecha:</span> <strong>{(saleToDelete.created_at || '').slice(0, 10)}</strong></p>
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting} data-testid="delete-cancel">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="delete-confirm"
+            >
+              {deleting ? 'Eliminando...' : 'Si, eliminar venta'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

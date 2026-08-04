@@ -47,6 +47,13 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Funnel de conversion Free->Basic->Enterprise con upgrades/downgrades
 - Alertas de limite, Cambios de plan recientes
 
+### Eliminacion de Ventas (Admin only, Feb 2026)
+- **`DELETE /api/sales/{id}`** solo permitido para `role == 'admin'`. Vendedores reciben 403.
+- Al eliminar: restaura stock (+quantity por item), borra `inventory_movements` (por `reference`), borra `finance_entries` de la venta y sus abonos (por `reference_id + reference_type IN [sale, sale_payment]`), y borra el documento de venta.
+- Registra evento `SALE_DELETED` en `audit_log` con metadata: total, pagado, patient_id, items_count, stock_restored, inv_movements_deleted, finance_entries_deleted.
+- **Frontend**: boton trash rojo en cada fila del historial + boton "Eliminar venta" en el modal de detalle. Solo visible cuando `user.role === 'admin'`.
+- **AlertDialog** de confirmacion explica los 4 efectos irreversibles y muestra card con datos de la venta antes de confirmar.
+
 ### Ventas Multi-Pago + Cuentas por Cobrar (Feb 2026)
 - **Sale.payments[]**: array con historial de pagos por venta `{method, amount, note, created_at, created_by}`.
 - **Nueva Venta** ahora permite N pagos con diferentes metodos (efectivo/tarjeta/transferencia/otro). Editor dinamico agregar/quitar filas + botones "Pagar total". Puede enviarse con saldo pendiente > 0.

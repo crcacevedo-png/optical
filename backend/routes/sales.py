@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from bson import ObjectId
 from datetime import datetime, timezone
 from typing import Optional
@@ -6,6 +6,7 @@ from typing import Optional
 from db import db, serialize_doc
 from auth_utils import get_current_user
 from models import SaleCreate
+from audit import log_audit
 
 router = APIRouter(prefix="/sales", tags=["Ventas"])
 
@@ -280,3 +281,81 @@ async def add_payment(
     })
 
     return {"message": "Pago registrado", "new_balance": max(0, new_balance), "status": status}
+
+
+@router.delete("/{sale_id}")
+async def delete_sale(sale_id: str, request: Request, user: dict = Depends(get_current_user)):
+    """Elimina una venta y revierte sus efectos.
+    Solo admin de la optica puede eliminar. Restaura stock, borra movimientos de
+    inventario y entradas de finanzas relacionadas. Registra evento en audit log.
+    """
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Solo el administrador puede eliminar ventas")
+
+    try:
+        oid = ObjectId(sale_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="sale_id invalido")
+
+    sale = await db.sales.find_one({"_id": oid})
+    if not sale or str(sale["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+    # ─── 1. Restaurar stock ───
+    stock_restored = 0
+    for item in sale.get("items", []) or []:
+        pid = item.get("product_id")
+        qty = int(item.get("quantity") or 0)
+        if not pid or qty <= 0:
+            continue
+        try:
+            pid_oid = ObjectId(pid) if not isinstance(pid, ObjectId) else pid
+        except Exception:
+            continue
+        stock_query = {"product_id": pid_oid, "company_id": sale["company_id"]}
+        if sale.get("branch_id"):
+            stock_query["branch_id"] = sale["branch_id"]
+        stock_record = await db.stock.find_one(stock_query)
+        if stock_record:
+            await db.stock.update_one(
+                {"_id": stock_record["_id"]},
+                {"$inc": {"quantity": qty}}
+            )
+            stock_restored += qty
+
+    # ─── 2. Borrar movimientos de inventario ligados a la venta ───
+    inv_del = await db.inventory_movements.delete_many({"reference": sale_id})
+
+    # ─── 3. Borrar entradas de finanzas ligadas (venta original + abonos) ───
+    fin_del = await db.finance_entries.delete_many({
+        "reference_id": oid,
+        "reference_type": {"$in": ["sale", "sale_payment"]}
+    })
+
+    # ─── 4. Eliminar la venta ───
+    await db.sales.delete_one({"_id": oid})
+
+    # ─── 5. Audit log ───
+    await log_audit(
+        "SALE_DELETED",
+        actor_id=user["_id"],
+        actor_email=user.get("email"),
+        metadata={
+            "sale_id": sale_id,
+            "total": sale.get("total"),
+            "amount_paid": sale.get("amount_paid"),
+            "patient_id": str(sale["patient_id"]) if sale.get("patient_id") else None,
+            "items_count": len(sale.get("items", []) or []),
+            "stock_restored": stock_restored,
+            "inv_movements_deleted": inv_del.deleted_count,
+            "finance_entries_deleted": fin_del.deleted_count,
+        },
+        request=request,
+    )
+
+    return {
+        "message": "Venta eliminada",
+        "stock_restored": stock_restored,
+        "inv_movements_deleted": inv_del.deleted_count,
+        "finance_entries_deleted": fin_del.deleted_count,
+    }
