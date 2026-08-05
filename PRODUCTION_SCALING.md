@@ -18,7 +18,18 @@ waitQueueTimeoutMS   = 3000
 retryWrites          = True
 ```
 
-Con esto un pod uvicorn maneja hasta ~200 conexiones concurrentes a Mongo sin agotar el pool. Para tunearlo sin redeploy de código, exportar cualquiera de las envs de arriba.
+**Object Storage compartido (`backend/object_storage.py`):**
+- Usa Emergent Object Storage via `INTEGRATION_PROXY_URL` + `EMERGENT_LLM_KEY`.
+- Migrado: `POST /api/settings/logo`, `GET /api/settings/logo`, `POST /api/companies/{id}/logo`, `GET /api/companies/{id}/logo`.
+- Path convention: `cortexia-optical/logos/{company_id}.{ext}`.
+- MongoDB campo `logo_storage_path` en `companies` = fuente de verdad para el path.
+- Fallback filesystem si `EMERGENT_LLM_KEY` no esta seteado (dev only).
+
+**Cache y Rate Limiter Redis-ready (`backend/cache.py`, `backend/rate_limiter.py`):**
+- Si `REDIS_URL` esta seteado → Redis compartido (multi-pod safe).
+- Si no → memoria in-process (dev/single-pod).
+- `plans_cache` y `companies_cache` migrados a la API async con namespacing.
+- `slowapi Limiter` usa `storage_uri=REDIS_URL` cuando esta disponible.
 
 ---
 

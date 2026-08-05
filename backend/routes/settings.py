@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from bson import ObjectId
 from pydantic import BaseModel
 from typing import List, Dict
@@ -7,6 +7,7 @@ from typing import List, Dict
 from db import db, serialize_doc, UPLOADS_DIR
 from auth_utils import get_current_user
 from models import CompanyUpdate
+import object_storage as objstore
 
 router = APIRouter(prefix="/settings", tags=["Configuracion"])
 
@@ -66,27 +67,53 @@ async def upload_my_company_logo(file: UploadFile = File(...), user: dict = Depe
     ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "png"
     if ext not in ("png", "jpg", "jpeg", "webp", "gif"):
         raise HTTPException(status_code=400, detail="Formato no soportado. Use PNG, JPG o WEBP")
+    content = await file.read()
     filename = f"{company_id}.{ext}"
-    filepath = UPLOADS_DIR / filename
-    with open(filepath, "wb") as f:
-        content = await file.read()
-        f.write(content)
-    await db.companies.update_one({"_id": ObjectId(company_id)}, {"$set": {"logo_filename": filename}})
+    if objstore.is_enabled():
+        # Object storage compartido (multi-pod safe)
+        path = objstore.build_logo_path(company_id, ext)
+        try:
+            objstore.put_object(path, content, objstore.content_type_for(ext))
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Fallo al subir logo: {e}") from e
+        await db.companies.update_one(
+            {"_id": ObjectId(company_id)},
+            {"$set": {"logo_filename": filename, "logo_storage_path": path}},
+        )
+    else:
+        # Fallback filesystem local (solo dev)
+        filepath = UPLOADS_DIR / filename
+        with open(filepath, "wb") as f:
+            f.write(content)
+        await db.companies.update_one(
+            {"_id": ObjectId(company_id)},
+            {"$set": {"logo_filename": filename, "logo_storage_path": None}},
+        )
     return {"message": "Logo actualizado", "logo_url": f"/api/companies/{company_id}/logo"}
 
 @router.get("/logo")
 async def get_my_company_logo(user: dict = Depends(get_current_user)):
     if user["role"] not in ["admin"]:
         raise HTTPException(status_code=403, detail="Acceso denegado")
-    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"logo_filename": 1})
+    company = await db.companies.find_one(
+        {"_id": ObjectId(user["company_id"])},
+        {"logo_filename": 1, "logo_storage_path": 1},
+    )
     if not company or not company.get("logo_filename"):
         raise HTTPException(status_code=404, detail="Sin logo")
+    ext = company["logo_filename"].rsplit(".", 1)[-1].lower()
+    media_type = objstore.content_type_for(ext) or "image/png"
+    if company.get("logo_storage_path") and objstore.is_enabled():
+        try:
+            data, ct = objstore.get_object(company["logo_storage_path"])
+            return Response(content=data, media_type=ct or media_type)
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=f"Logo no encontrado en storage: {e}") from e
+    # Legacy local
     filepath = UPLOADS_DIR / company["logo_filename"]
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
-    ext = company["logo_filename"].rsplit(".", 1)[-1].lower()
-    media_types = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}
-    return FileResponse(str(filepath), media_type=media_types.get(ext, "image/png"))
+    return FileResponse(str(filepath), media_type=media_type)
 
 
 # ═══════════════════════════════════════════════════════════════════

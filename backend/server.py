@@ -412,6 +412,28 @@ async def startup():
             )
         logger.info("Default plans seeded")
 
+    # ═══════════════════════════════════════════════════════════════════
+    # Object Storage init (multi-pod safe uploads)
+    # ═══════════════════════════════════════════════════════════════════
+    try:
+        import object_storage as _objstore
+        if _objstore.is_enabled():
+            _objstore.init_storage()
+            logger.info("Object storage initialized (Emergent)")
+        else:
+            logger.warning("Object storage disabled (EMERGENT_LLM_KEY missing) — using local filesystem")
+    except Exception as e:
+        logger.error(f"Object storage init error: {e}")
+
+    # ═══════════════════════════════════════════════════════════════════
+    # Cache backend init (Redis compartido si REDIS_URL disponible)
+    # ═══════════════════════════════════════════════════════════════════
+    try:
+        import cache as _cache
+        await _cache.init_cache()
+    except Exception as e:
+        logger.error(f"Cache init error: {e}")
+
 @app.on_event("shutdown")
 async def shutdown():
     client.close()
