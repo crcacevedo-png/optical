@@ -12,7 +12,24 @@ UPLOADS_DIR = ROOT_DIR / "uploads" / "logos"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
+
+# Pool tuneado para produccion multi-pod (soporta ~1000 usuarios concurrentes).
+# Env overrides opcionales para ajustar sin redeploy de codigo.
+_max_pool = int(os.environ.get('MONGO_MAX_POOL_SIZE', '200'))
+_min_pool = int(os.environ.get('MONGO_MIN_POOL_SIZE', '20'))
+_max_idle_ms = int(os.environ.get('MONGO_MAX_IDLE_MS', '60000'))
+_srv_sel_ms = int(os.environ.get('MONGO_SERVER_SELECTION_MS', '5000'))
+_wait_queue_ms = int(os.environ.get('MONGO_WAIT_QUEUE_MS', '3000'))
+
+client = AsyncIOMotorClient(
+    mongo_url,
+    maxPoolSize=_max_pool,
+    minPoolSize=_min_pool,
+    maxIdleTimeMS=_max_idle_ms,
+    serverSelectionTimeoutMS=_srv_sel_ms,
+    waitQueueTimeoutMS=_wait_queue_ms,
+    retryWrites=True,
+)
 db = client[os.environ['DB_NAME']]
 
 def serialize_doc(doc):
