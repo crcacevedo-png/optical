@@ -199,12 +199,17 @@ async def list_eyeglass_prescriptions(user: dict = Depends(get_current_user), pa
         serialize_doc(rx)
     patient_ids = list({ObjectId(rx["patient_id"]) for rx in prescriptions if rx.get("patient_id")})
     if patient_ids:
-        patients = await db.patients.find({"_id": {"$in": patient_ids}}, {"first_name": 1, "last_name": 1}).to_list(len(patient_ids))
+        patients = await db.patients.find(
+            {"_id": {"$in": patient_ids}},
+            {"first_name": 1, "last_name": 1, "phone": 1, "whatsapp": 1},
+        ).to_list(len(patient_ids))
         patient_map = {str(p["_id"]): p for p in patients}
         for rx in prescriptions:
             p = patient_map.get(rx.get("patient_id"))
             if p:
-                rx["patient_name"] = f"{p['first_name']} {p['last_name']}"
+                rx["patient_name"] = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
+                rx["patient_phone"] = p.get("phone", "")
+                rx["patient_whatsapp"] = p.get("whatsapp", "")
     return prescriptions
 
 @router.post("/eyeglass")
@@ -303,12 +308,17 @@ async def list_contact_lens_prescriptions(user: dict = Depends(get_current_user)
         serialize_doc(rx)
     patient_ids = list({ObjectId(rx["patient_id"]) for rx in prescriptions if rx.get("patient_id")})
     if patient_ids:
-        patients = await db.patients.find({"_id": {"$in": patient_ids}}, {"first_name": 1, "last_name": 1}).to_list(len(patient_ids))
+        patients = await db.patients.find(
+            {"_id": {"$in": patient_ids}},
+            {"first_name": 1, "last_name": 1, "phone": 1, "whatsapp": 1},
+        ).to_list(len(patient_ids))
         patient_map = {str(p["_id"]): p for p in patients}
         for rx in prescriptions:
             p = patient_map.get(rx.get("patient_id"))
             if p:
-                rx["patient_name"] = f"{p['first_name']} {p['last_name']}"
+                rx["patient_name"] = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
+                rx["patient_phone"] = p.get("phone", "")
+                rx["patient_whatsapp"] = p.get("whatsapp", "")
     return prescriptions
 
 @router.post("/contact")
@@ -412,12 +422,17 @@ async def list_medical_prescriptions(user: dict = Depends(get_current_user), pat
         serialize_doc(rx)
     patient_ids = list({ObjectId(rx["patient_id"]) for rx in prescriptions if rx.get("patient_id")})
     if patient_ids:
-        patients = await db.patients.find({"_id": {"$in": patient_ids}}, {"first_name": 1, "last_name": 1}).to_list(len(patient_ids))
+        patients = await db.patients.find(
+            {"_id": {"$in": patient_ids}},
+            {"first_name": 1, "last_name": 1, "phone": 1, "whatsapp": 1},
+        ).to_list(len(patient_ids))
         patient_map = {str(p["_id"]): p for p in patients}
         for rx in prescriptions:
             p = patient_map.get(rx.get("patient_id"))
             if p:
-                rx["patient_name"] = f"{p['first_name']} {p['last_name']}"
+                rx["patient_name"] = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
+                rx["patient_phone"] = p.get("phone", "")
+                rx["patient_whatsapp"] = p.get("whatsapp", "")
     return prescriptions
 
 @router.post("/medical")

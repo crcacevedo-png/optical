@@ -9,8 +9,54 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from '../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Plus, Eye, Pill, Download, Trash2, CircleDot } from 'lucide-react';
+import { Plus, Eye, Pill, Download, Trash2, CircleDot, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Nombre corto empresa para el mensaje
+const OPTICA_NAME = 'Cortexia Optical';
+
+const fmtEye = (sph, cyl, axis) => {
+  const s = (v) => (v === '' || v == null ? '-' : v);
+  return `Esf ${s(sph)} · Cil ${s(cyl)} · Eje ${s(axis)}`;
+};
+
+const buildWhatsAppMessage = (type, rx) => {
+  const name = rx.patient_name || 'Estimado(a) paciente';
+  const date = (rx.created_at || '').slice(0, 10);
+  if (type === 'eyeglass') {
+    const od = fmtEye(rx.od_sphere, rx.od_cylinder, rx.od_axis);
+    const oi = fmtEye(rx.oi_sphere, rx.oi_cylinder, rx.oi_axis);
+    const add = rx.od_addition || rx.oi_addition ? `\n  ADD OD: ${rx.od_addition || '-'} · OI: ${rx.oi_addition || '-'}` : '';
+    const lens = rx.lens_type ? `\nTipo de lente: ${rx.lens_type}` : '';
+    return `Hola ${name}, adjunto tu receta de anteojos del ${date}:\n\n  OD (derecho): ${od}\n  OI (izquierdo): ${oi}${add}${lens}\n\nGracias por confiar en ${OPTICA_NAME}.`;
+  }
+  if (type === 'contact') {
+    const od = `Poder ${rx.od_power ?? '-'} · BC ${rx.od_bc ?? '-'} · DIA ${rx.od_dia ?? '-'}`;
+    const oi = `Poder ${rx.oi_power ?? '-'} · BC ${rx.oi_bc ?? '-'} · DIA ${rx.oi_dia ?? '-'}`;
+    const brand = rx.brand ? `\nMarca: ${rx.brand}` : '';
+    const repl = rx.replacement ? `\nReemplazo: ${rx.replacement}` : '';
+    return `Hola ${name}, adjunto tu receta de lentes de contacto del ${date}:\n\n  OD: ${od}\n  OI: ${oi}${brand}${repl}\n\nGracias por confiar en ${OPTICA_NAME}.`;
+  }
+  if (type === 'medical') {
+    const meds = (rx.medications || [])
+      .map((m, i) => `  ${i + 1}. ${m.name || ''} - ${m.dosage || ''}${m.duration ? ` (${m.duration})` : ''}`)
+      .join('\n');
+    const dx = rx.diagnosis ? `\nDiagnostico: ${rx.diagnosis}` : '';
+    const inst = rx.instructions ? `\nIndicaciones: ${rx.instructions}` : '';
+    return `Hola ${name}, adjunto tu receta medica del ${date}:${dx}\n\nMedicamentos:\n${meds || '  (sin medicamentos)'}${inst}\n\nGracias por confiar en ${OPTICA_NAME}.`;
+  }
+  return `Hola ${name}, adjunto tu receta del ${date}.`;
+};
+
+const openWhatsAppFor = (type, rx) => {
+  const raw = (rx.patient_whatsapp || rx.patient_phone || '').replace(/\D/g, '');
+  if (!raw) {
+    toast.error('Este paciente no tiene telefono ni WhatsApp registrado');
+    return;
+  }
+  const msg = buildWhatsAppMessage(type, rx);
+  window.open(`https://wa.me/${raw}?text=${encodeURIComponent(msg)}`, '_blank');
+};
 
 export default function PrescriptionsPage() {
   const [eyeglassPrescriptions, setEyeglassPrescriptions] = useState([]);
@@ -345,8 +391,11 @@ export default function PrescriptionsPage() {
                       <TableCell className="text-sm">{rx.od_sphere || '-'} / {rx.od_cylinder || '-'} x {rx.od_axis || '-'}</TableCell>
                       <TableCell className="text-sm">{rx.oi_sphere || '-'} / {rx.oi_cylinder || '-'} x {rx.oi_axis || '-'}</TableCell>
                       <TableCell>{rx.lens_type || '-'}</TableCell>
-                      <TableCell className="text-right">
-                        <Button size="sm" variant="outline" onClick={() => downloadPdf('eyeglass', rx._id)}><Download className="w-4 h-4 mr-1" /> PDF</Button>
+                      <TableCell className="text-right space-x-1">
+                        <Button size="sm" variant="outline" onClick={() => openWhatsAppFor('eyeglass', rx)} className="border-green-300 text-green-700 hover:bg-green-50" data-testid={`send-rx-eyeglass-wa-${rx._id}`}>
+                          <MessageCircle className="w-4 h-4 mr-1" /> WhatsApp
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => downloadPdf('eyeglass', rx._id)} data-testid={`download-rx-eyeglass-${rx._id}`}><Download className="w-4 h-4 mr-1" /> PDF</Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -522,8 +571,11 @@ export default function PrescriptionsPage() {
                       <TableCell className="text-sm">{rx.oi_power || '-'} / {rx.oi_cylinder || '-'} x {rx.oi_axis || '-'}</TableCell>
                       <TableCell>{rx.brand || '-'}</TableCell>
                       <TableCell>{rx.replacement || '-'}</TableCell>
-                      <TableCell className="text-right">
-                        <Button size="sm" variant="outline" onClick={() => downloadPdf('contact', rx._id)}><Download className="w-4 h-4 mr-1" /> PDF</Button>
+                      <TableCell className="text-right space-x-1">
+                        <Button size="sm" variant="outline" onClick={() => openWhatsAppFor('contact', rx)} className="border-green-300 text-green-700 hover:bg-green-50" data-testid={`send-rx-contact-wa-${rx._id}`}>
+                          <MessageCircle className="w-4 h-4 mr-1" /> WhatsApp
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => downloadPdf('contact', rx._id)} data-testid={`download-rx-contact-${rx._id}`}><Download className="w-4 h-4 mr-1" /> PDF</Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -617,8 +669,11 @@ export default function PrescriptionsPage() {
                       <TableCell className="font-medium">{rx.patient_name || 'Paciente'}</TableCell>
                       <TableCell className="max-w-[200px] truncate">{rx.diagnosis || '-'}</TableCell>
                       <TableCell>{rx.medications?.length || 0} medicamento(s)</TableCell>
-                      <TableCell className="text-right">
-                        <Button size="sm" variant="outline" onClick={() => downloadPdf('medical', rx._id)}><Download className="w-4 h-4 mr-1" /> PDF</Button>
+                      <TableCell className="text-right space-x-1">
+                        <Button size="sm" variant="outline" onClick={() => openWhatsAppFor('medical', rx)} className="border-green-300 text-green-700 hover:bg-green-50" data-testid={`send-rx-medical-wa-${rx._id}`}>
+                          <MessageCircle className="w-4 h-4 mr-1" /> WhatsApp
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => downloadPdf('medical', rx._id)} data-testid={`download-rx-medical-${rx._id}`}><Download className="w-4 h-4 mr-1" /> PDF</Button>
                       </TableCell>
                     </TableRow>
                   ))}
