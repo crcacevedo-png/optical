@@ -18,7 +18,7 @@ from routes import (
     prescriptions, inventory, sales, quotations, consultations,
     finance, reports, users, suppliers, plans, superadmin, announcements,
     notifications, security, data_export, audit_log, onboarding, health_metrics,
-    cash_register
+    cash_register, support_tickets
 )
 
 app = FastAPI(title="Cortexia Optical API")
@@ -56,6 +56,7 @@ api_router.include_router(audit_log.router)
 api_router.include_router(onboarding.router)
 api_router.include_router(health_metrics.router)
 api_router.include_router(cash_register.router)
+api_router.include_router(support_tickets.router)
 
 # Global search
 @api_router.get("/search")
@@ -257,6 +258,11 @@ async def startup():
     # --- Cash registers ---
     await db.cash_registers.create_index([("company_id", 1), ("branch_id", 1), ("status", 1)])
     await db.cash_registers.create_index([("company_id", 1), ("opened_at", -1)])
+
+    # --- Support tickets ---
+    await db.support_tickets.create_index([("created_by", 1), ("_id", -1)])
+    await db.support_tickets.create_index([("status", 1), ("_id", -1)])
+    await db.support_tickets.create_index([("company_id", 1), ("_id", -1)])
 
     logger.info("MongoDB indexes verified/created OK")
     

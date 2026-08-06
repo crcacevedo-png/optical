@@ -22,6 +22,7 @@ const MODULE_META = {
   suppliers: { label: 'Proveedores', hint: 'Gestion de proveedores', planKey: 'proveedores' },
   finance: { label: 'Finanzas', hint: 'Ingresos y gastos', planKey: 'finanzas' },
   reports: { label: 'Reportes', hint: 'Reportes generales' },
+  support: { label: 'Soporte', hint: 'Crear tickets al equipo Cortexia' },
 };
 
 const ROLES = [

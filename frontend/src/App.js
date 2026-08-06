@@ -28,6 +28,7 @@ import OnboardingPage from './pages/OnboardingPage';
 import HealthMetricsPage from './pages/HealthMetricsPage';
 import ReceivablesPage from './pages/ReceivablesPage';
 import CashRegisterPage from './pages/CashRegisterPage';
+import SupportTicketsPage from './pages/SupportTicketsPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import './App.css';
@@ -72,6 +73,8 @@ function App() {
             <Route path="reports" element={<ReportsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="suppliers" element={<SuppliersPage />} />
+            <Route path="support" element={<SupportTicketsPage />} />
+            <Route path="admin/soporte" element={<SupportTicketsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

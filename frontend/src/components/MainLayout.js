@@ -9,7 +9,7 @@ import { ScrollArea } from '../components/ui/scroll-area';
 import { 
   LayoutDashboard, Users, Calendar, FileText, Package, 
   ShoppingCart, DollarSign, Building2, UserCog, BarChart3,
-  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone, Key, ShieldAlert, Rocket, Activity, HandCoins
+  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone, Key, ShieldAlert, Rocket, Activity, HandCoins, LifeBuoy
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -48,6 +48,7 @@ export default function MainLayout() {
     { path: '/admin/opticas', icon: Store, label: 'Opticas' },
     { path: '/admin/planes', icon: CreditCard, label: 'Planes' },
     { path: '/admin/comunicacion', icon: Megaphone, label: 'Comunicacion' },
+    { path: '/admin/soporte', icon: LifeBuoy, label: 'Soporte' },
     { path: '/admin/audit', icon: ShieldAlert, label: 'Auditoria' },
     { path: '/admin/health', icon: Activity, label: 'Salud Sistema' },
     { path: '/users', icon: UserCog, label: 'Usuarios' },
@@ -71,7 +72,9 @@ export default function MainLayout() {
       { path: '/onboarding', icon: Rocket, label: 'Inicio rapido' },
       { path: '/settings', icon: Settings, label: 'Configuracion' },
     ] : []),
-  ].filter(item => !item.key || canAccess(item.key));
+    // Soporte visible para TODOS los roles no-superadmin (bypass allowed_menu_items)
+    { path: '/support', icon: LifeBuoy, label: 'Soporte', key: 'support', alwaysShow: true },
+  ].filter(item => item.alwaysShow || !item.key || canAccess(item.key));
 
   const NavLink = ({ item, mobile = false }) => {
     const isActive = location.pathname === item.path;

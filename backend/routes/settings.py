@@ -17,7 +17,7 @@ router = APIRouter(prefix="/settings", tags=["Configuracion"])
 AVAILABLE_MENU_ITEMS = [
     "dashboard", "patients", "consultations", "agenda", "prescriptions",
     "quotations", "inventory", "sales", "cash-register", "receivables",
-    "suppliers", "finance", "reports",
+    "suppliers", "finance", "reports", "support",
 ]
 DEFAULT_USER_PERMISSIONS = AVAILABLE_MENU_ITEMS.copy()
 
