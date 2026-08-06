@@ -7,6 +7,7 @@ from db import db, serialize_doc
 from auth_utils import get_current_user
 from models import SaleCreate
 from audit import log_audit
+from cache import invalidate_inventory
 
 router = APIRouter(prefix="/sales", tags=["Ventas"])
 
@@ -148,6 +149,7 @@ async def create_sale(data: SaleCreate, user: dict = Depends(get_current_user)):
             "created_by": ObjectId(user["_id"])
         })
 
+    await invalidate_inventory(user["company_id"], str(branch_id) if branch_id else None)
     return {"_id": str(result.inserted_id), "message": "Venta registrada", "balance": max(0, balance)}
 
 @router.get("/receivables")
@@ -352,6 +354,9 @@ async def delete_sale(sale_id: str, request: Request, user: dict = Depends(get_c
         },
         request=request,
     )
+
+    branch_str = str(sale.get("branch_id")) if sale.get("branch_id") else None
+    await invalidate_inventory(str(sale["company_id"]), branch_str)
 
     return {
         "message": "Venta eliminada",

@@ -1,0 +1,33 @@
+{
+  "summary": "Validadas ambas optimizaciones de performance: (1) refactor list_quotations con batch $in y bulk update de vencidas mantiene contrato de API con campos enriquecidos (patient_name/phone/email/whatsapp + creator_name); (2) cache Redis TTL 60s en /api/inventory/products y /api/inventory/stock funciona con invalidacion correcta tras create_product, inventory_movement y create_sale. Filtros (category, search) no se cachean. Redis conectado confirmado en logs. 13/13 tests pasan.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_perf_optimizations.py",
+    "/app/test_reports/pytest/perf_opt.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "cache.py invalidate_inventory: siempre invalida key 'all' + branch. Bien. Nota: si un admin sin branch_id crea un producto sin data.branch_id, solo se invalida 'all'; los caches por-sucursal de vendedores NO se invalidan. Actualmente todos los caches por-sucursal quedan servidos con datos antiguos hasta TTL (60s) o proximo movimiento con branch_id. Aceptable dado TTL corto, pero documentar.",
+    "inventory.py list_products cache_key omite branch cuando no hay filtros; correcto. get_stock si cachea siempre incluso con branch_id query param — pero branch_id explicito en query se usa como parte de cache_key (effective_branch). OK.",
+    "quotations.py list_quotations bulk update de vencidas es idempotente y correcto. Los items del set patient_ids/creator_ids son ObjectId; find con $in funciona.",
+    "cache.py stats() sync path solo cuenta hits/misses de memoria; con Redis backend las metricas aget/aset tambien incrementan _hits/_misses aunque size sea 0 (esperado)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_perf_optimizations.py (nuevo)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "N/A"},
+  "test_credentials": "admin@cortexia.gt / Demo123!  |  vendedor@cortexia.gt / Demo123!",
+  "seed_data_creation": "Los tests crean productos TEST_perf_product_*, TEST_mov_product_*, TEST_sale_product_*, una cotizacion TEST y una venta TEST_consumer. No se eliminan al final; deben limpiarse si contaminan otras suites.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Auth es via cookie httpOnly (session en requests.Session). No hay 'token' en response JSON de /api/auth/login. GET /api/patients devuelve dict {patients, total, limit, skip} — no lista. GET /api/inventory/products y /api/inventory/stock retornan listas cacheadas 60s en Redis con invalidacion consistente.",
+  "rca of the issue": "N/A — todas las funcionalidades validadas correctamente. Regresion (login, patients, sales, quotations filter) OK. Cache invalidation en <1s tras mutacion (verificado en asserts inmediatos sin sleep)."
+}

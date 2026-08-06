@@ -62,37 +62,75 @@ async def list_quotations(
 ):
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
-    
+
     query = {"company_id": ObjectId(user["company_id"])}
     if status and status != "todas":
         query["status"] = status
     if patient_id:
         query["patient_id"] = ObjectId(patient_id)
-    
+
     quotations = await db.quotations.find(query).sort("created_at", -1).limit(limit).to_list(limit)
+    if not quotations:
+        return []
+
+    # Batch fetch de pacientes y creadores (elimina N+1)
+    patient_ids = {q["patient_id"] for q in quotations if q.get("patient_id")}
+    creator_ids = {q["created_by"] for q in quotations if q.get("created_by")}
+
+    patients_map = {}
+    if patient_ids:
+        docs = await db.patients.find(
+            {"_id": {"$in": list(patient_ids)}},
+            {"first_name": 1, "last_name": 1, "phone": 1, "email": 1, "whatsapp": 1},
+        ).to_list(len(patient_ids))
+        patients_map = {str(p["_id"]): p for p in docs}
+
+    creators_map = {}
+    if creator_ids:
+        docs = await db.users.find(
+            {"_id": {"$in": list(creator_ids)}},
+            {"name": 1},
+        ).to_list(len(creator_ids))
+        creators_map = {str(u["_id"]): u.get("name", "") for u in docs}
+
+    # Detectar cotizaciones vencidas y hacer un solo bulk_write al final
+    now_dt = datetime.now(timezone.utc)
+    expired_ids = []
+
     for q in quotations:
         serialize_doc(q)
-        # Serializar ObjectIds dentro de emails_sent
         for e in q.get("emails_sent", []) or []:
             if isinstance(e.get("sent_by"), ObjectId):
                 e["sent_by"] = str(e["sent_by"])
-        if q.get("patient_id"):
-            patient = await db.patients.find_one({"_id": ObjectId(q["patient_id"])}, {"first_name": 1, "last_name": 1, "phone": 1, "email": 1, "whatsapp": 1})
-            if patient:
-                q["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
-                q["patient_phone"] = patient.get("phone", "")
-                q["patient_email"] = patient.get("email", "")
-                q["patient_whatsapp"] = patient.get("whatsapp", "")
-        if q.get("created_by"):
-            creator = await db.users.find_one({"_id": ObjectId(q["created_by"])}, {"name": 1})
-            if creator:
-                q["creator_name"] = creator["name"]
+        pid = q.get("patient_id")
+        if pid:
+            p = patients_map.get(pid)
+            if p:
+                q["patient_name"] = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
+                q["patient_phone"] = p.get("phone", "")
+                q["patient_email"] = p.get("email", "")
+                q["patient_whatsapp"] = p.get("whatsapp", "")
+        cid = q.get("created_by")
+        if cid:
+            q["creator_name"] = creators_map.get(cid, "")
         if q["status"] == "pendiente":
-            created = datetime.fromisoformat(q["created_at"].replace("Z", "+00:00")) if isinstance(q["created_at"], str) else q["created_at"]
-            expiry = created + timedelta(days=q.get("validity_days", 15))
-            if datetime.now(timezone.utc) > expiry:
-                q["status"] = "vencida"
-                await db.quotations.update_one({"_id": ObjectId(q["_id"])}, {"$set": {"status": "vencida"}})
+            created_str = q["created_at"]
+            try:
+                created = datetime.fromisoformat(created_str.replace("Z", "+00:00")) if isinstance(created_str, str) else created_str
+                expiry = created + timedelta(days=q.get("validity_days", 15))
+                if now_dt > expiry:
+                    q["status"] = "vencida"
+                    expired_ids.append(ObjectId(q["_id"]))
+            except (ValueError, TypeError):
+                pass
+
+    # Un solo update masivo para las vencidas
+    if expired_ids:
+        await db.quotations.update_many(
+            {"_id": {"$in": expired_ids}},
+            {"$set": {"status": "vencida"}},
+        )
+
     return quotations
 
 @router.post("")

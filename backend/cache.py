@@ -167,3 +167,15 @@ def is_redis_backed() -> bool:
 # Instancias globales
 plans_cache = TTLCache(default_ttl=300, namespace="plans")
 companies_cache = TTLCache(default_ttl=120, namespace="companies")
+inventory_cache = TTLCache(default_ttl=60, namespace="inventory")
+
+
+async def invalidate_inventory(company_id: str, branch_id: str = None) -> None:
+    """Invalida cache de productos/stock para una empresa (opcional sucursal).
+    Se llama tras crear/editar producto, movimiento de inventario o venta."""
+    # products: la key es "products:{cid}:{branch_or_all}"
+    await inventory_cache.ainvalidate(f"products:{company_id}:all")
+    await inventory_cache.ainvalidate(f"stock:{company_id}:all")
+    if branch_id:
+        await inventory_cache.ainvalidate(f"products:{company_id}:{branch_id}")
+        await inventory_cache.ainvalidate(f"stock:{company_id}:{branch_id}")
