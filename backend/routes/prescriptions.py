@@ -205,11 +205,10 @@ async def list_eyeglass_prescriptions(user: dict = Depends(get_current_user), pa
         ).to_list(len(patient_ids))
         patient_map = {str(p["_id"]): p for p in patients}
         for rx in prescriptions:
-            p = patient_map.get(rx.get("patient_id"))
-            if p:
-                rx["patient_name"] = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
-                rx["patient_phone"] = p.get("phone", "")
-                rx["patient_whatsapp"] = p.get("whatsapp", "")
+            p = patient_map.get(rx.get("patient_id")) or {}
+            rx["patient_name"] = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
+            rx["patient_phone"] = p.get("phone", "") or ""
+            rx["patient_whatsapp"] = p.get("whatsapp", "") or ""
     return prescriptions
 
 @router.post("/eyeglass")
@@ -314,11 +313,10 @@ async def list_contact_lens_prescriptions(user: dict = Depends(get_current_user)
         ).to_list(len(patient_ids))
         patient_map = {str(p["_id"]): p for p in patients}
         for rx in prescriptions:
-            p = patient_map.get(rx.get("patient_id"))
-            if p:
-                rx["patient_name"] = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
-                rx["patient_phone"] = p.get("phone", "")
-                rx["patient_whatsapp"] = p.get("whatsapp", "")
+            p = patient_map.get(rx.get("patient_id")) or {}
+            rx["patient_name"] = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
+            rx["patient_phone"] = p.get("phone", "") or ""
+            rx["patient_whatsapp"] = p.get("whatsapp", "") or ""
     return prescriptions
 
 @router.post("/contact")
@@ -428,11 +426,10 @@ async def list_medical_prescriptions(user: dict = Depends(get_current_user), pat
         ).to_list(len(patient_ids))
         patient_map = {str(p["_id"]): p for p in patients}
         for rx in prescriptions:
-            p = patient_map.get(rx.get("patient_id"))
-            if p:
-                rx["patient_name"] = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
-                rx["patient_phone"] = p.get("phone", "")
-                rx["patient_whatsapp"] = p.get("whatsapp", "")
+            p = patient_map.get(rx.get("patient_id")) or {}
+            rx["patient_name"] = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
+            rx["patient_phone"] = p.get("phone", "") or ""
+            rx["patient_whatsapp"] = p.get("whatsapp", "") or ""
     return prescriptions
 
 @router.post("/medical")

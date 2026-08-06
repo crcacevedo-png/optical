@@ -83,6 +83,14 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Fix aplicado por testing agent: `_serialize_ticket` ahora serializa `attachments[].uploaded_by_id` (evita 500 en list/detail).
 - Verificado E2E: 50/50 tests (30 previos + 20 nuevos) — 0 issues.
 
+### WhatsApp para Recetas (Feb 2026)
+- Backend: `list_eyeglass_prescriptions`, `list_contact_lens_prescriptions`, `list_medical_prescriptions` ahora hacen batch `$in` de pacientes con projection `{first_name, last_name, phone, whatsapp}` y enriquecen cada rx con `patient_name`, `patient_phone`, `patient_whatsapp` (siempre presentes, incluso si el paciente fue eliminado = orphan rx).
+- Frontend `PrescriptionsPage.js`:
+  - Handler `openWhatsAppFor(type, rx)` que arma mensaje distinto por tipo con resumen de la receta (grados, medicamentos, diagnostico) y firma "Gracias por confiar en Cortexia Optical".
+  - Boton verde "WhatsApp" en cada fila de las 3 tablas junto a "PDF". Abre `https://wa.me/{numero}?text=...` en pestana nueva.
+  - Muestra toast si el paciente no tiene telefono ni WhatsApp registrado.
+- Verificado: testing agent 15/15 tests OK. Fix menor aplicado post-report: campos `patient_*` ahora siempre presentes en la respuesta (recetas huerfanas OK).
+
 ### Bugfix Caja: admin sin branch_id (Feb 2026)
 - **Problema en produccion**: usuarios admin no podian abrir caja. Backend respondia 400 `"El usuario no tiene sucursal asignada. Especifica una."` porque los admins normalmente no tienen `branch_id` asignado (ven todas las sucursales).
 - **Fix en `_get_branch_id_or_400` (`routes/cash_register.py`)**: si no hay override ni `user.branch_id`, se busca automaticamente:
