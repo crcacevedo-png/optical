@@ -51,6 +51,21 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
   - Batch fetch de patients y sellers (N+1 fix).
 - Verificado: 15/15 tests (testing agent). Suite en `/app/backend/tests/test_dashboard_cache_and_sales_cursor.py`.
 
+### Sistema de Tickets de Soporte (Feb 2026)
+- Cualquier usuario autenticado (admin, user "atencion al cliente", doctor) puede crear tickets que llegan al SuperAdmin.
+- Backend `/app/backend/routes/support_tickets.py`:
+  - `POST /api/support-tickets` con subject, message, category (bug|consulta|mejora|facturacion|otro), priority (baja|media|alta).
+  - `GET /api/support-tickets` — vendedor/admin ven solo los suyos; SuperAdmin ve TODOS con `company_name`. Filtros por status/priority/category.
+  - `GET /api/support-tickets/{id}` — devuelve el hilo completo. 403 para no-owner no-super.
+  - `POST /api/support-tickets/{id}/reply` — creador y SuperAdmin agregan mensajes. Al responder SuperAdmin a ticket `abierto`, pasa a `en_progreso`.
+  - `PATCH /api/support-tickets/{id}/status` — SuperAdmin cambia cualquiera; creador solo puede cerrar.
+  - `GET /api/support-tickets/stats/summary` — contadores por estado.
+- Notification push al SuperAdmin en creacion (event_type `SUPPORT_TICKET_CREATED`).
+- 3 indexes: `created_by+_id`, `status+_id`, `company_id+_id`.
+- Frontend: nueva pagina `SupportTicketsPage.js` accesible en `/support` para usuarios y `/admin/soporte` para SuperAdmin. Menu "Soporte" siempre visible (bypass allowed_menu_items).
+- 4 stat cards por estado, filtro rapido por click en cards, dialogo de creacion con validaciones, hilo de conversacion tipo chat, badges de estado/prioridad/categoria/optica.
+- Verificado E2E: 30/30 tests (testing agent) — 0 issues.
+
 ### Reporte de Cierres de Caja (Feb 2026)
 - Nuevos endpoints backend:
   - `GET /api/cash-register/report` — agrega cierres cerrados en rango `date_from/date_to` (opcional filtro por sucursal), con totales por metodo (cash, transfer, card, check, other), grand totals, cuentas por cobrar acumuladas y diferencia de efectivo consolidada.
