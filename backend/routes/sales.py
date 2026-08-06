@@ -24,32 +24,75 @@ async def list_sales(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     branch_id: Optional[str] = None,
-    limit: int = 100
+    limit: int = 100,
+    cursor: Optional[str] = None,
+    include_cursor: bool = False,
 ):
+    """Lista ventas con cursor pagination opcional.
+
+    - Sin `cursor` ni `include_cursor=true`: devuelve una lista plana (retro-compat).
+    - Con `cursor` (id de la ultima venta) o `include_cursor=true`: devuelve
+      {items, next_cursor, has_more}. El cursor apunta al `_id` de la ultima venta
+      recibida; internamente ordenamos por `_id desc` (equivalente cronologico).
+    """
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
-    
+
     query = {"company_id": ObjectId(user["company_id"])}
     if branch_id:
         query["branch_id"] = ObjectId(branch_id)
     elif user.get("branch_id"):
         query["branch_id"] = ObjectId(user["branch_id"])
-    
+
     if date_from and date_to:
         query["created_at"] = {"$gte": date_from, "$lte": date_to + "T23:59:59"}
-    
-    sales = await db.sales.find(query).sort("created_at", -1).limit(limit).to_list(limit)
+
+    # Cursor: _id < cursor (ObjectId es cronologico y unico → mejor que skip/limit)
+    if cursor:
+        try:
+            query["_id"] = {"$lt": ObjectId(cursor)}
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="cursor invalido") from exc
+
+    # Pedimos limit+1 para saber si hay mas paginas
+    fetch_n = max(1, min(limit, 500)) + 1
+    docs = await db.sales.find(query).sort("_id", -1).limit(fetch_n).to_list(fetch_n)
+    has_more = len(docs) > limit
+    sales = docs[:limit]
+
+    # Batch fetch de pacientes y vendedores (elimina N+1)
+    patient_ids = {s["patient_id"] for s in sales if s.get("patient_id")}
+    seller_ids = {s["created_by"] for s in sales if s.get("created_by")}
+
+    patients_map = {}
+    if patient_ids:
+        patients = await db.patients.find(
+            {"_id": {"$in": list(patient_ids)}},
+            {"first_name": 1, "last_name": 1},
+        ).to_list(len(patient_ids))
+        patients_map = {str(p["_id"]): f"{p.get('first_name','')} {p.get('last_name','')}".strip() for p in patients}
+
+    sellers_map = {}
+    if seller_ids:
+        sellers = await db.users.find(
+            {"_id": {"$in": list(seller_ids)}},
+            {"name": 1},
+        ).to_list(len(seller_ids))
+        sellers_map = {str(u["_id"]): u.get("name", "") for u in sellers}
+
     for s in sales:
         serialize_doc(s)
         _serialize_payments(s)
-        if s.get("patient_id"):
-            patient = await db.patients.find_one({"_id": ObjectId(s["patient_id"])}, {"first_name": 1, "last_name": 1})
-            if patient:
-                s["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
-        if s.get("created_by"):
-            seller = await db.users.find_one({"_id": ObjectId(s["created_by"])}, {"name": 1})
-            if seller:
-                s["seller_name"] = seller["name"]
+        pid = s.get("patient_id")
+        if pid:
+            s["patient_name"] = patients_map.get(pid, "")
+        cid = s.get("created_by")
+        if cid:
+            s["seller_name"] = sellers_map.get(cid, "")
+
+    if cursor or include_cursor:
+        next_cursor = sales[-1]["_id"] if sales and has_more else None
+        return {"items": sales, "next_cursor": next_cursor, "has_more": has_more}
     return sales
 
 @router.post("")

@@ -9,80 +9,120 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 from db import db, serialize_doc
 from auth_utils import get_current_user
+from cache import TTLCache
 
 router = APIRouter(prefix="/reports", tags=["Reportes"])
 
-async def get_stock_alerts_count(company_id, branch_id=None):
+# Cache 30s del dashboard, namespaced por empresa+sucursal
+dashboard_cache = TTLCache(default_ttl=30, namespace="dashboard")
+
+
+async def _get_stock_alerts_count(company_id, branch_id=None):
     query = {"company_id": company_id}
     if branch_id:
         query["branch_id"] = branch_id
     stock_items = await db.stock.find(query).to_list(1000)
+    if not stock_items:
+        return 0
+    # Batch fetch de productos para evitar N+1
+    pids = list({s["product_id"] for s in stock_items if s.get("product_id")})
+    products = await db.products.find(
+        {"_id": {"$in": pids}}, {"min_stock": 1}
+    ).to_list(len(pids))
+    min_stock_map = {p["_id"]: p.get("min_stock", 5) for p in products}
     count = 0
     for s in stock_items:
-        product = await db.products.find_one({"_id": s["product_id"]}, {"min_stock": 1})
-        if product and s["quantity"] <= product.get("min_stock", 5):
+        if s.get("quantity", 0) <= min_stock_map.get(s.get("product_id"), 5):
             count += 1
     return count
+
 
 @router.get("/dashboard")
 async def get_dashboard(user: dict = Depends(get_current_user), branch_id: Optional[str] = None):
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
-    
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    month_start = datetime.now(timezone.utc).strftime("%Y-%m-01")
-    
+
     company_id = ObjectId(user["company_id"])
-    branch_filter = {}
-    if branch_id:
-        try:
-            branch_filter["branch_id"] = ObjectId(branch_id)
-        except Exception:
-            raise HTTPException(status_code=400, detail="branch_id invalido")
-    elif user.get("branch_id"):
-        branch_filter["branch_id"] = ObjectId(user["branch_id"])
-    
-    apt_query = {"company_id": company_id, "date": today, **branch_filter}
-    appointments_today = await db.appointments.count_documents(apt_query)
-    appointments_pending = await db.appointments.count_documents({**apt_query, "status": "pendiente"})
-    
-    patients_query = {"company_id": company_id, "created_at": {"$gte": month_start}}
-    new_patients = await db.patients.count_documents(patients_query)
-    
-    sales_today_query = {"company_id": company_id, "created_at": {"$gte": today}, **branch_filter}
-    sales_today = await db.sales.find(sales_today_query).to_list(100)
-    total_sales_today = sum(s.get("total", 0) for s in sales_today)
-    sales_count_today = len(sales_today)
-    
-    sales_month_query = {"company_id": company_id, "created_at": {"$gte": month_start}, **branch_filter}
-    sales_month = await db.sales.find(sales_month_query).to_list(1000)
-    total_sales_month = sum(s.get("total", 0) for s in sales_month)
-    
-    finance_query = {"company_id": company_id, "date": {"$gte": month_start, "$lte": today}, **branch_filter}
-    finance_entries = await db.finance_entries.find(finance_query).to_list(1000)
-    income = sum(e["amount"] for e in finance_entries if e["type"] == "ingreso")
-    expense = sum(e["amount"] for e in finance_entries if e["type"] == "egreso")
-    
-    stock_alerts = await get_stock_alerts_count(company_id, branch_filter.get("branch_id"))
-    
-    upcoming_apts = await db.appointments.find({
-        "company_id": company_id, "date": {"$gte": today}, "status": {"$in": ["pendiente", "confirmada"]},
-        **branch_filter
-    }).sort([("date", 1), ("time", 1)]).limit(5).to_list(5)
-    
-    for apt in upcoming_apts:
-        serialize_doc(apt)
-        patient = await db.patients.find_one({"_id": ObjectId(apt["patient_id"])}, {"first_name": 1, "last_name": 1})
-        if patient:
-            apt["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
-    
-    return {
-        "appointments_today": appointments_today, "appointments_pending": appointments_pending,
-        "new_patients": new_patients, "sales_count_today": sales_count_today,
-        "total_sales_today": total_sales_today, "total_sales_month": total_sales_month,
-        "income": income, "expense": expense, "profit": income - expense,
-        "stock_alerts": stock_alerts, "upcoming_appointments": upcoming_apts
-    }
+    effective_branch = branch_id or user.get("branch_id") or "all"
+    cache_key = f"{user['company_id']}:{effective_branch}"
+
+    async def _compute():
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        month_start = datetime.now(timezone.utc).strftime("%Y-%m-01")
+
+        branch_filter = {}
+        if branch_id:
+            try:
+                branch_filter["branch_id"] = ObjectId(branch_id)
+            except Exception as exc:
+                raise HTTPException(status_code=400, detail="branch_id invalido") from exc
+        elif user.get("branch_id"):
+            branch_filter["branch_id"] = ObjectId(user["branch_id"])
+
+        apt_query = {"company_id": company_id, "date": today, **branch_filter}
+        appointments_today = await db.appointments.count_documents(apt_query)
+        appointments_pending = await db.appointments.count_documents({**apt_query, "status": "pendiente"})
+
+        patients_query = {"company_id": company_id, "created_at": {"$gte": month_start}}
+        new_patients = await db.patients.count_documents(patients_query)
+
+        # Solo sumamos totales — proyeccion + aggregation es mas eficiente que traer docs completos
+        sales_today_pipeline = [
+            {"$match": {"company_id": company_id, "created_at": {"$gte": today}, **branch_filter}},
+            {"$group": {"_id": None, "total": {"$sum": "$total"}, "count": {"$sum": 1}}},
+        ]
+        today_agg = await db.sales.aggregate(sales_today_pipeline).to_list(1)
+        total_sales_today = today_agg[0]["total"] if today_agg else 0
+        sales_count_today = today_agg[0]["count"] if today_agg else 0
+
+        sales_month_pipeline = [
+            {"$match": {"company_id": company_id, "created_at": {"$gte": month_start}, **branch_filter}},
+            {"$group": {"_id": None, "total": {"$sum": "$total"}}},
+        ]
+        month_agg = await db.sales.aggregate(sales_month_pipeline).to_list(1)
+        total_sales_month = month_agg[0]["total"] if month_agg else 0
+
+        finance_pipeline = [
+            {"$match": {"company_id": company_id, "date": {"$gte": month_start, "$lte": today}, **branch_filter}},
+            {"$group": {"_id": "$type", "total": {"$sum": "$amount"}}},
+        ]
+        finance_agg = await db.finance_entries.aggregate(finance_pipeline).to_list(10)
+        finance_by_type = {r["_id"]: r["total"] for r in finance_agg}
+        income = finance_by_type.get("ingreso", 0)
+        expense = finance_by_type.get("egreso", 0)
+
+        stock_alerts = await _get_stock_alerts_count(company_id, branch_filter.get("branch_id"))
+
+        upcoming_apts = await db.appointments.find({
+            "company_id": company_id, "date": {"$gte": today},
+            "status": {"$in": ["pendiente", "confirmada"]},
+            **branch_filter
+        }).sort([("date", 1), ("time", 1)]).limit(5).to_list(5)
+
+        # Batch fetch pacientes (fix N+1)
+        pids = list({a["patient_id"] for a in upcoming_apts if a.get("patient_id")})
+        patients_map = {}
+        if pids:
+            docs = await db.patients.find(
+                {"_id": {"$in": pids}}, {"first_name": 1, "last_name": 1}
+            ).to_list(len(pids))
+            patients_map = {str(p["_id"]): f"{p.get('first_name','')} {p.get('last_name','')}".strip() for p in docs}
+
+        for apt in upcoming_apts:
+            serialize_doc(apt)
+            pid = apt.get("patient_id")
+            if pid:
+                apt["patient_name"] = patients_map.get(pid, "")
+
+        return {
+            "appointments_today": appointments_today, "appointments_pending": appointments_pending,
+            "new_patients": new_patients, "sales_count_today": sales_count_today,
+            "total_sales_today": total_sales_today, "total_sales_month": total_sales_month,
+            "income": income, "expense": expense, "profit": income - expense,
+            "stock_alerts": stock_alerts, "upcoming_appointments": upcoming_apts
+        }
+
+    return await dashboard_cache.get_or_load(cache_key, _compute, ttl=30)
 
 @router.get("/sales")
 async def get_sales_report(
