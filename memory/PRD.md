@@ -38,6 +38,19 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - **Cache Redis TTL 60s en inventario**: `/api/inventory/products` y `/api/inventory/stock` cachean con namespace por empresa+sucursal. Invalidacion automatica en `POST /products`, `PUT /products`, `POST /movement`, `POST /sales`, `DELETE /sales`. Filtros por category/search NO se cachean (siempre fresh).
 - **p95 general bajo carga 100 VUs: 888ms → 577ms (-35%)**. Verificado E2E con 13/13 tests (testing agent) — sin issues.
 
+### Cache Dashboard + Cursor Pagination Ventas (Feb 2026)
+- **Cache Redis TTL 30s en `/api/reports/dashboard`** (`routes/reports.py`):
+  - Namespace `dashboard`, key `{company_id}:{branch_id_or_all}`.
+  - Sums convertidos a MongoDB aggregation pipelines (`$group`) — antes traía 100+1000 docs.
+  - Batch fetch de `upcoming_appointments.patient_name` (N+1 fix).
+  - `_get_stock_alerts_count` batch fetch de products (N+1 fix).
+- **Cursor pagination en `/api/sales`** (`routes/sales.py`):
+  - Retro-compatible: sin `cursor`/`include_cursor` devuelve lista plana (frontend actual sigue funcionando).
+  - Con `?include_cursor=true` o `?cursor=...` devuelve `{items, next_cursor, has_more}`.
+  - Ordena por `_id desc` (cronologico gracias a ObjectId timestamp) usando `_id<cursor` (mejor que skip/limit para 10.000+ registros).
+  - Batch fetch de patients y sellers (N+1 fix).
+- Verificado: 15/15 tests (testing agent). Suite en `/app/backend/tests/test_dashboard_cache_and_sales_cursor.py`.
+
 ### Reporte de Cierres de Caja (Feb 2026)
 - Nuevos endpoints backend:
   - `GET /api/cash-register/report` — agrega cierres cerrados en rango `date_from/date_to` (opcional filtro por sucursal), con totales por metodo (cash, transfer, card, check, other), grand totals, cuentas por cobrar acumuladas y diferencia de efectivo consolidada.
