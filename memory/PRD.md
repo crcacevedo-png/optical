@@ -26,10 +26,12 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - **Pool MongoDB tuneado** en `db.py` (maxPoolSize=200, minPool=20, waitQueue=3s, retryWrites). Configurable via env sin redeploy.
 - **Object Storage compartido**: nuevo `backend/object_storage.py` usa Emergent Object Storage. Migrados endpoints de logo (`/api/settings/logo` y `/api/companies/{id}/logo`). Multi-pod safe. Fallback local si no hay `EMERGENT_LLM_KEY`.
   - Nuevo campo Mongo: `companies.logo_storage_path`.
-- **Cache Redis-ready**: `cache.py` refactorizado con backend Redis via `REDIS_URL`. Fallback in-memory. API async (`aget/aset/get_or_load`), namespacing por instancia.
-- **Rate limiter Redis-ready**: `rate_limiter.py` usa `storage_uri=REDIS_URL` en slowapi cuando esta disponible. En multi-pod los limites son coherentes entre replicas.
-- Verificado E2E: upload PNG a Object Storage remoto, DB guarda `logo_storage_path`, download por API devuelve mismo contenido (69 bytes, PNG magic OK).
-- Pendiente para 1000 usuarios: uvicorn `--workers 4` sin `--reload` (requiere cambio en pipeline de deploy Emergent), HPA multi-pod (soporte), Celery/RQ para emails/PDFs, provisionar REDIS_URL.
+- **Redis Upstash conectado (ACTIVO en preview)**:
+  - `cache.py` con backend Redis via `REDIS_URL`. Verificado: hit_rate 66.7% en `plans_cache` tras warmup, backend=redis en `/api/health/metrics`.
+  - `rate_limiter.py` con `storage_uri=REDIS_URL` en slowapi. Verificado: key `LIMITS:LIMITER/{ip}//api/auth/login/10/1/minute` persiste en Redis.
+  - Multi-pod safe: cache y rate-limits coherentes entre replicas.
+- Verificado E2E: upload PNG a Object Storage remoto, DB guarda `logo_storage_path`, download por API devuelve mismo contenido (69 bytes, PNG magic OK). Redis muestra keys correctos con TTL.
+- Pendiente para 1000 usuarios: uvicorn `--workers 4` sin `--reload` (requiere cambio en pipeline de deploy Emergent), HPA multi-pod (soporte), Celery/RQ para emails/PDFs.
 
 ### Reporte de Cierres de Caja (Feb 2026)
 - Nuevos endpoints backend:
