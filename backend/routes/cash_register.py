@@ -46,12 +46,38 @@ def _serialize(doc: dict) -> dict:
 
 
 async def _get_branch_id_or_400(user: dict, override: Optional[str] = None) -> ObjectId:
-    """Determina la sucursal donde operar. Vendedores usan la propia. Admins pueden pasar override."""
+    """Determina la sucursal donde operar.
+
+    Reglas:
+    1. Si viene `override` explicito, se usa.
+    2. Si el usuario tiene `branch_id` propio (vendedores/doctores), se usa.
+    3. Si el usuario es admin sin branch_id asignada, se toma la sucursal principal
+       (`is_main=True`) o, si no existe, la primera sucursal activa de la empresa.
+    4. Si la empresa no tiene ninguna sucursal, se retorna 400.
+    """
     if override:
         return ObjectId(override)
     if user.get("branch_id"):
         return ObjectId(user["branch_id"])
-    raise HTTPException(status_code=400, detail="El usuario no tiene sucursal asignada. Especifica una.")
+    # Fallback: admins sin branch_id -> sucursal principal / primera de la empresa
+    company_oid = ObjectId(user["company_id"])
+    main = await db.branches.find_one(
+        {"company_id": company_oid, "is_active": {"$ne": False}, "is_main": True},
+        {"_id": 1},
+    )
+    if main:
+        return main["_id"]
+    any_branch = await db.branches.find_one(
+        {"company_id": company_oid, "is_active": {"$ne": False}},
+        {"_id": 1},
+        sort=[("_id", 1)],
+    )
+    if any_branch:
+        return any_branch["_id"]
+    raise HTTPException(
+        status_code=400,
+        detail="La empresa no tiene sucursales activas. Crea una en Configuracion > Sucursales.",
+    )
 
 
 @router.get("/current")
