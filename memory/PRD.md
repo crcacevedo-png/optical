@@ -83,6 +83,15 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Fix aplicado por testing agent: `_serialize_ticket` ahora serializa `attachments[].uploaded_by_id` (evita 500 en list/detail).
 - Verificado E2E: 50/50 tests (30 previos + 20 nuevos) — 0 issues.
 
+### Bugfix Caja: admin sin branch_id (Feb 2026)
+- **Problema en produccion**: usuarios admin no podian abrir caja. Backend respondia 400 `"El usuario no tiene sucursal asignada. Especifica una."` porque los admins normalmente no tienen `branch_id` asignado (ven todas las sucursales).
+- **Fix en `_get_branch_id_or_400` (`routes/cash_register.py`)**: si no hay override ni `user.branch_id`, se busca automaticamente:
+  1. La sucursal principal (`is_main: true`) activa de la empresa.
+  2. Si no existe, la primera sucursal activa.
+  3. Solo si la empresa no tiene NINGUNA sucursal activa, retorna 400 con mensaje mas util ("La empresa no tiene sucursales activas. Crea una en Configuracion > Sucursales.").
+- Aplica a: `/open`, `/close`, `/current`, `/current/preview`.
+- Testing agent: **12/12 tests OK** — sin regresion en vendedores con branch propio ni en el override explicito.
+
 ### Reporte de Cierres de Caja (Feb 2026)
 - Nuevos endpoints backend:
   - `GET /api/cash-register/report` — agrega cierres cerrados en rango `date_from/date_to` (opcional filtro por sucursal), con totales por metodo (cash, transfer, card, check, other), grand totals, cuentas por cobrar acumuladas y diferencia de efectivo consolidada.
