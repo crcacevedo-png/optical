@@ -271,12 +271,15 @@ async def upload_attachment(ticket_id: str, file: UploadFile = File(...), user: 
         "uploaded_by_name": user.get("name", ""),
         "uploaded_at": now,
     }
+    set_fields = {"updated_at": now}
+    # Uploader marca como leido hasta este momento (mismo criterio que reply)
+    if user["role"] == "superadmin":
+        set_fields["last_read_by_super"] = now
+    else:
+        set_fields["last_read_by_creator"] = now
     await db.support_tickets.update_one(
         {"_id": oid},
-        {
-            "$push": {"attachments": attachment},
-            "$set": {"updated_at": now},
-        },
+        {"$push": {"attachments": attachment}, "$set": set_fields},
     )
     # Retorna URL de descarga
     return {

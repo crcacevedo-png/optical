@@ -66,6 +66,23 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - 4 stat cards por estado, filtro rapido por click en cards, dialogo de creacion con validaciones, hilo de conversacion tipo chat, badges de estado/prioridad/categoria/optica.
 - Verificado E2E: 30/30 tests (testing agent) — 0 issues.
 
+### Tickets Soporte v2: Email + Adjuntos + Read/Unread + SLA (Feb 2026)
+- **Email al equipo Cortexia**: al crear ticket se envia email via Resend (queue_email best-effort) a `crcacevedo@gmail.com` (`SUPPORT_EMAIL` env override). Template `render_support_ticket()` con badge de prioridad, tabla de metadata y CTA al panel admin.
+- **Screenshots (adjuntos)**:
+  - Max 5 por ticket, max 5MB, solo PNG/JPG/WEBP/GIF.
+  - `POST /api/support-tickets/{id}/attachments` sube a Object Storage compartido con path `cortexia-optical/support/{ticket_id}/{filename}`.
+  - `GET /api/support-tickets/{id}/attachments/{filename}` sirve la imagen (403 si no owner/super).
+  - Frontend: file input multiple en dialog de creacion + boton "Adjuntar" en respuestas; galeria en detalle.
+- **Read/Unread**:
+  - Campos `last_read_by_creator` y `last_read_by_super` en Mongo.
+  - `POST /api/support-tickets/{id}/read` marca como leido para el usuario actual.
+  - Lista y detalle incluyen `unread: bool` calculado (`updated_at > last_read_by_<role>`).
+  - Stats incluye `unread: int` (contador global).
+  - Frontend: badge rojo "N sin leer" en header, punto rojo por fila, fondo azul suave, auto-mark-as-read al abrir detalle.
+- **SLA por prioridad (frontend)**: alta 24h, media 48h, baja 72h. Badge dinamico refrescado cada 60s con colores (verde/amber/rojo/vencido rojo intenso). Tickets `resuelto` y `cerrado` no muestran SLA.
+- Fix aplicado por testing agent: `_serialize_ticket` ahora serializa `attachments[].uploaded_by_id` (evita 500 en list/detail).
+- Verificado E2E: 50/50 tests (30 previos + 20 nuevos) — 0 issues.
+
 ### Reporte de Cierres de Caja (Feb 2026)
 - Nuevos endpoints backend:
   - `GET /api/cash-register/report` — agrega cierres cerrados en rango `date_from/date_to` (opcional filtro por sucursal), con totales por metodo (cash, transfer, card, check, other), grand totals, cuentas por cobrar acumuladas y diferencia de efectivo consolidada.
