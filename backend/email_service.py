@@ -254,3 +254,40 @@ def render_security_alert(name: str, event_title: str, event_description: str, e
       {_button("Ir a mi cuenta", app_url, BRAND_DARK)}
     """
     return _wrapper(content, "Alerta de seguridad")
+
+
+
+def render_support_ticket(*, ticket_id: str, subject: str, message: str, category: str, priority: str,
+                          creator_name: str, creator_email: str, company_name: str) -> str:
+    """Email al equipo Cortexia cuando llega un ticket nuevo."""
+    _, _, app_url = _get_config()
+    priority_colors = {
+        "alta": ("#DC2626", "#FEE2E2"),
+        "media": ("#D97706", "#FEF3C7"),
+        "baja": ("#475569", "#F1F5F9"),
+    }
+    color, bg = priority_colors.get(priority, priority_colors["media"])
+    detail_url = f"{app_url}/admin/soporte"
+    content = f"""
+      <p style="color:#334155;font-size:15px;line-height:1.6;margin:0 0 12px 0;">
+        Se ha creado un nuevo ticket de soporte en la plataforma.
+      </p>
+      <div style="background-color:{bg};border-left:4px solid {color};padding:16px 20px;border-radius:6px;margin:16px 0;">
+        <p style="color:{color};font-size:11px;margin:0 0 4px 0;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">
+          Prioridad: {priority}  ·  {category}
+        </p>
+        <p style="color:#0F172A;font-size:16px;margin:0;font-weight:bold;">{subject}</p>
+      </div>
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="width:100%;background-color:#F8FAFC;border-radius:8px;padding:14px 18px;margin:16px 0;">
+        <tr><td style="padding:4px 0;color:#64748B;font-size:13px;">Optica:</td><td style="padding:4px 0;color:#0F172A;font-size:13px;font-weight:bold;text-align:right;">{company_name}</td></tr>
+        <tr><td style="padding:4px 0;color:#64748B;font-size:13px;">Usuario:</td><td style="padding:4px 0;color:#0F172A;font-size:13px;text-align:right;">{creator_name}</td></tr>
+        <tr><td style="padding:4px 0;color:#64748B;font-size:13px;">Email:</td><td style="padding:4px 0;color:#0F172A;font-size:13px;text-align:right;"><a href="mailto:{creator_email}" style="color:{BRAND_TEAL};text-decoration:none;">{creator_email}</a></td></tr>
+        <tr><td style="padding:4px 0;color:#64748B;font-size:13px;">Ticket ID:</td><td style="padding:4px 0;color:#0F172A;font-size:11px;text-align:right;font-family:monospace;">{ticket_id}</td></tr>
+      </table>
+      <div style="background-color:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:16px 20px;margin:16px 0;">
+        <p style="color:#64748B;font-size:11px;margin:0 0 8px 0;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">Mensaje</p>
+        <p style="color:#0F172A;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">{message}</p>
+      </div>
+      {_button("Abrir el ticket", detail_url, BRAND_DARK)}
+    """
+    return _wrapper(content, f"Nuevo ticket: {subject[:60]}")
