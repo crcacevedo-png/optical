@@ -69,9 +69,13 @@ export default function MainLayout() {
       { path: '/branches', icon: Building2, label: 'Sucursales' },
       { path: '/users', icon: UserCog, label: 'Usuarios' },
       { path: '/reports', icon: BarChart3, label: 'Reportes' },
-      { path: '/my-plan', icon: CreditCard, label: 'Mi Plan' },
       { path: '/onboarding', icon: Rocket, label: 'Inicio rapido' },
-      { path: '/settings', icon: Settings, label: 'Configuracion' },
+      {
+        path: '/settings', icon: Settings, label: 'Configuracion',
+        children: [
+          { path: '/my-plan', icon: CreditCard, label: 'Mi Plan' },
+        ],
+      },
     ] : []),
     // Soporte visible para TODOS los roles no-superadmin (bypass allowed_menu_items)
     { path: '/support', icon: LifeBuoy, label: 'Soporte', key: 'support', alwaysShow: true },
@@ -79,20 +83,48 @@ export default function MainLayout() {
 
   const NavLink = ({ item, mobile = false }) => {
     const isActive = location.pathname === item.path;
+    const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+    const childActive = hasChildren && item.children.some((c) => location.pathname === c.path);
+    const isOpen = isActive || childActive;
     return (
-      <Link
-        to={item.path}
-        onClick={() => mobile && setSidebarOpen(false)}
-        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-          isActive
-            ? 'bg-pine-900 text-white'
-            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-        }`}
-        data-testid={`nav-${item.path.replace(/\//g, '').replace('admin', 'admin-')}`}
-      >
-        <item.icon className="w-5 h-5" />
-        <span>{item.label}</span>
-      </Link>
+      <div>
+        <Link
+          to={item.path}
+          onClick={() => mobile && setSidebarOpen(false)}
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+            isActive
+              ? 'bg-pine-900 text-white'
+              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+          }`}
+          data-testid={`nav-${item.path.replace(/\//g, '').replace('admin', 'admin-')}`}
+        >
+          <item.icon className="w-5 h-5" />
+          <span>{item.label}</span>
+        </Link>
+        {hasChildren && isOpen && (
+          <div className="mt-1 ml-4 pl-3 border-l border-slate-200 space-y-1" data-testid={`submenu-${item.label.toLowerCase()}`}>
+            {item.children.map((child) => {
+              const childIsActive = location.pathname === child.path;
+              return (
+                <Link
+                  key={child.path}
+                  to={child.path}
+                  onClick={() => mobile && setSidebarOpen(false)}
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    childIsActive
+                      ? 'bg-pine-50 text-pine-900 font-medium'
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                  }`}
+                  data-testid={`nav-${child.path.replace(/\//g, '')}`}
+                >
+                  <child.icon className="w-4 h-4" />
+                  <span>{child.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
     );
   };
 
