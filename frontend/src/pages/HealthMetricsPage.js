@@ -229,7 +229,11 @@ export default function HealthMetricsPage() {
             <ProgressRow
               label="Disco"
               percent={Math.round(diskHost)}
-              subtitle={`${data.system?.disk_used_gb} GB / ${data.system?.disk_total_gb} GB`}
+              subtitle={
+                data.system?.disk_is_shared_node
+                  ? `Nodo K8s compartido · Datos de tu app: ${fmt(data.system?.app_data_mb || 0)} MB`
+                  : `${data.system?.disk_used_gb} GB / ${data.system?.disk_total_gb} GB`
+              }
             />
           </CardContent>
         </Card>

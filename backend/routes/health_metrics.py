@@ -77,9 +77,11 @@ async def health_metrics(user: dict = Depends(get_current_user)):
 
     # ─── Sistema (host / pod) ─────────────────────────────────────────
     vm = psutil.virtual_memory()
-    # Medimos `/app` (volumen dedicado al pod), no `/` que es el disco compartido
-    # del nodo Kubernetes con decenas de otros pods y por tanto no refleja el
-    # consumo real de esta app.
+    # NOTA: en Kubernetes multi-tenant el filesystem visible al pod es el disco
+    # del NODO completo, compartido con decenas de otros pods. No es una metrica
+    # accionable ni refleja consumo real de esta app. Por eso el warning solo se
+    # dispara al 95% (nivel critico del nodo). Para monitorear tu propio uso
+    # revisa `mongo.total_size_mb`.
     disk_path = "/app" if os.path.isdir("/app") else "/"
     disk = psutil.disk_usage(disk_path)
     system_stats = {
@@ -92,6 +94,8 @@ async def health_metrics(user: dict = Depends(get_current_user)):
         "disk_used_gb": round(disk.used / 1024 / 1024 / 1024, 2),
         "disk_total_gb": round(disk.total / 1024 / 1024 / 1024, 2),
         "disk_percent": disk.percent,
+        "disk_is_shared_node": disk.total > 50 * 1024 * 1024 * 1024,  # >50GB = disco compartido del nodo
+        "app_data_mb": round(db_stats_summary.get("total_size_mb", 0), 2),
     }
 
     # ─── Cache stats ──────────────────────────────────────────────────
@@ -116,8 +120,11 @@ async def health_metrics(user: dict = Depends(get_current_user)):
     signals = []
     if system_stats["memory_percent"] > 80:
         signals.append({"level": "warning", "msg": "Uso de memoria del pod > 80%"})
-    if system_stats["disk_percent"] > 80:
-        signals.append({"level": "warning", "msg": "Uso de disco > 80%"})
+    # Solo alertar por disco cuando el nodo esta realmente critico (>95%).
+    # En Kubernetes el disco es compartido con otros pods; el uso "normal"
+    # oscila naturalmente entre 60-85%.
+    if system_stats["disk_percent"] > 95:
+        signals.append({"level": "warning", "msg": "Disco del nodo K8s > 95% (compartido con otros pods, contacta soporte)"})
     if db_stats_summary.get("total_size_mb", 0) > 5000:
         signals.append({"level": "info", "msg": "BD > 5GB — considera archivar audit_log manualmente"})
     if counts.get("companies", 0) > 500:
