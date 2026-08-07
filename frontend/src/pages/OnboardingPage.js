@@ -36,7 +36,7 @@ export const STEPS = [
     id: 'branches',
     icon: Store,
     title: 'Crea tus sucursales',
-    description: 'Si tu óptica tiene más de una ubicación, créalas para asignar inventario y ventas por sucursal.',
+    description: 'Obligatorio crear 1 sucursal inicial. Luego crea las adicionales cuando sean necesarias.',
     cta: 'Gestionar sucursales',
     href: '/branches',
     color: '#6D35D8',
