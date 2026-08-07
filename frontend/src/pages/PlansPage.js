@@ -12,7 +12,7 @@ import {
 import { toast } from 'sonner';
 import {
   Plus, CreditCard, Edit, Trash2, Package, ShoppingCart, Truck, DollarSign,
-  Users, Building2, Crown, Infinity
+  Users, Building2, Crown, Infinity, TrendingUp, BarChart3, Zap, Activity
 } from 'lucide-react';
 
 const ALL_MODULES = [
@@ -34,6 +34,7 @@ const PLAN_COLORS = {
 
 export default function PlansPage() {
   const [plans, setPlans] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -44,8 +45,12 @@ export default function PlansPage() {
 
   const fetchPlans = useCallback(async () => {
     try {
-      const res = await api.get('/api/plans');
-      setPlans(res.data);
+      const [pRes, sRes] = await Promise.all([
+        api.get('/api/plans'),
+        api.get('/api/plans/stats/summary').catch(() => ({ data: null })),
+      ]);
+      setPlans(pRes.data);
+      setStats(sRes.data);
     } catch (err) {
       toast.error('Error al cargar planes');
     } finally {
@@ -132,6 +137,71 @@ export default function PlansPage() {
           <Plus className="w-4 h-4 mr-2" /> Nuevo Plan
         </Button>
       </div>
+
+      {/* Analytics Panel */}
+      {stats && (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="plans-stats-panel">
+            <StatCard label="MRR proyectado" value={stats.mrr_projected} icon={TrendingUp} color="from-emerald-500 to-teal-500" currency />
+            <StatCard label="ARR proyectado" value={stats.arr_projected} icon={Crown} color="from-indigo-500 to-purple-500" currency />
+            <StatCard label="Empresas activas" value={stats.total_companies_active} icon={Building2} color="from-blue-500 to-blue-600" />
+            <StatCard label="Ingresos 30d" value={stats.revenue_paid_last_30d} icon={DollarSign} color="from-amber-500 to-orange-500" currency subtitle={`${stats.payments_count_last_30d} pagos`} />
+          </div>
+
+          {/* Distribucion por plan */}
+          {stats.per_plan?.length > 0 && (
+            <Card className="border-slate-200/80" data-testid="plans-distribution-card">
+              <CardHeader>
+                <CardTitle className="font-heading text-lg flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-slate-600" /> Distribucion por plan
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {stats.per_plan.map((row) => {
+                    const pct = stats.total_companies_active > 0
+                      ? (row.total_companies / stats.total_companies_active) * 100
+                      : 0;
+                    return (
+                      <div key={row.plan_id} className="space-y-1" data-testid={`plan-row-${row.plan_id}`}>
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-slate-800">{row.plan_name}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {row.total_companies} empresa{row.total_companies !== 1 ? 's' : ''}
+                            </Badge>
+                            {row.companies_yearly > 0 && (
+                              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs" variant="outline">
+                                <Zap className="w-3 h-3 mr-0.5" /> {row.companies_yearly} anual{row.companies_yearly !== 1 ? 'es' : ''}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="font-heading font-bold text-emerald-700">
+                              {row.currency} {row.mrr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              <span className="text-xs font-normal text-slate-500 ml-1">/mes</span>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-pine-600 to-pine-500 transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                        <p className="text-xs text-slate-500">{pct.toFixed(1)}% del total · ARR proyectado {row.currency} {row.arr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+                {stats.plan_changes_last_30d > 0 && (
+                  <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2 text-sm text-slate-600">
+                    <Activity className="w-4 h-4 text-slate-500" />
+                    {stats.plan_changes_last_30d} cambio{stats.plan_changes_last_30d !== 1 ? 's' : ''} de plan en los ultimos 30 dias
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
 
       {/* Plan Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -273,6 +343,24 @@ export default function PlansPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function StatCard({ label, value, icon: Icon, color, currency, subtitle }) {
+  const formatted = currency
+    ? `USD ${(Number(value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : (Number(value) || 0).toLocaleString();
+  return (
+    <div className="bg-white border border-slate-200/80 rounded-xl p-4 hover:shadow-sm transition-shadow" data-testid={`stat-${label.toLowerCase().replace(/\s+/g,'-')}`}>
+      <div className="flex items-center gap-2.5 mb-1.5">
+        <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${color} flex items-center justify-center`}>
+          <Icon className="w-4 h-4 text-white" />
+        </div>
+        <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">{label}</p>
+      </div>
+      <p className="font-heading text-2xl font-bold text-slate-900 leading-tight">{formatted}</p>
+      {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
     </div>
   );
 }

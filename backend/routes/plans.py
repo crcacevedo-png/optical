@@ -164,3 +164,88 @@ async def get_plan_history(company_id: str, user: dict = Depends(get_current_use
     for h in history:
         serialize_doc(h)
     return history
+
+
+
+@router.get("/stats/summary")
+async def plans_stats_summary(user: dict = Depends(get_current_user)):
+    """Panel del SuperAdmin: distribucion de empresas por plan + MRR proyectado."""
+    if user["role"] != "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+
+    plans = await db.plans.find({}).to_list(500)
+    plans_map = {str(p["_id"]): p for p in plans}
+
+    # Agrupacion: empresas activas por plan, tambien contando ciclo de facturacion
+    pipeline = [
+        {"$match": {"is_active": {"$ne": False}}},
+        {"$group": {
+            "_id": {"plan_id": "$plan_id", "billing_cycle": {"$ifNull": ["$billing_cycle", "monthly"]}},
+            "count": {"$sum": 1},
+        }},
+    ]
+    rows = await db.companies.aggregate(pipeline).to_list(1000)
+
+    # Construir stats por plan
+    per_plan = {}
+    total_companies = 0
+    mrr_total = 0.0
+    arr_total = 0.0
+    for row in rows:
+        plan_oid = row["_id"].get("plan_id")
+        cycle = row["_id"].get("billing_cycle") or "monthly"
+        count = row["count"]
+        total_companies += count
+        pid = str(plan_oid) if plan_oid else "none"
+        if pid not in per_plan:
+            plan_doc = plans_map.get(pid, {})
+            per_plan[pid] = {
+                "plan_id": pid,
+                "plan_name": plan_doc.get("name", "Sin plan"),
+                "price_monthly": float(plan_doc.get("price_monthly") or plan_doc.get("price", 0) or 0),
+                "price_yearly": float(plan_doc.get("price_yearly") or (plan_doc.get("price", 0) or 0) * 10),
+                "currency": (plan_doc.get("currency") or "USD").upper(),
+                "companies_monthly": 0,
+                "companies_yearly": 0,
+                "total_companies": 0,
+                "mrr": 0.0,
+                "arr": 0.0,
+            }
+        if cycle == "yearly":
+            per_plan[pid]["companies_yearly"] += count
+        else:
+            per_plan[pid]["companies_monthly"] += count
+        per_plan[pid]["total_companies"] += count
+
+    for stats in per_plan.values():
+        # MRR: mensual x cnt_mensuales + (anual/12) x cnt_anuales
+        mrr = stats["price_monthly"] * stats["companies_monthly"] + (stats["price_yearly"] / 12) * stats["companies_yearly"]
+        stats["mrr"] = round(mrr, 2)
+        stats["arr"] = round(mrr * 12, 2)
+        mrr_total += mrr
+        arr_total += mrr * 12
+
+    # Series historicas de plan_history (ultimos 30 dias)
+    from datetime import timedelta
+    since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    recent_changes = await db.plan_history.count_documents({"changed_at": {"$gte": since}})
+
+    # Total pagos exitosos (payment_transactions)
+    revenue_pipeline = [
+        {"$match": {"payment_status": "paid", "created_at": {"$gte": since}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]
+    rev_rows = await db.payment_transactions.aggregate(revenue_pipeline).to_list(1)
+    revenue_30d = float(rev_rows[0]["total"]) if rev_rows else 0.0
+    payments_30d = int(rev_rows[0]["count"]) if rev_rows else 0
+
+    return {
+        "total_companies_active": total_companies,
+        "total_plans": len(plans),
+        "mrr_projected": round(mrr_total, 2),
+        "arr_projected": round(arr_total, 2),
+        "plan_changes_last_30d": recent_changes,
+        "revenue_paid_last_30d": round(revenue_30d, 2),
+        "payments_count_last_30d": payments_30d,
+        "per_plan": sorted(per_plan.values(), key=lambda x: -x["total_companies"]),
+    }

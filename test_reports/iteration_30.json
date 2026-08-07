@@ -1,0 +1,36 @@
+{
+  "summary": "Backend testing of new SuperAdmin analytics endpoint GET /api/plans/stats/summary. 13/13 tests passed (100%). Covered auth (401/403/200), response shape, MRR/ARR math correctness, per_plan ordering, total_companies consistency, cache-invalidation regression on PUT /plans/{id}, plan reassignment regression, and general regression (login, /plans, /support-tickets, /billing/checkout).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/plans/{plan_id}", "issue": "PlanUpdate Pydantic model does not expose price_monthly / price_yearly fields (only 'price'). The stats/summary endpoint reads price_monthly/price_yearly from the plan doc — with fallback to price and price*10 respectively. Consequence: superadmin cannot set differentiated monthly vs. yearly prices via API; yearly pricing is implicit (=price*10). If the product requires real yearly pricing (e.g. $6,990 vs $8,388), add price_monthly & price_yearly to PlanCreate/PlanUpdate + expose in the UI."},
+      {"endpoint": "GET /api/plans/stats/summary", "issue": "Companies do not currently have a 'billing_cycle' field populated; the aggregate defaults to 'monthly' via $ifNull. All 4 active companies are counted as monthly. If yearly billing is planned, the /billing/checkout flow needs to persist billing_cycle onto the company doc, otherwise companies_yearly will always be 0 and MRR from yearly subscriptions is undercounted (mrr = price_yearly/12 * 0)."},
+      {"endpoint": "GET /api/plans/stats/summary", "issue": "Payments query filters by 'created_at' as ISO-string range. Works today because created_at is stored as ISO string, but if a future writer stores it as datetime, the $gte string comparison will silently miss rows. Consider standardizing on datetime objects."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_plans_stats_summary.py",
+    "/app/test_reports/pytest/plans_stats_summary.xml"
+  ],
+  "action_items": [
+    "Decide whether PlanCreate/PlanUpdate should expose price_monthly & price_yearly. If yes, add fields + update UI + backfill existing plans (currently only 'price' is stored). Otherwise, document that yearly = price*10 (default) and remove price_yearly branch from stats endpoint.",
+    "If billing yearly is offered via /billing/checkout, ensure the company document is updated with billing_cycle='yearly' when the yearly plan is purchased, so companies_yearly reflects correctly in /stats/summary."
+  ],
+  "critical_code_review_comments": [
+    "backend/routes/plans.py L205-206: uses `or` chain to compute price_monthly/price_yearly — this treats price_monthly=0 (Free plan) as falsy and falls back to `price`, which is fine for Free but hides the fact that price_monthly is not a first-class field. Recommend explicit None check.",
+    "backend/routes/plans.py L235: revenue query uses string comparison for `created_at >= since` (ISO string). Works only because writers use isoformat everywhere. Fragile — recommend using timezone-aware datetime objects consistently.",
+    "backend/routes/plans.py L250: sorted() sorts by -total_companies which puts Free (3 companies) before Enterprise (1). Product may prefer sorting paying customers first — verify with product.",
+    "PlanUpdate model (backend/models.py L373) does NOT include price_monthly/price_yearly — silently ignores extra fields from client. This can lead to confusing UX where UI seems to accept a value but backend drops it."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_plans_stats_summary.py"
+  ],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "not tested (backend-only request)"},
+  "test_credentials": "superadmin@cortexia.com / Montecristo2026 (superadmin), admin@cortexia.gt / Demo123! (admin). Auth is cookie-based (httpOnly), login sets a session cookie; there is no 'access_token' JSON in the login response.",
+  "seed_data_creation": "None. Tests use existing 4 companies (3 Free monthly + 1 Enterprise monthly). Plan reassign & price bump tests restore original state in finally blocks.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Auth is cookie-based (requests.Session with POST /api/auth/login sets cookie). Do NOT expect JSON 'access_token' in response. Environment has 3 plans (Free/Basic/Enterprise); Enterprise has 1 active company with billing_cycle=default(monthly), price=699. Currently only 'price' field is populated on plans (not price_monthly/price_yearly). plan_history has ~9 entries in last 30d due to prior test runs — assign test verifies delta>=+1. billing_cycle field is not populated on any company; all counted as monthly.",
+  "rca of the issue": "N/A — no bugs blocking the feature. The identified issues are design concerns about pricing model consistency (price vs price_monthly/price_yearly)."
+}
