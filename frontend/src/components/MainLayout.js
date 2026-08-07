@@ -72,7 +72,8 @@ export default function MainLayout() {
       {
         path: '/settings', icon: Settings, label: 'Configuracion',
         children: [
-          { path: '/branches', icon: Building2, label: 'Sucursales' },
+          { path: '/settings', icon: Building2, label: 'Perfil de la Optica' },
+          { path: '/branches', icon: Store, label: 'Sucursales' },
           { path: '/users', icon: UserCog, label: 'Usuarios' },
           { path: '/my-plan', icon: CreditCard, label: 'Mi Plan' },
           { path: '/support', icon: LifeBuoy, label: 'Soporte' },
