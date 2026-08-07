@@ -242,6 +242,23 @@ input:focus, select:focus, textarea:focus, button:focus {
     box-shadow: 0 0 0 4px rgba(22, 184, 180, 0.10), 0 1px 2px rgba(16, 33, 63, 0.04);
 }
 
+/* Oculta el boton nativo del navegador para mostrar/ocultar password
+   (Safari/iOS credentials-auto-fill-button y Edge -ms-reveal), evitando
+   que se sobreponga con nuestro propio boton del ojo. */
+.login-input::-webkit-credentials-auto-fill-button,
+.login-input::-webkit-contacts-auto-fill-button,
+.login-input::-webkit-strong-password-auto-fill-button {
+    visibility: hidden !important;
+    display: none !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    right: 0;
+}
+.login-input::-ms-reveal,
+.login-input::-ms-clear {
+    display: none !important;
+}
+
 .login-input-icon-left {
     position: absolute;
     left: 16px;
