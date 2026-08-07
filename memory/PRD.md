@@ -85,6 +85,13 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 
 ### WhatsApp para Recetas (Feb 2026)
 
+### Fix congruencia planes + submenu Configuracion (Feb 2026)
+- **Bug SuperAdmin 'Plan no encontrado'**: `plans_cache.invalidate()` era sync fire-and-forget, dejaba Redis stale con `_ids` obsoletos. Fix: `create_plan`, `update_plan`, `delete_plan` ahora usan `await plans_cache.ainvalidate("all_plans")` (bloqueante, atomico).
+- **Congruencia**: cualquier cambio del superadmin en planes (nombre, precio, limites, features, price_monthly/yearly) es visible INMEDIATAMENTE para el admin en `/my-plan` y en `/api/plans` sin esperar TTL de 5min.
+- **Fix menor**: `try/except ObjectId` en `update_plan` ahora solo cubre la conversion, no la query.
+- **UI submenu**: 'Mi Plan' movido de top-level a hijo de 'Configuracion' en el sidebar. `MainLayout.NavLink` soporta `children[]` y renderiza sub-items indentados con `border-l` cuando el parent o algun hijo esta activo.
+- **Testing agent: 18/18 tests OK, 0 issues.** Suite: `/app/backend/tests/test_plans_cache.py`.
+
 ### Billing self-service con Stripe (Feb 2026)
 - **Modelo**: suscripciones mensual y anual (anual = mensual x10, "2 meses gratis" -> ahorro 16%). Proracion la maneja Stripe internamente.
 - **Aprobacion**: self-service — admin paga y su plan se actualiza automatico al confirmarse.

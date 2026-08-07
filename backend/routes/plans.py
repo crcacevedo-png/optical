@@ -40,14 +40,15 @@ async def update_plan(plan_id: str, data: PlanUpdate, user: dict = Depends(get_c
     if user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
     try:
-        plan = await db.plans.find_one({"_id": ObjectId(plan_id)})
+        oid = ObjectId(plan_id)
     except Exception:
         raise HTTPException(status_code=400, detail="plan_id invalido")
+    plan = await db.plans.find_one({"_id": oid})
     if not plan:
         raise HTTPException(status_code=404, detail="Plan no encontrado")
     update_data = data.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    await db.plans.update_one({"_id": ObjectId(plan_id)}, {"$set": update_data})
+    await db.plans.update_one({"_id": oid}, {"$set": update_data})
     await plans_cache.ainvalidate("all_plans")
     return {"message": "Plan actualizado"}
 
