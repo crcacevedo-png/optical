@@ -8,6 +8,16 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Backend: FastAPI + Motor (MongoDB async) - Modular (22 archivos de rutas)
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
+
+### Bugfix Editar Plan + Migracion moneda Q (Feb 2026)
+- **Bug "Plan no encontrado"**: cache de Redis compartida entre entornos servia plans con ObjectIds obsoletos que ya no existian en MongoDB.
+  - Fix: namespace de cache ahora incluye `DB_NAME` (`cortexia:{db}:{ns}:{key}`) en `cache.py::_k()`.
+  - Safety net: `PUT /api/plans/{id}` invalida `plans_cache` cuando el plan no existe.
+  - Cache de plans purgada manualmente (una sola vez).
+- **Moneda GTQ (Quetzales)**: defaults cambiados a `GTQ` en `models.py`, `routes/plans.py`, `routes/billing.py` (Stripe usa `gtq`).
+- Frontend muestra `Q` en `PlansPage.js` (StatCards + distribucion) y `MyPlanPage.js` (`fmt()` traduce `GTQ` -> `Q`).
+- Migracion aplicada: todos los planes en DB y `payment_transactions` reetiquetados a `GTQ`.
+
 ## Lo Implementado
 
 ### Caja embebida en modulo Ventas (Feb 2026)

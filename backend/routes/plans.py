@@ -45,6 +45,8 @@ async def update_plan(plan_id: str, data: PlanUpdate, user: dict = Depends(get_c
         raise HTTPException(status_code=400, detail="plan_id invalido")
     plan = await db.plans.find_one({"_id": oid})
     if not plan:
+        # Cache stale? Invalidate so next GET fetches fresh data.
+        await plans_cache.ainvalidate("all_plans")
         raise HTTPException(status_code=404, detail="Plan no encontrado")
     update_data = data.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -204,7 +206,7 @@ async def plans_stats_summary(user: dict = Depends(get_current_user)):
                 "plan_name": plan_doc.get("name", "Sin plan"),
                 "price_monthly": float(plan_doc.get("price_monthly") or plan_doc.get("price", 0) or 0),
                 "price_yearly": float(plan_doc.get("price_yearly") or (plan_doc.get("price", 0) or 0) * 10),
-                "currency": (plan_doc.get("currency") or "USD").upper(),
+                "currency": (plan_doc.get("currency") or "GTQ").upper(),
                 "companies_monthly": 0,
                 "companies_yearly": 0,
                 "total_companies": 0,

@@ -178,7 +178,7 @@ export default function PlansPage() {
                           </div>
                           <div className="text-right">
                             <p className="font-heading font-bold text-emerald-700">
-                              {row.currency} {row.mrr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {(row.currency === 'GTQ' ? 'Q' : row.currency)} {row.mrr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               <span className="text-xs font-normal text-slate-500 ml-1">/mes</span>
                             </p>
                           </div>
@@ -186,7 +186,7 @@ export default function PlansPage() {
                         <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                           <div className="h-full bg-gradient-to-r from-pine-600 to-pine-500 transition-all" style={{ width: `${pct}%` }} />
                         </div>
-                        <p className="text-xs text-slate-500">{pct.toFixed(1)}% del total · ARR proyectado {row.currency} {row.arr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <p className="text-xs text-slate-500">{pct.toFixed(1)}% del total · ARR proyectado {(row.currency === 'GTQ' ? 'Q' : row.currency)} {row.arr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                       </div>
                     );
                   })}
@@ -349,7 +349,7 @@ export default function PlansPage() {
 
 function StatCard({ label, value, icon: Icon, color, currency, subtitle }) {
   const formatted = currency
-    ? `USD ${(Number(value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    ? `Q ${(Number(value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : (Number(value) || 0).toLocaleString();
   return (
     <div className="bg-white border border-slate-200/80 rounded-xl p-4 hover:shadow-sm transition-shadow" data-testid={`stat-${label.toLowerCase().replace(/\s+/g,'-')}`}>

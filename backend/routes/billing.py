@@ -50,7 +50,7 @@ def _plan_amount(plan: dict, cycle: str) -> tuple[float, str]:
         base = float(plan.get("price", 0) or 0)
         amount = base * 10 if cycle == "yearly" else base
     amount = float(amount)
-    currency = (plan.get("currency") or "usd").lower()
+    currency = (plan.get("currency") or "gtq").lower()
     return amount, currency
 
 

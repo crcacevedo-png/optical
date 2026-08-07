@@ -62,7 +62,10 @@ class TTLCache:
         self._misses = 0
 
     def _k(self, key: str) -> str:
-        return f"cortexia:{self._ns}:{key}"
+        # Include DB_NAME in the key so preview/prod (or any parallel deployments)
+        # sharing the same Redis instance don't step on each other's cache.
+        db_name = (os.environ.get("DB_NAME") or "default").strip()
+        return f"cortexia:{db_name}:{self._ns}:{key}"
 
     def _mem_get(self, key: str) -> Optional[Any]:
         entry = self._store.get(key)

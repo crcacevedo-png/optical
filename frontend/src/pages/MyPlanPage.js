@@ -7,7 +7,10 @@ import { Badge } from '../components/ui/badge';
 import { CreditCard, CheckCircle2, Zap, Package, Users, Building2, TrendingUp, XCircle, Clock, ShieldCheck, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
-const fmt = (n, cur = 'USD') => `${cur.toUpperCase()} ${(Number(n) || 0).toFixed(2)}`;
+const fmt = (n, cur = 'GTQ') => {
+  const symbol = (cur || 'GTQ').toUpperCase() === 'GTQ' ? 'Q' : cur.toUpperCase();
+  return `${symbol} ${(Number(n) || 0).toFixed(2)}`;
+};
 
 const CYCLE_META = {
   monthly: { label: 'Mensual', suffix: '/mes' },

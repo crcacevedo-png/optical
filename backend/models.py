@@ -365,6 +365,9 @@ class SupplierUpdate(BaseModel):
 class PlanCreate(BaseModel):
     name: str
     price: float = 0
+    price_monthly: Optional[float] = None
+    price_yearly: Optional[float] = None
+    currency: str = "GTQ"
     max_branches: int = 1
     max_patients: int = 50
     modules: List[str] = []
@@ -373,6 +376,9 @@ class PlanCreate(BaseModel):
 class PlanUpdate(BaseModel):
     name: Optional[str] = None
     price: Optional[float] = None
+    price_monthly: Optional[float] = None
+    price_yearly: Optional[float] = None
+    currency: Optional[str] = None
     max_branches: Optional[int] = None
     max_patients: Optional[int] = None
     modules: Optional[List[str]] = None
