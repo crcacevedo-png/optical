@@ -69,6 +69,7 @@ export default function MainLayout() {
       { path: '/branches', icon: Building2, label: 'Sucursales' },
       { path: '/users', icon: UserCog, label: 'Usuarios' },
       { path: '/reports', icon: BarChart3, label: 'Reportes' },
+      { path: '/my-plan', icon: CreditCard, label: 'Mi Plan' },
       { path: '/onboarding', icon: Rocket, label: 'Inicio rapido' },
       { path: '/settings', icon: Settings, label: 'Configuracion' },
     ] : []),

@@ -29,6 +29,7 @@ import HealthMetricsPage from './pages/HealthMetricsPage';
 import ReceivablesPage from './pages/ReceivablesPage';
 import CashRegisterPage from './pages/CashRegisterPage';
 import SupportTicketsPage from './pages/SupportTicketsPage';
+import MyPlanPage from './pages/MyPlanPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import './App.css';
@@ -74,6 +75,7 @@ function App() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="suppliers" element={<SuppliersPage />} />
             <Route path="support" element={<SupportTicketsPage />} />
+            <Route path="my-plan" element={<MyPlanPage />} />
             <Route path="admin/soporte" element={<SupportTicketsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
