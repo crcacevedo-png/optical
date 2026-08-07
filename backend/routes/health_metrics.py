@@ -77,13 +77,18 @@ async def health_metrics(user: dict = Depends(get_current_user)):
 
     # ─── Sistema (host / pod) ─────────────────────────────────────────
     vm = psutil.virtual_memory()
-    disk = psutil.disk_usage("/")
+    # Medimos `/app` (volumen dedicado al pod), no `/` que es el disco compartido
+    # del nodo Kubernetes con decenas de otros pods y por tanto no refleja el
+    # consumo real de esta app.
+    disk_path = "/app" if os.path.isdir("/app") else "/"
+    disk = psutil.disk_usage(disk_path)
     system_stats = {
         "cpu_percent": psutil.cpu_percent(interval=0.1),
         "cpu_count": psutil.cpu_count(),
         "memory_total_mb": round(vm.total / 1024 / 1024, 2),
         "memory_used_mb": round(vm.used / 1024 / 1024, 2),
         "memory_percent": vm.percent,
+        "disk_path": disk_path,
         "disk_used_gb": round(disk.used / 1024 / 1024 / 1024, 2),
         "disk_total_gb": round(disk.total / 1024 / 1024 / 1024, 2),
         "disk_percent": disk.percent,
