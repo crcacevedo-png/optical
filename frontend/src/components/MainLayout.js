@@ -54,6 +54,8 @@ export default function MainLayout() {
     { path: '/users', icon: UserCog, label: 'Usuarios' },
     { path: '/settings', icon: Settings, label: 'Configuracion' },
   ] : [
+    // Inicio rapido primero (solo admin)
+    ...(isAdmin ? [{ path: '/onboarding', icon: Rocket, label: 'Inicio rapido' }] : []),
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', key: 'dashboard' },
     { path: '/patients', icon: Users, label: 'Pacientes', key: 'patients' },
     { path: '/consultations', icon: Eye, label: 'Consultas', key: 'consultations' },
@@ -66,19 +68,20 @@ export default function MainLayout() {
     ...(hasModule('proveedores') ? [{ path: '/suppliers', icon: Truck, label: 'Proveedores', key: 'suppliers' }] : []),
     ...(hasModule('finanzas') ? [{ path: '/finance', icon: DollarSign, label: 'Finanzas', key: 'finance' }] : []),
     ...(isAdmin ? [
-      { path: '/branches', icon: Building2, label: 'Sucursales' },
-      { path: '/users', icon: UserCog, label: 'Usuarios' },
       { path: '/reports', icon: BarChart3, label: 'Reportes' },
-      { path: '/onboarding', icon: Rocket, label: 'Inicio rapido' },
       {
         path: '/settings', icon: Settings, label: 'Configuracion',
         children: [
+          { path: '/branches', icon: Building2, label: 'Sucursales' },
+          { path: '/users', icon: UserCog, label: 'Usuarios' },
           { path: '/my-plan', icon: CreditCard, label: 'Mi Plan' },
+          { path: '/support', icon: LifeBuoy, label: 'Soporte' },
         ],
       },
     ] : []),
-    // Soporte visible para TODOS los roles no-superadmin (bypass allowed_menu_items)
-    { path: '/support', icon: LifeBuoy, label: 'Soporte', key: 'support', alwaysShow: true },
+    // Para roles no-admin (user/doctor), Soporte queda en el top level
+    // porque no tienen acceso al menu Configuracion.
+    ...(!isAdmin ? [{ path: '/support', icon: LifeBuoy, label: 'Soporte', key: 'support', alwaysShow: true }] : []),
   ].filter(item => item.alwaysShow || !item.key || canAccess(item.key));
 
   const NavLink = ({ item, mobile = false }) => {
