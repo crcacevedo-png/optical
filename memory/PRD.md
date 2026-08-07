@@ -84,6 +84,27 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Verificado E2E: 50/50 tests (30 previos + 20 nuevos) — 0 issues.
 
 ### WhatsApp para Recetas (Feb 2026)
+
+### Billing self-service con Stripe (Feb 2026)
+- **Modelo**: suscripciones mensual y anual (anual = mensual x10, "2 meses gratis" -> ahorro 16%). Proracion la maneja Stripe internamente.
+- **Aprobacion**: self-service — admin paga y su plan se actualiza automatico al confirmarse.
+- **Backend** `routes/billing.py`:
+  - `POST /api/billing/checkout` (admin only): valida plan, arma sesion Stripe Checkout con metadata (company_id, plan_id, cycle, user_id), registra en `payment_transactions`. Rechaza planes gratuitos con mensaje claro.
+  - `GET /api/billing/status/{session_id}` (publico, para polling desde el redirect de Stripe).
+  - `GET /api/billing/my-transactions` (admin y superadmin).
+  - `POST /api/webhook/stripe` (endpoint webhook a nivel raiz, path completo). `_mark_paid_and_apply_plan` es idempotente: actualiza `companies.plan_id`, `billing_cycle`, `last_payment_at` y registra `plan_history`.
+- **Integracion**: `emergentintegrations.payments.stripe.checkout` con `STRIPE_API_KEY=sk_test_emergent` (sandbox compartido). Guatemala no tiene sandbox propio.
+- **Frontend** `MyPlanPage.js` en `/my-plan`, accesible desde el sidebar (solo admin):
+  - Muestra plan actual con barras de uso (pacientes / sucursales).
+  - Toggle mensual/anual con badge "Ahorra 16%".
+  - Grid de 3+ planes con badge "Popular" en Pro, botones "Elegir plan" -> redirect a Stripe Checkout.
+  - Polling automatico al volver con `?session_id=...` -> toast de exito.
+  - Historial de pagos con estados (pagado / pendiente / fallido).
+  - Banner explicativo del prorrateo.
+- **Indices**: `payment_transactions.session_id` (unique), `company_id+_id`, `payment_status`.
+- **Testing agent: 20/20 tests OK, 0 criticos.** Suite: `/app/backend/tests/test_billing.py`.
+
+### Bugfix Caja: admin sin branch_id (Feb 2026)
 - Backend: `list_eyeglass_prescriptions`, `list_contact_lens_prescriptions`, `list_medical_prescriptions` ahora hacen batch `$in` de pacientes con projection `{first_name, last_name, phone, whatsapp}` y enriquecen cada rx con `patient_name`, `patient_phone`, `patient_whatsapp` (siempre presentes, incluso si el paciente fue eliminado = orphan rx).
 - Frontend `PrescriptionsPage.js`:
   - Handler `openWhatsAppFor(type, rx)` que arma mensaje distinto por tipo con resumen de la receta (grados, medicamentos, diagnostico) y firma "Gracias por confiar en Cortexia Optical".

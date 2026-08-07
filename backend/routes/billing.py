@@ -122,7 +122,9 @@ async def create_checkout(
 
 @router.get("/status/{session_id}")
 async def get_status(session_id: str, request: Request):
-    """Polling endpoint. Al detectar pago exitoso via Stripe, actualiza plan de la empresa."""
+    """Polling endpoint publico (sin auth). Necesario porque Stripe puede redirigir
+    desde un dominio externo y la cookie de sesion podria no viajar. La sesion
+    Stripe misma es opaca a terceros — solo devolvemos estado, no datos sensibles."""
     tx = await db.payment_transactions.find_one({"session_id": session_id})
     if not tx:
         raise HTTPException(status_code=404, detail="Transaccion no encontrada")
