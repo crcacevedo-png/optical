@@ -76,20 +76,45 @@ async def health_metrics(user: dict = Depends(get_current_user)):
     }
 
     # ─── Sistema (host / pod) ─────────────────────────────────────────
+    # En Kubernetes `psutil.virtual_memory()` y `psutil.disk_usage("/")` reportan
+    # el NODO completo (compartido con decenas de otros pods). Para conocer el
+    # uso REAL de nuestro contenedor leemos los limites de cgroup v2.
+    def _read_int(path):
+        try:
+            with open(path) as f:
+                v = f.read().strip()
+            return int(v) if v.isdigit() else None
+        except Exception:
+            return None
+
+    cg_mem_limit = _read_int("/sys/fs/cgroup/memory.max")  # cgroups v2
+    cg_mem_used = _read_int("/sys/fs/cgroup/memory.current")
+    if cg_mem_limit is None:
+        # cgroups v1 fallback
+        cg_mem_limit = _read_int("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+        cg_mem_used = _read_int("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+
     vm = psutil.virtual_memory()
-    # NOTA: en Kubernetes multi-tenant el filesystem visible al pod es el disco
-    # del NODO completo, compartido con decenas de otros pods. No es una metrica
-    # accionable ni refleja consumo real de esta app. Por eso el warning solo se
-    # dispara al 95% (nivel critico del nodo). Para monitorear tu propio uso
-    # revisa `mongo.total_size_mb`.
+    # Si tenemos cgroup y no es "sin limite" (valores absurdamente grandes), lo usamos.
+    if cg_mem_limit and cg_mem_used and cg_mem_limit < (1 << 62):
+        mem_total_bytes = cg_mem_limit
+        mem_used_bytes = cg_mem_used
+        mem_source = "cgroup"
+    else:
+        mem_total_bytes = vm.total
+        mem_used_bytes = vm.used
+        mem_source = "host"
+    mem_percent = round((mem_used_bytes / mem_total_bytes) * 100, 1) if mem_total_bytes else 0
+
     disk_path = "/app" if os.path.isdir("/app") else "/"
     disk = psutil.disk_usage(disk_path)
     system_stats = {
         "cpu_percent": psutil.cpu_percent(interval=0.1),
         "cpu_count": psutil.cpu_count(),
-        "memory_total_mb": round(vm.total / 1024 / 1024, 2),
-        "memory_used_mb": round(vm.used / 1024 / 1024, 2),
-        "memory_percent": vm.percent,
+        "memory_source": mem_source,
+        "memory_total_mb": round(mem_total_bytes / 1024 / 1024, 2),
+        "memory_used_mb": round(mem_used_bytes / 1024 / 1024, 2),
+        "memory_percent": mem_percent,
         "disk_path": disk_path,
         "disk_used_gb": round(disk.used / 1024 / 1024 / 1024, 2),
         "disk_total_gb": round(disk.total / 1024 / 1024 / 1024, 2),
