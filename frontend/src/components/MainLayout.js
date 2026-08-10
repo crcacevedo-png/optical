@@ -9,7 +9,7 @@ import { ScrollArea } from '../components/ui/scroll-area';
 import { 
   LayoutDashboard, Users, Calendar, FileText, Package, 
   ShoppingCart, DollarSign, Building2, UserCog, BarChart3,
-  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone, Key, ShieldAlert, Rocket, Activity, HandCoins, LifeBuoy
+  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone, Key, ShieldAlert, Rocket, Activity, HandCoins, LifeBuoy, Tent
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -65,6 +65,7 @@ export default function MainLayout() {
     ...(hasModule('inventario') ? [{ path: '/inventory', icon: Package, label: 'Inventario', key: 'inventory' }] : []),
     ...(hasModule('ventas') ? [{ path: '/sales', icon: ShoppingCart, label: 'Ventas', key: 'sales' }] : []),
     ...(hasModule('ventas') ? [{ path: '/receivables', icon: HandCoins, label: 'Cuentas por Cobrar', key: 'receivables' }] : []),
+    ...(hasModule('jornadas') ? [{ path: '/jornadas', icon: Tent, label: 'Jornadas', key: 'jornadas' }] : []),
     ...(hasModule('proveedores') ? [{ path: '/suppliers', icon: Truck, label: 'Proveedores', key: 'suppliers' }] : []),
     ...(hasModule('finanzas') ? [{ path: '/finance', icon: DollarSign, label: 'Finanzas', key: 'finance' }] : []),
     ...(isAdmin ? [

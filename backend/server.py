@@ -18,7 +18,7 @@ from routes import (
     prescriptions, inventory, sales, quotations, consultations,
     finance, reports, users, suppliers, plans, superadmin, announcements,
     notifications, security, data_export, audit_log, onboarding, health_metrics,
-    cash_register, support_tickets, billing
+    cash_register, support_tickets, billing, jornadas
 )
 
 app = FastAPI(title="Cortexia Optical API")
@@ -58,6 +58,7 @@ api_router.include_router(health_metrics.router)
 api_router.include_router(cash_register.router)
 api_router.include_router(support_tickets.router)
 api_router.include_router(billing.router)
+api_router.include_router(jornadas.router)
 # Webhook Stripe: se registra a nivel raiz (no dentro de /api) porque el path
 # ya incluye /api/webhook/stripe segun la libreria emergentintegrations.
 app.include_router(billing.webhook_router)
@@ -273,6 +274,12 @@ async def startup():
     await db.payment_transactions.create_index([("company_id", 1), ("_id", -1)])
     await db.payment_transactions.create_index([("payment_status", 1)])
 
+    # --- Jornadas ---
+    await db.jornadas.create_index([("company_id", 1), ("status", 1), ("start_date", -1)])
+    await db.jornadas.create_index([("company_id", 1), ("responsible_branch_id", 1), ("start_date", -1)])
+    await db.jornadas.create_index([("company_id", 1), ("is_deleted", 1), ("start_date", -1)])
+    await db.jornadas.create_index([("company_id", 1), ("name", 1)])
+
     logger.info("MongoDB indexes verified/created OK")
     
     # Seed superadmin - lee credenciales SOLO de env vars. Si no estan presentes,
@@ -403,7 +410,7 @@ async def startup():
                 "price": 299,
                 "max_branches": 3,
                 "max_patients": 500,
-                "modules": ["inventario", "ventas"],
+                "modules": ["inventario", "ventas", "jornadas"],
                 "is_active": True,
                 "created_at": datetime.now(timezone.utc).isoformat()
             },
@@ -412,7 +419,7 @@ async def startup():
                 "price": 799,
                 "max_branches": 0,
                 "max_patients": 0,
-                "modules": ["inventario", "ventas", "proveedores", "finanzas"],
+                "modules": ["inventario", "ventas", "proveedores", "finanzas", "jornadas"],
                 "is_active": True,
                 "created_at": datetime.now(timezone.utc).isoformat()
             }

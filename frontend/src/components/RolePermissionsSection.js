@@ -19,6 +19,7 @@ const MODULE_META = {
   sales: { label: 'Ventas', hint: 'Registro y gestion de ventas', planKey: 'ventas' },
   'cash-register': { label: 'Caja', hint: 'Abrir/cerrar caja diaria', planKey: 'ventas' },
   receivables: { label: 'Cuentas por Cobrar', hint: 'Ventas con saldo pendiente', planKey: 'ventas' },
+  jornadas: { label: 'Jornadas', hint: 'Brigadas y eventos fuera de sucursal', planKey: 'jornadas' },
   suppliers: { label: 'Proveedores', hint: 'Gestion de proveedores', planKey: 'proveedores' },
   finance: { label: 'Finanzas', hint: 'Ingresos y gastos', planKey: 'finanzas' },
   reports: { label: 'Reportes', hint: 'Reportes generales' },

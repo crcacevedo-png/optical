@@ -30,6 +30,9 @@ import ReceivablesPage from './pages/ReceivablesPage';
 import CashRegisterPage from './pages/CashRegisterPage';
 import SupportTicketsPage from './pages/SupportTicketsPage';
 import MyPlanPage from './pages/MyPlanPage';
+import JornadasPage from './pages/JornadasPage';
+import JornadaFormPage from './pages/JornadaFormPage';
+import JornadaPanelPage from './pages/JornadaPanelPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import './App.css';
@@ -62,6 +65,10 @@ function App() {
             <Route path="receivables" element={<ReceivablesPage />} />
             <Route path="cash-register" element={<CashRegisterPage />} />
             <Route path="quotations" element={<QuotationsPage />} />
+            <Route path="jornadas" element={<JornadasPage />} />
+            <Route path="jornadas/new" element={<JornadaFormPage />} />
+            <Route path="jornadas/:id" element={<JornadaPanelPage />} />
+            <Route path="jornadas/:id/edit" element={<JornadaFormPage />} />
             <Route path="admin/opticas" element={<AdminOpticasPage />} />
             <Route path="admin/planes" element={<PlansPage />} />
             <Route path="admin/dashboard" element={<SuperAdminDashboard />} />

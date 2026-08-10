@@ -416,3 +416,57 @@ class UserUpdate(BaseModel):
     is_active: Optional[bool] = None
     password: Optional[str] = None
     role: Optional[str] = None  # Solo aplicable si quien hace la request es superadmin
+
+
+# ═══════════════════════════════════════════════════════════════════
+# JORNADAS (brigadas visuales / eventos fuera de sucursal)
+# ═══════════════════════════════════════════════════════════════════
+class JornadaCashConfig(BaseModel):
+    mode: str = "own"  # "own" = caja propia | "branch" = usa caja de la sucursal
+    initial_fund: float = 0
+
+class JornadaInventoryConfig(BaseModel):
+    use_branch_stock: bool = True   # Fuente A: inventario de sucursal (traslado)
+    use_consignment: bool = False   # Fuente B: consignacion (Excel)
+    prioritize_consignment: bool = True  # En modo mixto, cual descontar primero
+
+class JornadaCreate(BaseModel):
+    name: str
+    start_date: str  # ISO date
+    end_date: str    # ISO date
+    responsible_branch_id: str  # Sucursal responsable (multi-tenant scope)
+    location: Optional[str] = None
+    address: Optional[str] = None
+    municipality: Optional[str] = None
+    department: Optional[str] = None
+    partner_entity: Optional[str] = None  # Empresa/colegio/municipalidad aliada
+    manager_user_id: Optional[str] = None  # Responsable de la jornada
+    team_user_ids: List[str] = []
+    description: Optional[str] = None
+    cash_config: JornadaCashConfig = JornadaCashConfig()
+    inventory_config: JornadaInventoryConfig = JornadaInventoryConfig()
+    price_list_discount_percent: Optional[float] = None  # Descuento global opcional
+    goal_amount: Optional[float] = None
+    goal_patients: Optional[int] = None
+
+class JornadaUpdate(BaseModel):
+    name: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    responsible_branch_id: Optional[str] = None
+    location: Optional[str] = None
+    address: Optional[str] = None
+    municipality: Optional[str] = None
+    department: Optional[str] = None
+    partner_entity: Optional[str] = None
+    manager_user_id: Optional[str] = None
+    team_user_ids: Optional[List[str]] = None
+    description: Optional[str] = None
+    cash_config: Optional[JornadaCashConfig] = None
+    inventory_config: Optional[JornadaInventoryConfig] = None
+    price_list_discount_percent: Optional[float] = None
+    goal_amount: Optional[float] = None
+    goal_patients: Optional[int] = None
+
+class JornadaStatusChange(BaseModel):
+    reason: Optional[str] = None  # Requerido para reopen y cancel

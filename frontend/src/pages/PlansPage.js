@@ -12,7 +12,7 @@ import {
 import { toast } from 'sonner';
 import {
   Plus, CreditCard, Edit, Trash2, Package, ShoppingCart, Truck, DollarSign,
-  Users, Building2, Crown, Infinity, TrendingUp, BarChart3, Zap, Activity
+  Users, Building2, Crown, Infinity, TrendingUp, BarChart3, Zap, Activity, Tent
 } from 'lucide-react';
 
 const ALL_MODULES = [
@@ -20,6 +20,7 @@ const ALL_MODULES = [
   { key: 'ventas', label: 'Ventas', icon: ShoppingCart },
   { key: 'proveedores', label: 'Proveedores', icon: Truck },
   { key: 'finanzas', label: 'Finanzas', icon: DollarSign },
+  { key: 'jornadas', label: 'Jornadas', icon: Tent },
 ];
 
 const emptyForm = {
