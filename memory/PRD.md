@@ -9,6 +9,24 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### JORNADAS - Iteracion 1: Cimientos (Feb 2026)
+Modulo nuevo de brigadas visuales / eventos fuera de sucursal. Multi-tenant, opcional por plan.
+- **Backend**: `routes/jornadas.py` (481 lineas), coleccion `jornadas`, modelos `JornadaCreate/Update/StatusChange/CashConfig/InventoryConfig` en `models.py`.
+- **Ciclo de vida**: `planificada -> activa -> en_cierre -> cerrada` (+ `cancelada`). Endpoints:
+  - `GET /api/jornadas` con filtros (status, branch_id, from_date, to_date, search) + paginacion.
+  - `POST/PUT/DELETE /api/jornadas/{id}` (soft-delete via `is_deleted`).
+  - `GET /api/jornadas/{id}` y `/{id}/summary` con KPIs (total_sold, patients_count, cash_balance, cumplimiento meta).
+  - Transiciones: `/activate` (valida fuente de inventario) · `/start-closing` · `/close` · `/cancel` (motivo obligatorio, sin ventas/pacientes) · `/reopen` (solo superadmin, motivo obligatorio).
+- **Gating de plan**: `_require_module()` valida que la empresa tenga `jornadas` en `plan.modules`. Free devuelve HTTP 402. Modulo agregado a seed Basic + Enterprise y migracion aplicada a planes existentes.
+- **Auditoria completa**: `JORNADA_CREATED/UPDATED/DELETED/ACTIVATED/START_CLOSING/CLOSED/CANCELLED/REOPENED` con actor, target, metadata (from/to/reason).
+- **Indices Mongo**: `(company_id, status, start_date)`, `(company_id, responsible_branch_id, start_date)`, `(company_id, is_deleted, start_date)`, `(company_id, name)`.
+- **Frontend**: 3 paginas nuevas — `JornadasPage.js` (listado con filtros y cards), `JornadaFormPage.js` (creacion/edicion por 4 pasos), `JornadaPanelPage.js` (panel con KPIs, config, acciones de estado, modal de cancel/reopen).
+- **Sidebar**: item "Jornadas" con icono Tent, visible solo si `hasModule('jornadas')`. Rutas: `/jornadas`, `/jornadas/new`, `/jornadas/:id`, `/jornadas/:id/edit`.
+- **Permisos por rol**: agregado a `RolePermissionsSection.js` (`planKey: 'jornadas'`).
+- **Testing**: `backend/tests/test_jornadas.py` (391 lineas, 19 tests). Resultado pytest: 17 passed, 2 skipped, 0 failed.
+- **Pendiente en Iteraciones 2 y 3**: Caja propia, traslado desde sucursal, POS de la jornada, pacientes con indicador, carga Excel consignacion, cierre validado + liquidacion + reporte PDF/Excel.
+
+
 ### Bugfix Editar Plan + Migracion moneda Q (Feb 2026)
 - **Bug "Plan no encontrado"**: cache de Redis compartida entre entornos servia plans con ObjectIds obsoletos que ya no existian en MongoDB.
   - Fix: namespace de cache ahora incluye `DB_NAME` (`cortexia:{db}:{ns}:{key}`) en `cache.py::_k()`.
