@@ -228,9 +228,24 @@ input:focus, select:focus, textarea:focus, button:focus {
     font-family: 'Inter', 'Manrope', system-ui, sans-serif;
     font-size: 14.5px;
     color: #10213F;
+    -webkit-text-fill-color: #10213F;
+    caret-color: #10213F;
     box-shadow: 0 1px 2px rgba(16, 33, 63, 0.03);
     transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
     outline: none;
+}
+
+/* Fix: Chrome/Safari autofill vuelve el texto transparente / amarillo.
+   Forzamos color y fondo blanco al autocompletarse. */
+.login-input:-webkit-autofill,
+.login-input:-webkit-autofill:hover,
+.login-input:-webkit-autofill:focus,
+.login-input:-webkit-autofill:active {
+    -webkit-text-fill-color: #10213F !important;
+    caret-color: #10213F !important;
+    -webkit-box-shadow: 0 0 0 1000px #FFFFFF inset !important;
+    box-shadow: 0 0 0 1000px #FFFFFF inset, 0 1px 2px rgba(16, 33, 63, 0.03) !important;
+    transition: background-color 5000s ease-in-out 0s;
 }
 
 .login-input::placeholder {
