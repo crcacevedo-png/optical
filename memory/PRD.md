@@ -9,6 +9,22 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### JORNADAS - Iteracion 3: Consignacion Excel + Liquidacion + Reportes (Feb 2026)
+- **Backend** nuevo `routes/jornada_consignment.py` (~900 lineas): carga por Excel, liquidacion y reportes.
+- **Carga Excel** (`openpyxl`, colecciones `jornada_excel_uploads` + productos con `is_consignment_source=true`):
+  - `POST /excel/preview` detecta fila de encabezados (skip logos/titulos), auto-sugiere mapeo por similitud de palabras, retorna preview de filas y estimacion total.
+  - `POST /excel/import` con `mapping_json` (multipart): descripcion y cantidad obligatorios; autocrea productos o los vincula por SKU; consolida duplicados dentro del mismo archivo; hash SHA-256 para idempotencia (rechazo si mismo archivo dos veces); margen por defecto si no hay precio; agrega a `jornada_stock` con `source='consignment'`.
+  - `GET /excel/uploads` historial. `POST /excel/{uid}/revert` elimina stock+productos autocreados solo si no hay ventas.
+- **Liquidacion** (`GET /liquidation`): agrupa por proveedor con items desglosados: vendido/devuelto/faltante, costo, precio, a_pagar (sold*cost), ingreso (sold*price), utilidad. Totales globales.
+- **Reportes finales** con `reportlab` (PDF) y `openpyxl` (Excel):
+  - `GET /report.pdf` con secciones Ventas (metodos, categoria, marca, origen), Inventario (enviado/vendido/devuelto/faltante), Pacientes (nuevos, recurrentes, conversion, recetas), Caja (fondo, neto, egresos por categoria, diferencia arqueo), Liquidacion por proveedor, Meta comercial (% alcanzado), Utilidad bruta y neta.
+  - `GET /report.xlsx` con hoja Resumen + hoja Liquidacion detallada.
+- **Frontend**: nuevo `JornadaExcelImport.js` (wizard 3 pasos: subida -> mapeo con preview -> confirmacion con resumen). Nuevo `JornadaLiquidationTab.js` con KPIs, tarjetas por proveedor, tabla detallada, historial de cargas Excel con revert. Botones "Descargar PDF/Excel" en el header del panel (cuando cerrada/en_cierre) y en la tab Liquidacion. Nueva tab 'Liquidacion' en el panel (6 tabs total).
+- **Testing**: `test_jornada_consignment.py` (13 tests): preview con fila titulo, gating consignment, oversize; import creates/vincula/idempotencia/mapping requerido; revert elimina; liquidation structure; PDF/XLSX magic bytes correctos; multi-tenant 404. **Resultado: 13/13 passed**.
+- **Auditoria**: `JORNADA_EXCEL_IMPORT`, `JORNADA_EXCEL_REVERT`.
+- **Modulo Jornadas COMPLETO**: 3 iteraciones cubriendo requerimiento completo del spec.
+
+
 ### JORNADAS - Iteracion 2: Operacion (Caja + Inventario + POS + Pacientes) (Feb 2026)
 - **Backend** (`routes/jornada_ops.py`, ~600 lineas): endpoints operativos para caja, inventario, POS y pacientes de la jornada.
 - **Caja de jornada** (usa `cash_registers` con `jornada_id`):
