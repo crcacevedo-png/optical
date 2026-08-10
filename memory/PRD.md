@@ -9,6 +9,21 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### JORNADAS - Iteracion 3.1: POS encadenado (Consulta + Receta + Ticket) (Feb 2026)
+- **Backend** en `jornada_ops.py` (extendido):
+  - `POST /jornadas/{jid}/consultations` — consulta rapida con jornada_id + type='jornada' en `consultations`.
+  - `POST /jornadas/{jid}/prescriptions/eyeglass` — receta con jornada_id + consultation_id opcional en `eyeglass_prescriptions`.
+  - `GET /jornadas/{jid}/sales/{sale_id}/receipt.pdf` — ticket 80mm generado con `reportlab.pdfgen.canvas` (header empresa, jornada, items, totales, pagos, saldo pendiente).
+  - `JSaleCreate` extendido con `consultation_id` y `prescription_id`, guardados como ObjectId en `sales`.
+- **Frontend** `JornadaPOSTab.js`:
+  - Botones "Consulta" y "Receta" aparecen al seleccionar paciente; pasan a verde "Consulta OK" / "Receta OK" al guardar.
+  - Modal "Venta registrada" post-cobro con "Ver / Imprimir ticket" (abre PDF) y "Compartir por WhatsApp" (wa.me link) si el paciente tiene telefono.
+  - Ventas recientes clickeables re-abren el modal para reimprimir el ticket.
+- **Auditoria**: `JORNADA_CONSULTATION_CREATED`, `JORNADA_RX_CREATED`.
+- **Testing**: `test_jornada_pos_ticket.py` — **8/8 passed** (consulta OK, rx OK, sale con refs + PDF, 404 sale ajena, multitenant isolation, gating jornada activa).
+- **Total tests Jornadas**: 52 (17 + 14 + 13 + 8).
+
+
 ### JORNADAS - Iteracion 3: Consignacion Excel + Liquidacion + Reportes (Feb 2026)
 - **Backend** nuevo `routes/jornada_consignment.py` (~900 lineas): carga por Excel, liquidacion y reportes.
 - **Carga Excel** (`openpyxl`, colecciones `jornada_excel_uploads` + productos con `is_consignment_source=true`):
