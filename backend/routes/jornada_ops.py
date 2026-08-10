@@ -176,10 +176,9 @@ async def open_cash(jid: str, data: JCashOpen, request: Request, user: dict = De
 @router.get("/{jid}/cash")
 async def get_cash_state(jid: str, user: dict = Depends(get_current_user)):
     """Estado actual de la caja de la jornada (abierta o cerrada mas reciente)."""
-    try:
-        joid = ObjectId(jid)
-    except Exception:
-        raise HTTPException(status_code=400, detail="jornada_id invalido")
+    # Validar que la jornada pertenece a la empresa del usuario (multi-tenant)
+    await _get_jornada_active_or_400(jid, user["company_id"], {"planificada", "activa", "en_cierre", "cerrada", "cancelada"})
+    joid = ObjectId(jid)
     reg = await db.cash_registers.find_one(
         {"company_id": ObjectId(user["company_id"]), "jornada_id": joid},
         sort=[("opened_at", -1)],
@@ -457,11 +456,8 @@ async def list_jornada_inventory(
     jid: str, user: dict = Depends(get_current_user),
     search: Optional[str] = None,
 ):
-    try:
-        joid = ObjectId(jid)
-    except Exception:
-        raise HTTPException(status_code=400, detail="jornada_id invalido")
-    q = {"company_id": ObjectId(user["company_id"]), "jornada_id": joid}
+    j = await _get_jornada_active_or_400(jid, user["company_id"], {"planificada", "activa", "en_cierre", "cerrada", "cancelada"})
+    q = {"company_id": ObjectId(user["company_id"]), "jornada_id": j["_id"]}
     if search:
         q["$or"] = [
             {"product_name": {"$regex": search, "$options": "i"}},
@@ -706,14 +702,11 @@ async def list_jornada_sales(
     jid: str, user: dict = Depends(get_current_user),
     limit: int = Query(100, ge=1, le=500),
 ):
-    try:
-        joid = ObjectId(jid)
-    except Exception:
-        raise HTTPException(status_code=400, detail="jornada_id invalido")
+    j = await _get_jornada_active_or_400(jid, user["company_id"], {"planificada", "activa", "en_cierre", "cerrada", "cancelada"})
     sales = await (
         db.sales.find({
             "company_id": ObjectId(user["company_id"]),
-            "jornada_id": joid,
+            "jornada_id": j["_id"],
         }).sort("_id", -1).limit(limit).to_list(limit)
     )
     # Batch load patients
@@ -860,10 +853,8 @@ async def list_jornada_patients(
     jid: str, user: dict = Depends(get_current_user),
     limit: int = Query(200, ge=1, le=1000),
 ):
-    try:
-        joid = ObjectId(jid)
-    except Exception:
-        raise HTTPException(status_code=400, detail="jornada_id invalido")
+    j = await _get_jornada_active_or_400(jid, user["company_id"], {"planificada", "activa", "en_cierre", "cerrada", "cancelada"})
+    joid = j["_id"]
     patients = await db.patients.find({
         "company_id": ObjectId(user["company_id"]),
         "is_deleted": {"$ne": True},

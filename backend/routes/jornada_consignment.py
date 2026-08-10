@@ -382,12 +382,9 @@ async def import_excel(
 
 @router.get("/{jid}/excel/uploads")
 async def list_excel_uploads(jid: str, user: dict = Depends(get_current_user)):
-    try:
-        joid = ObjectId(jid)
-    except Exception:
-        raise HTTPException(status_code=400, detail="jornada_id invalido")
+    j = await _get_jornada_or_404(jid, user["company_id"])
     rows = await db.jornada_excel_uploads.find({
-        "company_id": ObjectId(user["company_id"]), "jornada_id": joid
+        "company_id": ObjectId(user["company_id"]), "jornada_id": j["_id"]
     }).sort("_id", -1).to_list(100)
     for r in rows:
         serialize_doc(r)

@@ -327,7 +327,9 @@ class TestCA10to12_Patients:
         r2 = s.get(f"{API}/patients?search={phone}", timeout=10)
         assert r2.status_code == 200
         data = r2.json()
-        items = data.get("items") if isinstance(data, dict) else data
+        items = data.get("patients") if isinstance(data, dict) else data
+        if items is None:
+            items = data.get("items") if isinstance(data, dict) else data
         found = [p for p in (items or []) if str(p.get("_id") or p.get("id")) == pid]
         assert found, f"paciente {pid} no aparece en /api/patients"
 

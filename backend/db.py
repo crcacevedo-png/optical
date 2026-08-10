@@ -33,12 +33,15 @@ client = AsyncIOMotorClient(
 db = client[os.environ['DB_NAME']]
 
 def serialize_doc(doc):
-    """Convert all ObjectId fields in a MongoDB document to strings."""
+    """Convert all ObjectId fields in a MongoDB document to strings.
+    Also handles top-level lists of ObjectIds (e.g. jornada_ids)."""
     if doc is None:
         return None
     for key, value in list(doc.items()):
         if isinstance(value, ObjectId):
             doc[key] = str(value)
+        elif isinstance(value, list) and value and any(isinstance(x, ObjectId) for x in value):
+            doc[key] = [str(x) if isinstance(x, ObjectId) else x for x in value]
     return doc
 
 def calculate_age(birth_date_str: str) -> int:

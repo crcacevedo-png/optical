@@ -9,6 +9,15 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### JORNADAS - Test de Aceptacion Completo (CA1..CA22) (Feb 2026)
+- Test comprehensivo `test_jornadas_acceptance.py` (28 tests) validando 1:1 cada uno de los 22 criterios del spec + relaciones cross-collection (patients, sales, stock, inventory_movements).
+- **Bugs encontrados y corregidos**:
+  1. `serialize_doc` no serializaba listas de ObjectIds → `GET /api/patients` devolvia 500 cuando el paciente tenia `jornada_ids`. Fix en `db.py::serialize_doc` para manejar listas top-level de ObjectIds.
+  2. `GET /jornadas/{jid}/cash` retornaba 200 con null cuando la jornada era de otra empresa (no validaba tenancy antes de consultar). Fix: usa `_get_jornada_active_or_400` que valida `company_id` primero. Igual para `/inventory`, `/sales`, `/patients`, `/excel/uploads`.
+- **Resultado final**: **28/28 pasados**. Todos los CA1..CA22 verificados incluyendo: creacion, caja independiente, apertura+movimientos+arqueo+cierre, fuentes de inventario (branch/consignment/mixto), traslado descuenta stock de sucursal, consignacion NO afecta stock, Excel con header row detection + auto-map + preview + errores descargables + autocreacion + vinculacion, revert (con y sin ventas), pacientes en coleccion central con `jornada_ids` filtrable, vincular existente sin duplicar, POS restringido al inventario de la jornada, venta descuenta fuente correcta e ingresa a caja, cierre valida caja + devuelve remanente automaticamente, liquidacion (vendido/devuelto/faltante/a_pagar/utilidad), PDF+XLSX descargables, cerrada solo lectura + reopen solo superadmin auditado, aislamiento multi-tenant en TODOS los endpoints, consolidacion en `/api/sales` global con marca `jornada_id`.
+- **Total tests modulo Jornadas**: 80 (17 + 14 + 13 + 8 + 28 acceptance).
+
+
 ### JORNADAS - Iteracion 3.1: POS encadenado (Consulta + Receta + Ticket) (Feb 2026)
 - **Backend** en `jornada_ops.py` (extendido):
   - `POST /jornadas/{jid}/consultations` — consulta rapida con jornada_id + type='jornada' en `consultations`.
