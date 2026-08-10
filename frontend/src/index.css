@@ -219,20 +219,31 @@ input:focus, select:focus, textarea:focus, button:focus {
 }
 
 .login-input {
+    /* Reset agresivo del user-agent (Chrome/Safari mobile a veces aplica
+       appearance: menulist-button u ocultan fondo en type=email) */
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
     width: 100%;
     height: 54px;
-    border-radius: 14px;
-    border: 1px solid #E3EAF3;
-    background: #FFFFFF;
+    border-radius: 14px !important;
+    border: 1px solid #E3EAF3 !important;
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
     padding: 0 16px 0 46px;
     font-family: 'Inter', 'Manrope', system-ui, sans-serif;
-    font-size: 14.5px;
-    color: #10213F;
-    -webkit-text-fill-color: #10213F;
-    caret-color: #10213F;
+    font-size: 16px; /* 16px+ evita zoom en iOS al enfocar */
+    line-height: 1.4;
+    color: #10213F !important;
+    -webkit-text-fill-color: #10213F !important;
+    caret-color: #10213F !important;
     box-shadow: 0 1px 2px rgba(16, 33, 63, 0.03);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    outline: none !important;
+    box-sizing: border-box;
 }
 
 /* Fix: Chrome/Safari autofill vuelve el texto transparente / amarillo.
