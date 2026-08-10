@@ -608,6 +608,8 @@ class JSaleCreate(BaseModel):
     payments: List[JSalePayment]
     discount: float = 0
     notes: Optional[str] = None
+    consultation_id: Optional[str] = None
+    prescription_id: Optional[str] = None
 
 
 @router.post("/{jid}/sales")
@@ -658,6 +660,8 @@ async def create_jornada_sale(
         "jornada_id": j["_id"],
         "patient_id": ObjectId(data.patient_id) if data.patient_id else None,
         "patient_name_override": data.patient_name_override,
+        "consultation_id": ObjectId(data.consultation_id) if data.consultation_id else None,
+        "prescription_id": ObjectId(data.prescription_id) if data.prescription_id else None,
         "items": [i.model_dump() for i in data.items],
         "subtotal": subtotal,
         "discount": discount,
@@ -872,3 +876,242 @@ async def list_jornada_patients(
         _svc(p)
         p["is_first_capture_here"] = str(p.get("jornada_id_first") or "") == str(joid)
     return {"items": patients, "count": len(patients)}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# CONSULTA / RECETA RAPIDA + TICKET PDF (Iter 3.1 - encadenado en POS)
+# ═══════════════════════════════════════════════════════════════════════
+class JConsultationQuick(BaseModel):
+    patient_id: str
+    reason: Optional[str] = None
+    observations: Optional[str] = None
+    vision_od: Optional[str] = None
+    vision_oi: Optional[str] = None
+
+
+class JEyeglassRxQuick(BaseModel):
+    patient_id: str
+    consultation_id: Optional[str] = None
+    professional_name: Optional[str] = None
+    od_sphere: Optional[float] = None
+    od_cylinder: Optional[float] = None
+    od_axis: Optional[float] = None
+    od_addition: Optional[float] = None
+    od_dp: Optional[float] = None
+    oi_sphere: Optional[float] = None
+    oi_cylinder: Optional[float] = None
+    oi_axis: Optional[float] = None
+    oi_addition: Optional[float] = None
+    oi_dp: Optional[float] = None
+    observations: Optional[str] = None
+    lens_type: Optional[str] = None
+    frame_type: Optional[str] = None
+
+
+@router.post("/{jid}/consultations")
+async def create_jornada_consultation(
+    jid: str, data: JConsultationQuick, request: Request,
+    user: dict = Depends(get_current_user),
+):
+    j = await _get_jornada_active_or_400(jid, user["company_id"], {"activa"})
+    try:
+        pid = ObjectId(data.patient_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="patient_id invalido") from exc
+    company_oid = ObjectId(user["company_id"])
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "company_id": company_oid,
+        "branch_id": j["responsible_branch_id"],
+        "jornada_id": j["_id"],
+        "patient_id": pid,
+        "professional_id": ObjectId(user["_id"]),
+        "professional_name": user.get("name"),
+        "date": now,
+        "reason": data.reason,
+        "observations": data.observations,
+        "vision_od": data.vision_od,
+        "vision_oi": data.vision_oi,
+        "type": "jornada",
+        "created_at": now,
+        "created_by": ObjectId(user["_id"]),
+    }
+    result = await db.consultations.insert_one(doc)
+    await log_audit(
+        "JORNADA_CONSULTATION_CREATED",
+        actor_id=user["_id"], actor_email=user.get("email"), actor_role=user["role"],
+        company_id=user.get("company_id"), target_id=str(result.inserted_id),
+        target_type="consultation", metadata={"jornada_id": jid, "patient_id": data.patient_id},
+        request=request,
+    )
+    return {"_id": str(result.inserted_id), "message": "Consulta registrada"}
+
+
+@router.post("/{jid}/prescriptions/eyeglass")
+async def create_jornada_prescription(
+    jid: str, data: JEyeglassRxQuick, request: Request,
+    user: dict = Depends(get_current_user),
+):
+    j = await _get_jornada_active_or_400(jid, user["company_id"], {"activa"})
+    try:
+        pid = ObjectId(data.patient_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="patient_id invalido") from exc
+    company_oid = ObjectId(user["company_id"])
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "company_id": company_oid,
+        "patient_id": pid,
+        "jornada_id": j["_id"],
+        "consultation_id": ObjectId(data.consultation_id) if data.consultation_id else None,
+        "professional_name": data.professional_name or user.get("name"),
+        "od_sphere": data.od_sphere, "od_cylinder": data.od_cylinder,
+        "od_axis": data.od_axis, "od_addition": data.od_addition, "od_dp": data.od_dp,
+        "oi_sphere": data.oi_sphere, "oi_cylinder": data.oi_cylinder,
+        "oi_axis": data.oi_axis, "oi_addition": data.oi_addition, "oi_dp": data.oi_dp,
+        "observations": data.observations,
+        "lens_type": data.lens_type, "frame_type": data.frame_type,
+        "created_at": now, "created_by": ObjectId(user["_id"]),
+    }
+    result = await db.eyeglass_prescriptions.insert_one(doc)
+    await log_audit(
+        "JORNADA_RX_CREATED",
+        actor_id=user["_id"], actor_email=user.get("email"), actor_role=user["role"],
+        company_id=user.get("company_id"), target_id=str(result.inserted_id),
+        target_type="prescription", metadata={"jornada_id": jid, "patient_id": data.patient_id},
+        request=request,
+    )
+    return {"_id": str(result.inserted_id), "message": "Receta creada"}
+
+
+@router.get("/{jid}/sales/{sale_id}/receipt.pdf")
+async def sale_receipt_pdf(
+    jid: str, sale_id: str, user: dict = Depends(get_current_user),
+):
+    """Ticket PDF 80mm para impresora termica o compartir por WhatsApp."""
+    from fastapi.responses import StreamingResponse
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+    import io as _io
+
+    j = await _get_jornada_active_or_400(jid, user["company_id"], {"activa", "en_cierre", "cerrada"})
+    try:
+        soid = ObjectId(sale_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="sale_id invalido") from exc
+    sale = await db.sales.find_one({
+        "_id": soid,
+        "company_id": ObjectId(user["company_id"]),
+        "jornada_id": j["_id"],
+    })
+    if not sale:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}) or {}
+    patient_name = "Consumidor final"
+    if sale.get("patient_id"):
+        p = await db.patients.find_one({"_id": sale["patient_id"]})
+        if p:
+            patient_name = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
+    elif sale.get("patient_name_override"):
+        patient_name = sale["patient_name_override"]
+
+    width = 80 * mm
+    lines_items = len(sale.get("items") or [])
+    lines_pay = len(sale.get("payments") or [])
+    height = (60 + 6 * lines_items + 6 * lines_pay + 40) * mm
+    buf = _io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(width, height))
+
+    y = height - 8 * mm
+    c.setFont("Helvetica-Bold", 10)
+    c.drawCentredString(width / 2, y, str(company.get("name") or "Cortexia Optical"))
+    y -= 4 * mm
+    c.setFont("Helvetica", 7)
+    if company.get("phone"):
+        c.drawCentredString(width / 2, y, f"Tel: {company.get('phone')}")
+        y -= 3 * mm
+    if company.get("address"):
+        c.drawCentredString(width / 2, y, str(company.get("address"))[:40])
+        y -= 3 * mm
+    y -= 2 * mm
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(width / 2, y, "* JORNADA *")
+    y -= 3.5 * mm
+    c.setFont("Helvetica", 7)
+    c.drawCentredString(width / 2, y, str(j.get("name") or "")[:42])
+    y -= 3 * mm
+    if j.get("location"):
+        c.drawCentredString(width / 2, y, str(j.get("location"))[:42])
+        y -= 3 * mm
+    y -= 1 * mm
+    c.line(4 * mm, y, width - 4 * mm, y)
+    y -= 3 * mm
+    c.setFont("Helvetica", 7)
+    date_str = (sale.get("created_at") or "")[:19].replace("T", " ")
+    c.drawString(4 * mm, y, f"Ticket: {str(sale['_id'])[-8:].upper()}")
+    c.drawRightString(width - 4 * mm, y, date_str)
+    y -= 3.5 * mm
+    c.drawString(4 * mm, y, f"Cliente: {patient_name[:35]}")
+    y -= 3.5 * mm
+    c.line(4 * mm, y, width - 4 * mm, y)
+    y -= 3 * mm
+    c.setFont("Helvetica-Bold", 7)
+    c.drawString(4 * mm, y, "Producto")
+    c.drawRightString(width - 4 * mm, y, "Total")
+    y -= 3 * mm
+    c.setFont("Helvetica", 7)
+    for it in (sale.get("items") or []):
+        name = str(it.get("name", ""))[:30]
+        qty = int(it.get("quantity", 0))
+        price = float(it.get("price", 0))
+        line_total = float(it.get("total", qty * price))
+        c.drawString(4 * mm, y, f"{name}")
+        c.drawRightString(width - 4 * mm, y, f"Q {line_total:.2f}")
+        y -= 3 * mm
+        c.drawString(6 * mm, y, f"  {qty} x Q {price:.2f}")
+        y -= 3.5 * mm
+    y -= 1 * mm
+    c.line(4 * mm, y, width - 4 * mm, y)
+    y -= 3 * mm
+    c.setFont("Helvetica", 7)
+    c.drawString(4 * mm, y, "Subtotal")
+    c.drawRightString(width - 4 * mm, y, f"Q {float(sale.get('subtotal', 0)):.2f}")
+    y -= 3 * mm
+    if float(sale.get("discount", 0)) > 0:
+        c.drawString(4 * mm, y, "Descuento")
+        c.drawRightString(width - 4 * mm, y, f"-Q {float(sale.get('discount', 0)):.2f}")
+        y -= 3 * mm
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(4 * mm, y, "TOTAL")
+    c.drawRightString(width - 4 * mm, y, f"Q {float(sale.get('total', 0)):.2f}")
+    y -= 4 * mm
+    c.setFont("Helvetica", 7)
+    method_labels = {"cash": "Efectivo", "card": "Tarjeta", "transfer": "Transf.", "check": "Cheque", "other": "Otro"}
+    for p in (sale.get("payments") or []):
+        m = method_labels.get(p.get("method"), p.get("method", ""))
+        c.drawString(4 * mm, y, f"Pago {m}")
+        c.drawRightString(width - 4 * mm, y, f"Q {float(p.get('amount', 0)):.2f}")
+        y -= 3 * mm
+    if float(sale.get("balance", 0)) > 0.01:
+        c.setFont("Helvetica-Bold", 8)
+        c.setFillColor(colors.HexColor("#d97706"))
+        c.drawString(4 * mm, y, "SALDO PENDIENTE")
+        c.drawRightString(width - 4 * mm, y, f"Q {float(sale.get('balance', 0)):.2f}")
+        c.setFillColor(colors.black)
+        y -= 3.5 * mm
+    y -= 2 * mm
+    c.line(4 * mm, y, width - 4 * mm, y)
+    y -= 3 * mm
+    c.setFont("Helvetica", 6)
+    c.drawCentredString(width / 2, y, "Gracias por su compra")
+    y -= 3 * mm
+    c.drawCentredString(width / 2, y, "www.cortexiaoptical.com")
+
+    c.showPage()
+    c.save()
+    buf.seek(0)
+    return StreamingResponse(
+        buf, media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename=ticket_{sale_id}.pdf"},
+    )

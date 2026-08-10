@@ -10,7 +10,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../components/ui/select';
 import { toast } from 'sonner';
-import { ShoppingCart, Search, Plus, Minus, Trash2, User } from 'lucide-react';
+import { ShoppingCart, Search, Plus, Minus, Trash2, User, Stethoscope, Eye, MessageCircle, Printer } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from '../components/ui/dialog';
+import { Textarea } from '../components/ui/textarea';
 
 const fmtQ = (n) => `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -35,6 +39,14 @@ export default function JornadaPOSTab({ jornada, reload }) {
   const [payments, setPayments] = useState([{ method: 'cash', amount: 0, reference: '' }]);
   const [processing, setProcessing] = useState(false);
   const [recentSales, setRecentSales] = useState([]);
+  // Iter 3.1 - encadenar consulta/receta y ticket
+  const [consultationId, setConsultationId] = useState(null);
+  const [prescriptionId, setPrescriptionId] = useState(null);
+  const [consultDialog, setConsultDialog] = useState(false);
+  const [rxDialog, setRxDialog] = useState(false);
+  const [ticketDialog, setTicketDialog] = useState(null); // saved sale info
+  const [consultForm, setConsultForm] = useState({ reason: '', observations: '', vision_od: '', vision_oi: '' });
+  const [rxForm, setRxForm] = useState({ od_sphere: '', od_cylinder: '', od_axis: '', od_addition: '', oi_sphere: '', oi_cylinder: '', oi_axis: '', oi_addition: '', lens_type: '', observations: '' });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,6 +132,42 @@ export default function JornadaPOSTab({ jornada, reload }) {
     setPatientQuery('');
     setDiscount(0);
     setPayments([{ method: 'cash', amount: 0, reference: '' }]);
+    setConsultationId(null);
+    setPrescriptionId(null);
+  };
+
+  const saveConsultation = async () => {
+    if (!patient) { toast.error('Selecciona un paciente primero'); return; }
+    setProcessing(true);
+    try {
+      const res = await api.post(`/api/jornadas/${jid}/consultations`, {
+        patient_id: patient._id, ...consultForm,
+      });
+      setConsultationId(res.data._id);
+      toast.success('Consulta registrada y vinculada');
+      setConsultDialog(false);
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail));
+    } finally { setProcessing(false); }
+  };
+
+  const saveRx = async () => {
+    if (!patient) { toast.error('Selecciona un paciente primero'); return; }
+    setProcessing(true);
+    try {
+      const payload = { patient_id: patient._id, consultation_id: consultationId };
+      Object.entries(rxForm).forEach(([k, v]) => {
+        if (v !== '' && v !== null) {
+          payload[k] = ['lens_type', 'observations'].includes(k) ? v : parseFloat(v);
+        }
+      });
+      const res = await api.post(`/api/jornadas/${jid}/prescriptions/eyeglass`, payload);
+      setPrescriptionId(res.data._id);
+      toast.success('Receta creada y vinculada');
+      setRxDialog(false);
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail));
+    } finally { setProcessing(false); }
   };
 
   const submitSale = async () => {
@@ -127,15 +175,22 @@ export default function JornadaPOSTab({ jornada, reload }) {
     if (paid <= 0 && total > 0) { toast.error('Debe registrar al menos un pago (o balance sera saldo pendiente)'); }
     setProcessing(true);
     try {
-      await api.post(`/api/jornadas/${jid}/sales`, {
+      const res = await api.post(`/api/jornadas/${jid}/sales`, {
         patient_id: patient?._id || null,
         patient_name_override: patient ? null : (patientQuery || null),
         items: cart.map(c => ({ product_id: c.product_id, name: c.name, quantity: c.quantity, price: c.price, total: c.price * c.quantity })),
         payments: payments.filter(p => parseFloat(p.amount) > 0).map(p => ({ method: p.method, amount: parseFloat(p.amount), reference: p.reference })),
         discount: parseFloat(discount) || 0,
         notes: null,
+        consultation_id: consultationId,
+        prescription_id: prescriptionId,
       });
       toast.success(balance > 0.01 ? `Venta con saldo pendiente ${fmtQ(balance)}` : 'Venta registrada');
+      // Guardar info para modal de ticket
+      setTicketDialog({
+        sale_id: res.data._id, total, patient_name: patient ? `${patient.first_name} ${patient.last_name}` : (patientQuery || 'Consumidor final'),
+        patient_phone: patient?.whatsapp || patient?.phone,
+      });
       resetSale();
       load(); reload?.();
     } catch (err) {
@@ -239,6 +294,26 @@ export default function JornadaPOSTab({ jornada, reload }) {
                 )}
               </div>
             )}
+            {patient && (
+              <div className="flex gap-1.5 pt-1">
+                <Button
+                  size="sm" variant={consultationId ? "default" : "outline"}
+                  className={`flex-1 h-7 text-[11px] ${consultationId ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
+                  onClick={() => setConsultDialog(true)}
+                  data-testid="jpos-consult-btn"
+                >
+                  <Stethoscope className="w-3 h-3 mr-1" /> {consultationId ? 'Consulta OK' : 'Consulta'}
+                </Button>
+                <Button
+                  size="sm" variant={prescriptionId ? "default" : "outline"}
+                  className={`flex-1 h-7 text-[11px] ${prescriptionId ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
+                  onClick={() => setRxDialog(true)}
+                  data-testid="jpos-rx-btn"
+                >
+                  <Eye className="w-3 h-3 mr-1" /> {prescriptionId ? 'Receta OK' : 'Receta'}
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Discount */}
@@ -285,7 +360,9 @@ export default function JornadaPOSTab({ jornada, reload }) {
             <div className="space-y-1.5 max-h-36 overflow-y-auto text-xs">
               {recentSales.map(s => (
                 <div key={s._id} className="flex items-center justify-between p-1.5 rounded hover:bg-slate-50">
-                  <span className="text-slate-500">{s.patient_name}</span>
+                  <button type="button" className="text-slate-500 hover:text-pine-900 truncate max-w-[140px] text-left" onClick={() => setTicketDialog({ sale_id: s._id, total: s.total, patient_name: s.patient_name, patient_phone: null })} data-testid={`jpos-recent-${s._id}`}>
+                    {s.patient_name}
+                  </button>
                   <span className="font-semibold">{fmtQ(s.total)}</span>
                 </div>
               ))}
@@ -293,6 +370,123 @@ export default function JornadaPOSTab({ jornada, reload }) {
           </CardContent></Card>
         )}
       </div>
+
+      {/* Consulta rapida */}
+      <Dialog open={consultDialog} onOpenChange={setConsultDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Consulta rapida</DialogTitle>
+            <DialogDescription>Registra la consulta y se vinculara automaticamente a esta venta.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Motivo</Label>
+              <Input value={consultForm.reason} onChange={(e) => setConsultForm({ ...consultForm, reason: e.target.value })} placeholder="Ej. Vision borrosa" data-testid="jpos-consult-reason" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <Label>Vision OD</Label>
+                <Input value={consultForm.vision_od} onChange={(e) => setConsultForm({ ...consultForm, vision_od: e.target.value })} placeholder="20/20" data-testid="jpos-consult-od" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Vision OI</Label>
+                <Input value={consultForm.vision_oi} onChange={(e) => setConsultForm({ ...consultForm, vision_oi: e.target.value })} placeholder="20/40" data-testid="jpos-consult-oi" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Observaciones</Label>
+              <Textarea rows={2} value={consultForm.observations} onChange={(e) => setConsultForm({ ...consultForm, observations: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConsultDialog(false)}>Cancelar</Button>
+            <Button className="bg-pine-900 hover:bg-pine-800" disabled={processing} onClick={saveConsultation} data-testid="jpos-consult-save">
+              {processing ? 'Guardando...' : 'Guardar consulta'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Receta rapida */}
+      <Dialog open={rxDialog} onOpenChange={setRxDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Receta de lentes rapida</DialogTitle>
+            <DialogDescription>La receta quedara vinculada al paciente y a la venta.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-5 gap-2 items-end">
+              <Label className="text-xs">Ojo</Label>
+              <Label className="text-xs text-center">Esfera</Label>
+              <Label className="text-xs text-center">Cilindro</Label>
+              <Label className="text-xs text-center">Eje</Label>
+              <Label className="text-xs text-center">Add</Label>
+            </div>
+            {['od', 'oi'].map((eye) => (
+              <div key={eye} className="grid grid-cols-5 gap-2 items-center">
+                <Label className="text-xs font-semibold uppercase">{eye}</Label>
+                <Input type="number" step="0.25" value={rxForm[`${eye}_sphere`]} onChange={(e) => setRxForm({ ...rxForm, [`${eye}_sphere`]: e.target.value })} className="text-center text-xs h-8" data-testid={`jpos-rx-${eye}-sphere`} />
+                <Input type="number" step="0.25" value={rxForm[`${eye}_cylinder`]} onChange={(e) => setRxForm({ ...rxForm, [`${eye}_cylinder`]: e.target.value })} className="text-center text-xs h-8" />
+                <Input type="number" step="1" value={rxForm[`${eye}_axis`]} onChange={(e) => setRxForm({ ...rxForm, [`${eye}_axis`]: e.target.value })} className="text-center text-xs h-8" />
+                <Input type="number" step="0.25" value={rxForm[`${eye}_addition`]} onChange={(e) => setRxForm({ ...rxForm, [`${eye}_addition`]: e.target.value })} className="text-center text-xs h-8" />
+              </div>
+            ))}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <Label>Tipo de lente</Label>
+                <Input value={rxForm.lens_type} onChange={(e) => setRxForm({ ...rxForm, lens_type: e.target.value })} placeholder="Monofocal / Progresivo" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Observaciones</Label>
+                <Input value={rxForm.observations} onChange={(e) => setRxForm({ ...rxForm, observations: e.target.value })} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRxDialog(false)}>Cancelar</Button>
+            <Button className="bg-pine-900 hover:bg-pine-800" disabled={processing} onClick={saveRx} data-testid="jpos-rx-save">
+              {processing ? 'Guardando...' : 'Guardar receta'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ticket / WhatsApp share */}
+      <Dialog open={ticketDialog !== null} onOpenChange={(o) => { if (!o) setTicketDialog(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-center">Venta registrada</DialogTitle>
+          </DialogHeader>
+          {ticketDialog && (
+            <div className="space-y-3">
+              <div className="text-center py-3">
+                <p className="text-xs text-slate-400 uppercase">Total cobrado</p>
+                <p className="font-heading text-3xl font-bold text-pine-900">{fmtQ(ticketDialog.total)}</p>
+                <p className="text-sm text-slate-500 mt-1">{ticketDialog.patient_name}</p>
+              </div>
+              <a
+                href={`${process.env.REACT_APP_BACKEND_URL}/api/jornadas/${jid}/sales/${ticketDialog.sale_id}/receipt.pdf`}
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full bg-pine-900 hover:bg-pine-800 text-white text-sm font-medium py-2.5 rounded-md transition-colors"
+                data-testid="ticket-view-pdf"
+              >
+                <Printer className="w-4 h-4" /> Ver / Imprimir ticket
+              </a>
+              {ticketDialog.patient_phone && (
+                <a
+                  href={`https://wa.me/${(ticketDialog.patient_phone || '').replace(/\D/g, '')}?text=${encodeURIComponent(`Gracias por su compra en la jornada. Ticket: ${process.env.REACT_APP_BACKEND_URL}/api/jornadas/${jid}/sales/${ticketDialog.sale_id}/receipt.pdf`)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full bg-[#25D366] hover:bg-[#20b859] text-white text-sm font-medium py-2.5 rounded-md transition-colors"
+                  data-testid="ticket-whatsapp"
+                >
+                  <MessageCircle className="w-4 h-4" /> Compartir por WhatsApp
+                </a>
+              )}
+              <Button variant="outline" className="w-full" onClick={() => setTicketDialog(null)}>Cerrar</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
