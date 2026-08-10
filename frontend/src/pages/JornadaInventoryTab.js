@@ -13,7 +13,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '../components/ui/dialog';
 import { toast } from 'sonner';
-import { Package, Truck, Search, Plus, Minus, RefreshCw } from 'lucide-react';
+import { Package, Truck, Search, Plus, Minus, RefreshCw, FileSpreadsheet } from 'lucide-react';
+import JornadaExcelImport from './JornadaExcelImport';
 
 const fmtQ = (n) => `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -32,6 +33,7 @@ export default function JornadaInventoryTab({ jornada, reload }) {
   const [processing, setProcessing] = useState(false);
   const [adjustDialog, setAdjustDialog] = useState(null); // row being adjusted
   const [adjustForm, setAdjustForm] = useState({ delta: 0, reason: 'dano', notes: '' });
+  const [excelOpen, setExcelOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,8 +128,14 @@ export default function JornadaInventoryTab({ jornada, reload }) {
               <Truck className="w-4 h-4 mr-1.5" /> Traslado desde sucursal
             </Button>
           )}
+          {canOperate && jornada.inventory_config?.use_consignment && (
+            <Button size="sm" variant="outline" onClick={() => setExcelOpen(true)} data-testid="jinv-excel-btn">
+              <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Cargar Excel consignacion
+            </Button>
+          )}
         </div>
       </div>
+      <JornadaExcelImport jornadaId={jid} open={excelOpen} onClose={() => setExcelOpen(false)} onSuccess={load} />
 
       {loading ? (
         <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pine-900" /></div>

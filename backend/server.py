@@ -18,7 +18,7 @@ from routes import (
     prescriptions, inventory, sales, quotations, consultations,
     finance, reports, users, suppliers, plans, superadmin, announcements,
     notifications, security, data_export, audit_log, onboarding, health_metrics,
-    cash_register, support_tickets, billing, jornadas, jornada_ops
+    cash_register, support_tickets, billing, jornadas, jornada_ops, jornada_consignment
 )
 
 app = FastAPI(title="Cortexia Optical API")
@@ -60,6 +60,7 @@ api_router.include_router(support_tickets.router)
 api_router.include_router(billing.router)
 api_router.include_router(jornadas.router)
 api_router.include_router(jornada_ops.router)
+api_router.include_router(jornada_consignment.router)
 # Webhook Stripe: se registra a nivel raiz (no dentro de /api) porque el path
 # ya incluye /api/webhook/stripe segun la libreria emergentintegrations.
 app.include_router(billing.webhook_router)

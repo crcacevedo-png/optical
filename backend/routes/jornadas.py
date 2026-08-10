@@ -458,6 +458,15 @@ async def close_jornada(
         user, request,
     )
     res["returned_products"] = returned_count
+
+    # Liquidacion de consignacion (info al cerrar)
+    consign_count = await db.jornada_stock.count_documents({
+        "company_id": company_oid, "jornada_id": j["_id"], "source": "consignment",
+    })
+    if consign_count > 0:
+        res["consignment_liquidation_hint"] = (
+            "Consulta /api/jornadas/{id}/liquidation y descarga el reporte PDF/Excel"
+        )
     return res
 
 

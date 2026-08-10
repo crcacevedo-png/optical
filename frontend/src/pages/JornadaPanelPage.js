@@ -13,12 +13,13 @@ import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Tent, Calendar, MapPin, Building2, User, Wallet, Package, Users,
-  ShoppingCart, DollarSign, Target, Edit, Play, PauseCircle, CheckCircle2, XCircle, RotateCcw, AlertCircle, LayoutDashboard,
+  ShoppingCart, DollarSign, Target, Edit, Play, PauseCircle, CheckCircle2, XCircle, RotateCcw, AlertCircle, LayoutDashboard, FileDown, FileSpreadsheet, Receipt,
 } from 'lucide-react';
 import JornadaCashTab from './JornadaCashTab';
 import JornadaInventoryTab from './JornadaInventoryTab';
 import JornadaPatientsTab from './JornadaPatientsTab';
 import JornadaPOSTab from './JornadaPOSTab';
+import JornadaLiquidationTab from './JornadaLiquidationTab';
 
 const STATUS_META = {
   planificada: { label: 'Planificada', cls: 'bg-slate-100 text-slate-700 border-slate-200' },
@@ -141,17 +142,32 @@ export default function JornadaPanelPage() {
               <RotateCcw className="w-4 h-4 mr-1.5" /> Reabrir
             </Button>
           )}
+          {(j.status === 'cerrada' || j.status === 'en_cierre') && (
+            <>
+              <Button size="sm" variant="outline" asChild data-testid="report-pdf-btn">
+                <a href={`${process.env.REACT_APP_BACKEND_URL}/api/jornadas/${id}/report.pdf`} target="_blank" rel="noopener noreferrer">
+                  <FileDown className="w-4 h-4 mr-1.5" /> Reporte PDF
+                </a>
+              </Button>
+              <Button size="sm" variant="outline" asChild data-testid="report-xlsx-btn">
+                <a href={`${process.env.REACT_APP_BACKEND_URL}/api/jornadas/${id}/report.xlsx`} target="_blank" rel="noopener noreferrer">
+                  <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Reporte Excel
+                </a>
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
       {/* Tabs */}
       <Tabs defaultValue="resumen" className="w-full" data-testid="jornada-tabs">
-        <TabsList className="grid grid-cols-5 w-full lg:w-auto lg:inline-flex">
+        <TabsList className="grid grid-cols-3 lg:grid-cols-6 w-full lg:w-auto lg:inline-flex">
           <TabsTrigger value="resumen" data-testid="tab-resumen"><LayoutDashboard className="w-3.5 h-3.5 mr-1.5" /> Resumen</TabsTrigger>
           <TabsTrigger value="inventario" data-testid="tab-inventario"><Package className="w-3.5 h-3.5 mr-1.5" /> Inventario</TabsTrigger>
           <TabsTrigger value="pacientes" data-testid="tab-pacientes"><Users className="w-3.5 h-3.5 mr-1.5" /> Pacientes</TabsTrigger>
           <TabsTrigger value="pos" data-testid="tab-pos" disabled={j.status !== 'activa'}><ShoppingCart className="w-3.5 h-3.5 mr-1.5" /> POS</TabsTrigger>
           <TabsTrigger value="caja" data-testid="tab-caja"><Wallet className="w-3.5 h-3.5 mr-1.5" /> Caja</TabsTrigger>
+          <TabsTrigger value="liquidacion" data-testid="tab-liquidacion"><Receipt className="w-3.5 h-3.5 mr-1.5" /> Liquidacion</TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumen" className="mt-4 space-y-4">
@@ -211,6 +227,7 @@ export default function JornadaPanelPage() {
         <TabsContent value="pacientes" className="mt-4"><JornadaPatientsTab jornada={j} reload={load} /></TabsContent>
         <TabsContent value="pos" className="mt-4"><JornadaPOSTab jornada={j} reload={load} /></TabsContent>
         <TabsContent value="caja" className="mt-4"><JornadaCashTab jornada={j} reload={load} /></TabsContent>
+        <TabsContent value="liquidacion" className="mt-4"><JornadaLiquidationTab jornada={j} /></TabsContent>
       </Tabs>
 
       {/* Cancel / Reopen modal */}
