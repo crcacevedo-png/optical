@@ -9,6 +9,33 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### JORNADAS - Iteracion 2: Operacion (Caja + Inventario + POS + Pacientes) (Feb 2026)
+- **Backend** (`routes/jornada_ops.py`, ~600 lineas): endpoints operativos para caja, inventario, POS y pacientes de la jornada.
+- **Caja de jornada** (usa `cash_registers` con `jornada_id`):
+  - `POST /api/jornadas/{jid}/cash/open` (solo mode='own'), `GET /cash` (register + totals), `POST /cash/movements` (ingreso/egreso con category y descripcion), `POST /cash/close` (arqueo con conteo fisico, diff obligatorio si difiere, opcional traslado neto a caja de sucursal).
+  - Compute totales: ventas de jornada por metodo, ingresos/egresos manuales, expected_cash, egresos_by_category.
+- **Inventario** (colecciones nuevas `jornada_stock` + `jornada_transfers`):
+  - `POST /inventory/transfer` desde sucursal (descuenta stock, upsert en jornada_stock, audita).
+  - `GET /inventory` consolidado con initial/sold/adjusted/current qty + valor.
+  - `POST /inventory/adjust` (delta +/-, motivo obligatorio, solo admin).
+  - `POST /inventory/return` traslado inverso a sucursal fuente.
+- **POS de jornada** (extiende `sales` con `jornada_id`):
+  - `POST /{jid}/sales` valida stock en jornada_stock, requiere caja abierta si mode='own', crea venta multi-payment, descuenta stock e incrementa contadores agregados.
+  - `GET /{jid}/sales` listado con paciente resuelto.
+- **Pacientes** (extiende `patients` con `jornada_id_first` + `jornada_ids`):
+  - `POST /patients/search` para deteccion de duplicados por DPI/telefono/nombre.
+  - `POST /patients` crea nuevo o vincula existente (add jornada al historial).
+  - `GET /patients` lista pacientes con flag `is_first_capture_here`.
+- **Cierre con validacion** (`POST /jornadas/{jid}/close`):
+  - Rechaza si hay caja abierta o ventas en borrador.
+  - Devuelve automaticamente remanente `source='branch'` a la sucursal origen (traslado inverso).
+- **Frontend**: `JornadaPanelPage.js` refactorizado con 5 tabs. 4 archivos nuevos: `JornadaCashTab.js`, `JornadaInventoryTab.js`, `JornadaPatientsTab.js`, `JornadaPOSTab.js`.
+- **Indices Mongo nuevos**: `jornada_stock (company, jornada, product)`, `(company, jornada, source)`, `jornada_transfers (company, jornada, created_at)`, `cash_registers (company, jornada, status)`, `sales (company, jornada, _id)`, `patients (company, jornada_ids)`.
+- **Auditoria**: JORNADA_CASH_OPENED/MOVEMENT/CLOSED, JORNADA_INV_TRANSFER/ADJUST/RETURN, JORNADA_SALE_CREATED, JORNADA_PATIENT_CREATED/LINKED.
+- **Testing**: `test_jornada_ops.py` (14 tests). Resultado: **14 passed, 0 failed**.
+- **Pendiente Iter 3**: Carga Excel consignacion, liquidacion, reporte PDF/Excel, inclusion en reportes de sucursal con filtro.
+
+
 ### JORNADAS - Iteracion 1: Cimientos (Feb 2026)
 Modulo nuevo de brigadas visuales / eventos fuera de sucursal. Multi-tenant, opcional por plan.
 - **Backend**: `routes/jornadas.py` (481 lineas), coleccion `jornadas`, modelos `JornadaCreate/Update/StatusChange/CashConfig/InventoryConfig` en `models.py`.
