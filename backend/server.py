@@ -18,7 +18,7 @@ from routes import (
     prescriptions, inventory, sales, quotations, consultations,
     finance, reports, users, suppliers, plans, superadmin, announcements,
     notifications, security, data_export, audit_log, onboarding, health_metrics,
-    cash_register, support_tickets, billing, jornadas
+    cash_register, support_tickets, billing, jornadas, jornada_ops
 )
 
 app = FastAPI(title="Cortexia Optical API")
@@ -59,6 +59,7 @@ api_router.include_router(cash_register.router)
 api_router.include_router(support_tickets.router)
 api_router.include_router(billing.router)
 api_router.include_router(jornadas.router)
+api_router.include_router(jornada_ops.router)
 # Webhook Stripe: se registra a nivel raiz (no dentro de /api) porque el path
 # ya incluye /api/webhook/stripe segun la libreria emergentintegrations.
 app.include_router(billing.webhook_router)
@@ -279,6 +280,13 @@ async def startup():
     await db.jornadas.create_index([("company_id", 1), ("responsible_branch_id", 1), ("start_date", -1)])
     await db.jornadas.create_index([("company_id", 1), ("is_deleted", 1), ("start_date", -1)])
     await db.jornadas.create_index([("company_id", 1), ("name", 1)])
+    # Iter 2: operativos (caja, inventario, ventas, pacientes)
+    await db.jornada_stock.create_index([("company_id", 1), ("jornada_id", 1), ("product_id", 1)])
+    await db.jornada_stock.create_index([("company_id", 1), ("jornada_id", 1), ("source", 1)])
+    await db.jornada_transfers.create_index([("company_id", 1), ("jornada_id", 1), ("created_at", -1)])
+    await db.cash_registers.create_index([("company_id", 1), ("jornada_id", 1), ("status", 1)])
+    await db.sales.create_index([("company_id", 1), ("jornada_id", 1), ("_id", -1)])
+    await db.patients.create_index([("company_id", 1), ("jornada_ids", 1)])
 
     logger.info("MongoDB indexes verified/created OK")
     

@@ -383,17 +383,82 @@ async def start_closing(jid: str, request: Request, user: dict = Depends(get_cur
 async def close_jornada(
     jid: str, request: Request, user: dict = Depends(get_current_user),
 ):
-    """En cierre -> Cerrada. En iteracion 1 solo cambia estado; la liquidacion
-    y validaciones completas de caja/inventario se anaden en iteracion 3."""
+    """En cierre -> Cerrada. Valida caja cerrada (si es propia) y devuelve
+    inventario remanente de sucursal automaticamente."""
     await _require_module(user)
     if user["role"] not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Solo administradores")
-    now = datetime.now(timezone.utc).isoformat()
-    return await _change_status(
+    j = await _get_jornada_or_404(jid, user.get("company_id"))
+    if j["status"] != "en_cierre":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Transicion invalida: {j['status']} -> cerrada. Inicia el cierre primero.",
+        )
+
+    # Validacion 1: si tiene caja propia, debe estar cerrada
+    if (j.get("cash_config") or {}).get("mode") == "own":
+        open_reg = await db.cash_registers.find_one({
+            "company_id": ObjectId(user["company_id"]),
+            "jornada_id": j["_id"], "status": "open",
+        })
+        if open_reg:
+            raise HTTPException(
+                status_code=400,
+                detail="La caja de la jornada esta abierta. Ciera la caja antes de finalizar.",
+            )
+
+    # Validacion 2: ventas en borrador (por si en el futuro se agregan)
+    draft_sales = await db.sales.count_documents({
+        "company_id": ObjectId(user["company_id"]),
+        "jornada_id": j["_id"], "status": "borrador",
+    })
+    if draft_sales > 0:
+        raise HTTPException(status_code=400, detail=f"Hay {draft_sales} venta(s) en borrador")
+
+    # Devolucion automatica del remanente de sucursal (si hay)
+    company_oid = ObjectId(user["company_id"])
+    remaining = await db.jornada_stock.find({
+        "company_id": company_oid, "jornada_id": j["_id"],
+        "source": "branch", "current_qty": {"$gt": 0},
+    }).to_list(2000)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    returned_count = 0
+    for row in remaining:
+        qty = int(row.get("current_qty") or 0)
+        if qty <= 0:
+            continue
+        src_bid = row.get("source_branch_id")
+        pid = row.get("product_id")
+        stock_row = await db.stock.find_one({
+            "company_id": company_oid, "branch_id": src_bid, "product_id": pid,
+        })
+        if stock_row:
+            await db.stock.update_one({"_id": stock_row["_id"]}, {"$inc": {"quantity": qty}})
+        else:
+            await db.stock.insert_one({
+                "company_id": company_oid, "branch_id": src_bid,
+                "product_id": pid, "quantity": qty, "created_at": now_iso,
+            })
+        await db.inventory_movements.insert_one({
+            "company_id": company_oid, "branch_id": src_bid, "product_id": pid,
+            "type": "entrada", "quantity": qty,
+            "notes": f"Devolucion desde Jornada: {j.get('name','')} (cierre)",
+            "reference": jid, "reference_type": "jornada_return",
+            "created_at": now_iso, "created_by": ObjectId(user["_id"]),
+        })
+        await db.jornada_stock.update_one(
+            {"_id": row["_id"]},
+            {"$set": {"current_qty": 0, "returned_qty": qty, "updated_at": now_iso}},
+        )
+        returned_count += 1
+
+    res = await _change_status(
         jid, "cerrada", {"en_cierre"}, "JORNADA_CLOSED",
-        {"closed_at": now, "closed_by": ObjectId(user["_id"])},
+        {"closed_at": now_iso, "closed_by": ObjectId(user["_id"])},
         user, request,
     )
+    res["returned_products"] = returned_count
+    return res
 
 
 @router.post("/{jid}/cancel")

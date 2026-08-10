@@ -4,6 +4,7 @@ import { api, formatApiErrorDetail, useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '../components/ui/dialog';
@@ -12,8 +13,12 @@ import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Tent, Calendar, MapPin, Building2, User, Wallet, Package, Users,
-  ShoppingCart, DollarSign, Target, Edit, Play, PauseCircle, CheckCircle2, XCircle, RotateCcw, AlertCircle,
+  ShoppingCart, DollarSign, Target, Edit, Play, PauseCircle, CheckCircle2, XCircle, RotateCcw, AlertCircle, LayoutDashboard,
 } from 'lucide-react';
+import JornadaCashTab from './JornadaCashTab';
+import JornadaInventoryTab from './JornadaInventoryTab';
+import JornadaPatientsTab from './JornadaPatientsTab';
+import JornadaPOSTab from './JornadaPOSTab';
 
 const STATUS_META = {
   planificada: { label: 'Planificada', cls: 'bg-slate-100 text-slate-700 border-slate-200' },
@@ -139,69 +144,74 @@ export default function JornadaPanelPage() {
         </div>
       </div>
 
-      {/* Iter 2/3 notice */}
-      {j.status === 'activa' && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-2.5" data-testid="wip-notice">
-          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm">
-            <p className="font-semibold text-amber-800">Modulos en construccion</p>
-            <p className="text-amber-700 mt-0.5">
-              Caja propia, inventario, punto de venta y pacientes de jornada estan en desarrollo. Por ahora puedes gestionar el ciclo de vida (estados) y la configuracion.
-            </p>
+      {/* Tabs */}
+      <Tabs defaultValue="resumen" className="w-full" data-testid="jornada-tabs">
+        <TabsList className="grid grid-cols-5 w-full lg:w-auto lg:inline-flex">
+          <TabsTrigger value="resumen" data-testid="tab-resumen"><LayoutDashboard className="w-3.5 h-3.5 mr-1.5" /> Resumen</TabsTrigger>
+          <TabsTrigger value="inventario" data-testid="tab-inventario"><Package className="w-3.5 h-3.5 mr-1.5" /> Inventario</TabsTrigger>
+          <TabsTrigger value="pacientes" data-testid="tab-pacientes"><Users className="w-3.5 h-3.5 mr-1.5" /> Pacientes</TabsTrigger>
+          <TabsTrigger value="pos" data-testid="tab-pos" disabled={j.status !== 'activa'}><ShoppingCart className="w-3.5 h-3.5 mr-1.5" /> POS</TabsTrigger>
+          <TabsTrigger value="caja" data-testid="tab-caja"><Wallet className="w-3.5 h-3.5 mr-1.5" /> Caja</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="resumen" className="mt-4 space-y-4">
+          {/* KPIs */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="jornada-kpis">
+            <KpiCard icon={ShoppingCart} label="Vendido" value={fmtQ(kpis.total_sold)} subtitle={`${kpis.sales_count} venta(s)`} color="from-emerald-500 to-teal-500" />
+            <KpiCard icon={Users} label="Pacientes" value={kpis.patients_count} subtitle={kpis.goal_patients ? `Meta: ${kpis.goal_patients}` : '—'} color="from-blue-500 to-blue-600" pct={kpis.goal_patients_pct} />
+            <KpiCard icon={Wallet} label="Saldo caja" value={fmtQ(kpis.cash_balance)} subtitle="Efectivo neto" color="from-amber-500 to-orange-500" />
+            <KpiCard icon={Target} label="Meta comercial" value={kpis.goal_amount ? fmtQ(kpis.goal_amount) : '—'} subtitle={kpis.goal_amount_pct != null ? `${kpis.goal_amount_pct}% alcanzado` : 'Sin meta'} color="from-violet-500 to-purple-500" pct={kpis.goal_amount_pct} />
           </div>
-        </div>
-      )}
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="jornada-kpis">
-        <KpiCard icon={ShoppingCart} label="Vendido" value={fmtQ(kpis.total_sold)} subtitle={`${kpis.sales_count} venta(s)`} color="from-emerald-500 to-teal-500" />
-        <KpiCard icon={Users} label="Pacientes" value={kpis.patients_count} subtitle={kpis.goal_patients ? `Meta: ${kpis.goal_patients}` : '—'} color="from-blue-500 to-blue-600" pct={kpis.goal_patients_pct} />
-        <KpiCard icon={Wallet} label="Saldo caja" value={fmtQ(kpis.cash_balance)} subtitle="Efectivo neto" color="from-amber-500 to-orange-500" />
-        <KpiCard icon={Target} label="Meta comercial" value={kpis.goal_amount ? fmtQ(kpis.goal_amount) : '—'} subtitle={kpis.goal_amount_pct != null ? `${kpis.goal_amount_pct}% alcanzado` : 'Sin meta'} color="from-violet-500 to-purple-500" pct={kpis.goal_amount_pct} />
-      </div>
+          {/* Config summary + Descripcion */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <Card className="border-slate-200/80 lg:col-span-2" data-testid="jornada-config">
+              <CardHeader className="pb-3"><CardTitle className="text-base font-heading">Configuracion</CardTitle></CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <ConfigRow icon={Wallet} label="Caja">
+                  {j.cash_config?.mode === 'own' ? (
+                    <>Caja propia · Fondo inicial {fmtQ(j.cash_config?.initial_fund)}</>
+                  ) : 'Caja de la sucursal'}
+                </ConfigRow>
+                <ConfigRow icon={Package} label="Inventario">
+                  <div className="flex flex-wrap gap-1.5">
+                    {j.inventory_config?.use_branch_stock && <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">Traslado sucursal</Badge>}
+                    {j.inventory_config?.use_consignment && <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200">Consignacion</Badge>}
+                    {!j.inventory_config?.use_branch_stock && !j.inventory_config?.use_consignment && <span className="text-slate-400">Sin configurar</span>}
+                  </div>
+                </ConfigRow>
+                {j.price_list_discount_percent != null && (
+                  <ConfigRow icon={DollarSign} label="Descuento global">{j.price_list_discount_percent}%</ConfigRow>
+                )}
+                {j.partner_entity && (
+                  <ConfigRow icon={Building2} label="Entidad aliada">{j.partner_entity}</ConfigRow>
+                )}
+                {(j.address || j.municipality || j.department) && (
+                  <ConfigRow icon={MapPin} label="Direccion">
+                    {[j.address, j.municipality, j.department].filter(Boolean).join(', ')}
+                  </ConfigRow>
+                )}
+              </CardContent>
+            </Card>
 
-      {/* Config summary + Descripcion */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="border-slate-200/80 lg:col-span-2" data-testid="jornada-config">
-          <CardHeader className="pb-3"><CardTitle className="text-base font-heading">Configuracion</CardTitle></CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <ConfigRow icon={Wallet} label="Caja">
-              {j.cash_config?.mode === 'own' ? (
-                <>Caja propia · Fondo inicial {fmtQ(j.cash_config?.initial_fund)}</>
-              ) : 'Caja de la sucursal'}
-            </ConfigRow>
-            <ConfigRow icon={Package} label="Inventario">
-              <div className="flex flex-wrap gap-1.5">
-                {j.inventory_config?.use_branch_stock && <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">Traslado sucursal</Badge>}
-                {j.inventory_config?.use_consignment && <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200">Consignacion</Badge>}
-                {!j.inventory_config?.use_branch_stock && !j.inventory_config?.use_consignment && <span className="text-slate-400">Sin configurar</span>}
-              </div>
-            </ConfigRow>
-            {j.price_list_discount_percent != null && (
-              <ConfigRow icon={DollarSign} label="Descuento global">{j.price_list_discount_percent}%</ConfigRow>
-            )}
-            {j.partner_entity && (
-              <ConfigRow icon={Building2} label="Entidad aliada">{j.partner_entity}</ConfigRow>
-            )}
-            {(j.address || j.municipality || j.department) && (
-              <ConfigRow icon={MapPin} label="Direccion">
-                {[j.address, j.municipality, j.department].filter(Boolean).join(', ')}
-              </ConfigRow>
-            )}
-          </CardContent>
-        </Card>
+            <Card className="border-slate-200/80" data-testid="jornada-notes">
+              <CardHeader className="pb-3"><CardTitle className="text-base font-heading">Notas internas</CardTitle></CardHeader>
+              <CardContent>
+                {j.description ? (
+                  <p className="text-sm text-slate-600 whitespace-pre-wrap">{j.description}</p>
+                ) : (
+                  <p className="text-sm text-slate-400 italic">Sin notas</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-        <Card className="border-slate-200/80" data-testid="jornada-notes">
-          <CardHeader className="pb-3"><CardTitle className="text-base font-heading">Notas internas</CardTitle></CardHeader>
-          <CardContent>
-            {j.description ? (
-              <p className="text-sm text-slate-600 whitespace-pre-wrap">{j.description}</p>
-            ) : (
-              <p className="text-sm text-slate-400 italic">Sin notas</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+        <TabsContent value="inventario" className="mt-4"><JornadaInventoryTab jornada={j} reload={load} /></TabsContent>
+        <TabsContent value="pacientes" className="mt-4"><JornadaPatientsTab jornada={j} reload={load} /></TabsContent>
+        <TabsContent value="pos" className="mt-4"><JornadaPOSTab jornada={j} reload={load} /></TabsContent>
+        <TabsContent value="caja" className="mt-4"><JornadaCashTab jornada={j} reload={load} /></TabsContent>
+      </Tabs>
 
       {/* Cancel / Reopen modal */}
       <Dialog open={actionModal !== null} onOpenChange={(o) => { if (!o) { setActionModal(null); setReason(''); } }}>
