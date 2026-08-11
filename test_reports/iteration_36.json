@@ -1,0 +1,35 @@
+{
+  "summary": "Tested new Agenda features: GET /api/appointments/reminders endpoint and frontend flows (next-appt modal after consultation save + Recordatorios manana widget in AgendaPage). Backend: 8/8 pytest tests PASSED covering structure, status exclusion, 502 GT prefix for 8-digit phones, when_word (hoy/manana), days_ahead range validation (400 for -1 and 31), superadmin 403, unauth 401. Frontend: verified reminders-open-btn, reminders-dialog empty state, and full flow of creating a new consultation which auto-opens next-appt-dialog (default date = today+6 months). Quick buttons 1 semana/1 mes/3 meses correctly recalculate the date. 'Ahora no' closes without creating. All data-testids present and functional.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dialogs (both reminders and next-appt)", "issues": ["Radix DialogContent warning in console: 'Missing Description or aria-describedby'. Accessibility improvement - low priority."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_appointment_reminders.py",
+    "/app/test_reports/pytest/reminders_results.xml"
+  ],
+  "action_items": [
+    "(Optional a11y) Add DialogDescription or aria-describedby to reminders-dialog and next-appt-dialog to remove Radix accessibility warning."
+  ],
+  "critical_code_review_comments": [
+    "URL encoding of the WhatsApp message in appointments.py L64 is manual (only encodes ' ', '!', '?'). Characters like '\u00e1', '\u00e9', ',', ':' etc are not encoded. Consider using urllib.parse.quote for robustness (currently 'manana' avoids accents but if company_name contains accents or commas the URL may render differently in WhatsApp Web).",
+    "Endpoint /reminders correctly excludes cancelled/completed/no_asistio and applies company_id + branch_id filtering; multi-tenant isolation is guaranteed by ObjectId(user['company_id']) filter.",
+    "Frontend AgendaPage: reminders fetched on mount with days_ahead=1; if the user leaves the page open across midnight, the count may be stale. Consider refetching when the reminders modal is opened.",
+    "ConsultationsPage: modal auto-open uses setTimeout 300ms after openDetail. Works but tightly coupled to a race. Consider chaining after openDetail() awaits."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% (all flows verified)"},
+  "test_credentials": "admin@cortexia.gt / Demo123! ; superadmin@cortexia.com / Montecristo2026",
+  "seed_data_creation": "Created TESTReminder Paciente (phone/whatsapp 55551234) + 6 appointments (today + tomorrow variants across statuses). Cleanup runs on pytest fixture teardown, but the patient record itself and any front-end triggered appts may persist (TEST_ prefix in notes).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend endpoint /api/appointments/reminders is stable. Test file at /app/backend/tests/test_appointment_reminders.py can be reused for regression. Frontend uses native browser date/time inputs (type=date/time) inside the next-appt-dialog and reminders-dialog. No shadcn calendar used here (matches existing pattern in the app).",
+  "rca of the issue": "N/A - feature works as specified."
+}

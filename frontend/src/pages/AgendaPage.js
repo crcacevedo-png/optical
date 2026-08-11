@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { BranchFilter } from '../components/BranchFilter';
 import {
   Plus, CalendarIcon, ChevronLeft, ChevronRight,
-  Check, X, MoreHorizontal, Clock
+  Check, X, MoreHorizontal, Clock, MessageCircle, Phone
 } from 'lucide-react';
 import {
   format, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths,
@@ -91,6 +91,17 @@ export default function AgendaPage() {
 
   useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
   useEffect(() => { fetchPatients(); }, [fetchPatients]);
+
+  // Recordatorios de manana via WhatsApp
+  const [reminders, setReminders] = useState({ date: '', items: [] });
+  const [remindersOpen, setRemindersOpen] = useState(false);
+  const fetchReminders = useCallback(async () => {
+    try {
+      const { data } = await api.get('/api/appointments/reminders', { params: { days_ahead: 1 } });
+      setReminders(data);
+    } catch (err) { /* silent */ }
+  }, []);
+  useEffect(() => { fetchReminders(); }, [fetchReminders]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -347,7 +358,22 @@ export default function AgendaPage() {
           <h1 className="font-heading text-2xl sm:text-3xl font-semibold text-slate-900">Agenda</h1>
           <p className="text-slate-500 mt-1">Gestiona las citas de tus pacientes</p>
         </div>
-        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setRemindersOpen(true)}
+            className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+            data-testid="reminders-open-btn"
+          >
+            <MessageCircle className="w-4 h-4 mr-2" />
+            Recordatorios manana
+            {reminders.count > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] font-bold">
+                {reminders.count}
+              </span>
+            )}
+          </Button>
+          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogTrigger asChild>
             <Button className="bg-pine-900 hover:bg-pine-700" data-testid="add-appointment-btn">
               <Plus className="w-4 h-4 mr-2" /> Nueva Cita
@@ -442,7 +468,56 @@ export default function AgendaPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
+      {/* Modal: Recordatorios de manana */}
+      <Dialog open={remindersOpen} onOpenChange={setRemindersOpen}>
+        <DialogContent className="sm:max-w-lg" data-testid="reminders-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-heading">Recordatorios para manana</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-xs text-slate-500">
+              {reminders.date ? `Citas del ${reminders.date} — ${reminders.count || 0} paciente(s)` : 'Cargando...'}
+            </p>
+            {(reminders.items || []).length === 0 ? (
+              <div className="py-6 text-center text-sm text-slate-400 italic">No hay citas para manana</div>
+            ) : (
+              <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto -mx-2">
+                {(reminders.items || []).map((a) => (
+                  <div key={a._id} className="flex items-center gap-3 py-2.5 px-2" data-testid={`reminder-${a._id}`}>
+                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                      <Clock className="w-4 h-4 text-emerald-700" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-800 text-sm truncate">{a.patient_name}</p>
+                      <p className="text-xs text-slate-500">
+                        {a.time} · {a.patient_phone || 'sin telefono'}
+                      </p>
+                    </div>
+                    {a.whatsapp_url ? (
+                      <a
+                        href={a.whatsapp_url}
+                        target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20b859] text-white text-xs font-medium px-3 py-1.5 rounded-md"
+                        data-testid={`reminder-wa-${a._id}`}
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" /> Enviar
+                      </a>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 italic">sin WhatsApp</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-100">
+              Al hacer click en &quot;Enviar&quot; se abre WhatsApp Web con el mensaje pre-armado. Confirma y envia desde WhatsApp.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Controls Bar */}
       <Card className="border-slate-200/80">

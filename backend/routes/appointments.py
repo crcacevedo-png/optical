@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from bson import ObjectId
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date as _date, timedelta
 from typing import Optional
 
 from db import db, serialize_doc
@@ -8,6 +8,66 @@ from auth_utils import get_current_user
 from models import AppointmentCreate, AppointmentUpdate
 
 router = APIRouter(prefix="/appointments", tags=["Agenda"])
+
+
+@router.get("/reminders")
+async def upcoming_reminders(
+    user: dict = Depends(get_current_user),
+    days_ahead: int = 1,
+    branch_id: Optional[str] = None,
+):
+    """Devuelve citas de dias venideros (default: manana) con datos de paciente
+    y un mensaje pre-armado para compartir por WhatsApp Web."""
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="SuperAdmin no puede ver citas")
+    if days_ahead < 0 or days_ahead > 30:
+        raise HTTPException(status_code=400, detail="days_ahead debe estar entre 0 y 30")
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1}) or {}
+    target = (_date.today() + timedelta(days=days_ahead)).isoformat()
+    query = {
+        "company_id": ObjectId(user["company_id"]),
+        "date": target,
+        "status": {"$nin": ["cancelada", "completada", "no_asistio"]},
+    }
+    if branch_id:
+        query["branch_id"] = ObjectId(branch_id)
+    elif user.get("branch_id"):
+        query["branch_id"] = ObjectId(user["branch_id"])
+    appts = await db.appointments.find(query).sort([("time", 1)]).to_list(500)
+    pids = [ObjectId(a["patient_id"]) for a in appts if a.get("patient_id")]
+    pmap: dict = {}
+    if pids:
+        docs = await db.patients.find(
+            {"_id": {"$in": pids}}, {"first_name": 1, "last_name": 1, "phone": 1, "whatsapp": 1}
+        ).to_list(len(pids))
+        pmap = {str(d["_id"]): d for d in docs}
+    company_name = company.get("name") or "Cortexia Optical"
+    when_word = {0: "hoy", 1: "manana"}.get(days_ahead, f"el {target}")
+    out: list = []
+    for a in appts:
+        serialize_doc(a)
+        p = pmap.get(a.get("patient_id")) or {}
+        name = f"{p.get('first_name','')} {p.get('last_name','')}".strip() or "Paciente"
+        phone = (p.get("whatsapp") or p.get("phone") or "").strip()
+        digits = "".join(ch for ch in phone if ch.isdigit())
+        # Prefijo 502 (Guatemala) si el numero tiene 8 digitos
+        if digits and len(digits) == 8:
+            digits = "502" + digits
+        message = (
+            f"Hola {p.get('first_name','')}, le recordamos su cita en {company_name} "
+            f"{when_word} {target} a las {a.get('time','')}. "
+            f"Si necesita reprogramar, respondanos por este medio. Gracias!"
+        )
+        a["patient_name"] = name
+        a["patient_phone"] = phone
+        a["whatsapp_url"] = (
+            f"https://wa.me/{digits}?text={message.replace(' ', '%20').replace('!', '%21').replace('?', '%3F')}"
+            if digits else None
+        )
+        a["reminder_message"] = message
+        out.append(a)
+    return {"date": target, "count": len(out), "items": out}
+
 
 @router.get("")
 async def list_appointments(

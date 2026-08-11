@@ -9,6 +9,13 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Agenda - Proxima cita al terminar consulta + Recordatorios WhatsApp (Feb 2026)
+- **Backend** `routes/appointments.py`: nuevo `GET /api/appointments/reminders?days_ahead=1` retorna las citas del dia objetivo con `patient_name`, `patient_phone`, `reminder_message` y `whatsapp_url` (link wa.me con mensaje pre-armado URL-encoded). Anade prefijo 502 automatico a telefonos de 8 digitos (Guatemala). Excluye status cancelada/completada/no_asistio. Multi-tenant por `company_id`. Rechaza superadmin (403) y `days_ahead` fuera de [0,30] (400).
+- **Frontend** `ConsultationsPage.js`: al guardar consulta NUEVA (no edicion), abre modal "Agendar proxima cita" con fecha default a +6 meses, botones rapidos (1 semana / 1 mes / 3 meses / 6 meses / 1 ano) y POST a `/api/appointments` con patient_id + professional_id de la consulta. Opcion "Ahora no" para saltar.
+- **Frontend** `AgendaPage.js`: boton "Recordatorios manana" en header (con contador badge) abre modal listando citas del dia siguiente. Cada item tiene boton verde WhatsApp que abre `wa.me/{phone}?text={message}` en nueva pestana. Mensaje personalizado con nombre del paciente, empresa, fecha y hora.
+- **Testing**: 8/8 pytest tests + verificacion frontend end-to-end (`reminders_results.xml`).
+
+
 ### JORNADAS - Test de Aceptacion Completo (CA1..CA22) (Feb 2026)
 - Test comprehensivo `test_jornadas_acceptance.py` (28 tests) validando 1:1 cada uno de los 22 criterios del spec + relaciones cross-collection (patients, sales, stock, inventory_movements).
 - **Bugs encontrados y corregidos**:
