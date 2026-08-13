@@ -70,9 +70,11 @@ app.include_router(billing.webhook_router)
 
 # Global search
 @api_router.get("/search")
-async def global_search(q: str = Query(..., min_length=2), user: dict = Depends(get_current_user)):
+async def global_search(q: str = Query(..., min_length=2, max_length=100), user: dict = Depends(get_current_user)):
     company_id = ObjectId(user["company_id"])
-    regex = {"$regex": q, "$options": "i"}
+    # SEC hardening: escape user input para prevenir ReDoS y regex injection
+    import re
+    regex = {"$regex": re.escape(q), "$options": "i"}
     results = []
     patients = await db.patients.find(
         {"company_id": company_id, "$or": [{"first_name": regex}, {"last_name": regex}, {"phone": regex}, {"dpi": regex}]},

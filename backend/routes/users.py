@@ -28,7 +28,21 @@ async def list_users(user: dict = Depends(get_current_user)):
 async def create_user(data: UserCreate, request: Request, user: dict = Depends(get_current_user), company_id: Optional[str] = None):
     if user["role"] not in ["admin", "superadmin"]:
         raise HTTPException(status_code=403, detail="Acceso denegado")
-    
+
+    # SEC-002 fix (Feb 2026): Allowlist estricta de roles asignables
+    # - Admin (cliente): solo puede crear roles no-privilegiados (user, doctor).
+    # - Superadmin: puede crear cualquier rol conocido.
+    # Rechaza roles desconocidos con 400 y roles privilegiados desde admin con 403.
+    ALLOWED_ROLES_FOR_ADMIN = {"user", "doctor"}
+    ALLOWED_ROLES_FOR_SUPERADMIN = {"user", "doctor", "admin", "superadmin"}
+    requested_role = (data.role or "").strip()
+    if user["role"] == "admin":
+        if requested_role not in ALLOWED_ROLES_FOR_ADMIN:
+            raise HTTPException(status_code=403, detail="No puede asignar este rol")
+    else:  # superadmin
+        if requested_role not in ALLOWED_ROLES_FOR_SUPERADMIN:
+            raise HTTPException(status_code=400, detail="Rol invalido")
+
     is_valid, msg = validate_password_strength(data.password)
     if not is_valid:
         raise HTTPException(status_code=400, detail=msg)
@@ -39,24 +53,28 @@ async def create_user(data: UserCreate, request: Request, user: dict = Depends(g
     
     target_company_id = None
     if user["role"] == "superadmin":
-        if not company_id:
-            raise HTTPException(status_code=400, detail="Debe especificar la empresa (company_id)")
-        target_company_id = ObjectId(company_id)
+        # Superadmin puede crear cuentas sin company (para otros superadmins)
+        if requested_role == "superadmin":
+            target_company_id = None
+        else:
+            if not company_id:
+                raise HTTPException(status_code=400, detail="Debe especificar la empresa (company_id)")
+            target_company_id = ObjectId(company_id)
     else:
         target_company_id = ObjectId(user["company_id"])
     
     user_doc = {
         "email": data.email.lower(), "password_hash": hash_password(data.password),
-        "name": data.name, "role": data.role, "company_id": target_company_id,
+        "name": data.name, "role": requested_role, "company_id": target_company_id,
         "branch_id": ObjectId(data.branch_id) if data.branch_id else None,
         "is_active": True, "created_at": datetime.now(timezone.utc).isoformat()
     }
     result = await db.users.insert_one(user_doc)
     new_user_id = str(result.inserted_id)
     await log_audit("USER_CREATED", actor_id=user["_id"], actor_email=user.get("email"),
-                    actor_role=user["role"], company_id=str(target_company_id),
+                    actor_role=user["role"], company_id=str(target_company_id) if target_company_id else None,
                     target_id=new_user_id, target_type="user",
-                    metadata={"new_user_email": data.email.lower(), "new_user_role": data.role},
+                    metadata={"new_user_email": data.email.lower(), "new_user_role": requested_role},
                     request=request)
     return {"_id": new_user_id, "message": "Usuario creado"}
 
@@ -104,7 +122,7 @@ async def update_user(user_id: str, data: UserUpdate, request: Request, user: di
             raise HTTPException(status_code=403, detail="Solo superadmin puede cambiar roles")
         if is_self:
             raise HTTPException(status_code=400, detail="No puede cambiar su propio rol")
-        if data.role not in ["user", "admin", "superadmin"]:
+        if data.role not in ["user", "doctor", "admin", "superadmin"]:
             raise HTTPException(status_code=400, detail="Rol invalido")
         update_data["role"] = data.role
     

@@ -112,6 +112,40 @@ Modulo nuevo de brigadas visuales / eventos fuera de sucursal. Multi-tenant, opc
 
 ## Lo Implementado
 
+### Security Audit + Hardening (Feb 2026)
+Auditoria de seguridad completa (read-only) con 2 findings CRITICOS (P0) y varios P3. Todos los fixes de codigo aplicados y verificados.
+
+**SEC-002 (P0 - RESUELTO)**: Privilege escalation via role mass-assignment.
+- Bug: `POST /api/users` aceptaba `role: str` arbitrario. Un admin cliente podia crear `role=superadmin` y escalar a cross-tenant.
+- Fix en `routes/users.py::create_user`: allowlist estricta:
+  - Admin (cliente): solo puede crear `user`, `doctor`.
+  - Superadmin: puede crear cualquier rol conocido.
+  - Roles fuera de allowlist -> 403 (admin) / 400 (superadmin con rol invalido).
+- PUT `/users/{id}` tambien incluye `doctor` en la lista de roles validos.
+- Verificado via curl E2E: admin creando superadmin/admin -> 403; admin creando user/doctor -> 200.
+
+**SEC-001 (P0 - RESUELTO EN PREVIEW)**: JWT_SECRET expuesto en historial de git.
+- JWT_SECRET aparecia 3 veces en commits antiguos del historial (aunque `.env` ya estaba en `.gitignore` y no era trackeado actualmente).
+- Rotado en preview con `secrets.token_urlsafe(64)` (86 chars). Nuevo valor aparece 0 veces en historial. Login funcional post-rotacion.
+- **Accion pendiente del usuario**: rotar en produccion via Emergent Deployments env config los mismos secrets (JWT_SECRET, ADMIN_PASSWORD, MONGO_URL, RESEND_API_KEY, EMERGENT_LLM_KEY, REDIS_URL).
+
+**SEC-003 (P3 - RESUELTO)**: ReDoS/regex injection en 8 search endpoints.
+- Fix: todos los `$regex` con input del usuario ahora usan `re.escape(input[:100])`:
+  - `server.py::global_search` (agregado `max_length=100`)
+  - `routes/companies.py::list_companies`, `patients.py::list_patients`, `inventory.py::list_products`
+  - `routes/suppliers.py::list_suppliers`, `jornadas.py::list_jornadas`
+  - `routes/jornada_ops.py` (busqueda de productos + deteccion duplicados de pacientes)
+  - `routes/audit_log.py::list_audit_logs`
+
+**SEC-004 (P3 - RESUELTO)**: Onboarding step_id sin allowlist.
+- Bug: `PUT /api/onboarding/status` construia clave `$set` a partir de input del usuario (`onboarding_progress.{step_id}`).
+- Fix en `routes/onboarding.py`: `ALLOWED_STEP_IDS = {"company_data", "branches", "users", "inventory", "first_patient", "first_sale", "change_password"}`. Match exacto con los steps del `OnboardingPage.js` frontend.
+
+**Hardening adicional (P3 - RESUELTO)**: `settings.py::update_my_company` bloqueaba `is_active` toggle self-service.
+- `BLOCKED_FIELDS = {"is_active", "plan_id", "reactivated_at", "reactivated_by", "deactivated_reason", "deactivated_at", "needs_reactivation_feedback"}`. Solo SuperAdmin puede tocarlos desde `/admin/opticas`.
+
+**Verdict final del auditor**: `CONDITIONAL PASS - NEEDS ATTENTION` — todos los fixes de codigo verificados; solo pendiente rotacion manual de secrets en produccion.
+
 ### Feedback rapido post-reactivacion + Nota de reglas de desactivacion (Feb 2026)
 
 **Feedback rapido cuando se reactiva una optica**:

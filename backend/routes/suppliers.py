@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from bson import ObjectId
 from datetime import datetime, timezone
 from typing import Optional
+import re
 
 from db import db, serialize_doc
 from auth_utils import get_current_user
@@ -16,7 +17,7 @@ async def list_suppliers(user: dict = Depends(get_current_user), search: Optiona
     
     query = {"company_id": ObjectId(user["company_id"]), "is_active": {"$ne": False}}
     if search:
-        regex = {"$regex": search, "$options": "i"}
+        regex = {"$regex": re.escape(search[:100]), "$options": "i"}
         query["$or"] = [{"name": regex}, {"contact_name": regex}, {"phone": regex}]
     
     suppliers = await db.suppliers.find(query).sort("name", 1).to_list(500)

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from bson import ObjectId
 from datetime import datetime, timezone
 from typing import Optional
+import re
 
 from db import db, serialize_doc
 from auth_utils import get_current_user
@@ -25,10 +26,11 @@ async def list_products(user: dict = Depends(get_current_user), category: Option
         if category:
             query["category"] = category
         if search:
+            safe = re.escape(search[:100])
             query["$or"] = [
-                {"name": {"$regex": search, "$options": "i"}},
-                {"sku": {"$regex": search, "$options": "i"}},
-                {"brand": {"$regex": search, "$options": "i"}},
+                {"name": {"$regex": safe, "$options": "i"}},
+                {"sku": {"$regex": safe, "$options": "i"}},
+                {"brand": {"$regex": safe, "$options": "i"}},
             ]
         products = await db.products.find(query).to_list(500)
         for p in products:

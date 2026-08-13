@@ -10,6 +10,7 @@ from routes.notifications import create_notification
 from email_service import queue_email, render_welcome_company
 import object_storage as objstore
 import os
+import re
 
 router = APIRouter(prefix="/companies", tags=["Empresas"])
 
@@ -25,10 +26,12 @@ async def list_companies(
 
     query = {}
     if search:
+        # SEC hardening: escape user input para prevenir ReDoS
+        safe = re.escape(search)
         query = {"$or": [
-            {"name": {"$regex": search, "$options": "i"}},
-            {"email": {"$regex": search, "$options": "i"}},
-            {"tax_id": {"$regex": search, "$options": "i"}},
+            {"name": {"$regex": safe, "$options": "i"}},
+            {"email": {"$regex": safe, "$options": "i"}},
+            {"tax_id": {"$regex": safe, "$options": "i"}},
         ]}
 
     companies = await db.companies.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)

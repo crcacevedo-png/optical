@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Query
 from bson import ObjectId
 from datetime import datetime, timezone
 from typing import Optional
+import re
 
 from db import db, serialize_doc
 from auth_utils import get_current_user
@@ -122,7 +123,7 @@ async def list_jornadas(
             date_q["$lte"] = to_date
         query["start_date"] = date_q
     if search:
-        query["name"] = {"$regex": search, "$options": "i"}
+        query["name"] = {"$regex": re.escape(search[:100]), "$options": "i"}
 
     total = await db.jornadas.count_documents(query)
     items = await (

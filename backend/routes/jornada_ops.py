@@ -18,6 +18,7 @@ from bson import ObjectId
 from datetime import datetime, timezone
 from typing import Optional, List, Literal
 from pydantic import BaseModel, Field
+import re
 
 from db import db, serialize_doc
 from auth_utils import get_current_user
@@ -459,10 +460,11 @@ async def list_jornada_inventory(
     j = await _get_jornada_active_or_400(jid, user["company_id"], {"planificada", "activa", "en_cierre", "cerrada", "cancelada"})
     q = {"company_id": ObjectId(user["company_id"]), "jornada_id": j["_id"]}
     if search:
+        safe = re.escape(search[:100])
         q["$or"] = [
-            {"product_name": {"$regex": search, "$options": "i"}},
-            {"product_sku": {"$regex": search, "$options": "i"}},
-            {"product_brand": {"$regex": search, "$options": "i"}},
+            {"product_name": {"$regex": safe, "$options": "i"}},
+            {"product_sku": {"$regex": safe, "$options": "i"}},
+            {"product_brand": {"$regex": safe, "$options": "i"}},
         ]
     items = await db.jornada_stock.find(q).sort("product_name", 1).to_list(2000)
     total_value = 0.0
@@ -764,8 +766,8 @@ async def find_duplicates(
         or_clauses.append({"phone": data.phone.strip()})
     if (data.first_name or "").strip() and (data.last_name or "").strip():
         or_clauses.append({
-            "first_name": {"$regex": f"^{data.first_name.strip()}$", "$options": "i"},
-            "last_name": {"$regex": f"^{data.last_name.strip()}$", "$options": "i"},
+            "first_name": {"$regex": f"^{re.escape(data.first_name.strip())}$", "$options": "i"},
+            "last_name": {"$regex": f"^{re.escape(data.last_name.strip())}$", "$options": "i"},
         })
     if not or_clauses:
         return {"matches": []}

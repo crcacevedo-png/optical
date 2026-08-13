@@ -1,6 +1,7 @@
 """Endpoint para que el SuperAdmin consulte el audit log."""
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
+import re
 
 from db import db, serialize_doc
 from auth_utils import get_current_user
@@ -25,7 +26,7 @@ async def list_audit_logs(
     if action:
         query["action"] = action
     if actor_email:
-        query["actor_email"] = {"$regex": actor_email, "$options": "i"}
+        query["actor_email"] = {"$regex": re.escape(actor_email[:100]), "$options": "i"}
     if company_id:
         from bson import ObjectId
         try:

@@ -53,7 +53,14 @@ async def get_my_company(user: dict = Depends(get_current_user)):
 async def update_my_company(data: CompanyUpdate, user: dict = Depends(get_current_user)):
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
-    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    # SEC hardening (Feb 2026): filtrar campos sensibles que admin NO puede auto-modificar.
+    # is_active toggle solo lo puede hacer el SuperAdmin desde /admin/opticas.
+    BLOCKED_FIELDS = {"is_active", "plan_id", "reactivated_at", "reactivated_by",
+                       "deactivated_reason", "deactivated_at", "needs_reactivation_feedback"}
+    update_data = {
+        k: v for k, v in data.model_dump().items()
+        if v is not None and k not in BLOCKED_FIELDS
+    }
     if not update_data:
         raise HTTPException(status_code=400, detail="Sin datos para actualizar")
     await db.companies.update_one({"_id": ObjectId(user["company_id"])}, {"$set": update_data})

@@ -8,6 +8,19 @@ from auth_utils import get_current_user
 
 router = APIRouter(prefix="/onboarding", tags=["Onboarding"])
 
+# SEC hardening (Feb 2026): allowlist explicita de step_ids validos.
+# Sin esto, un cliente podria inyectar keys arbitrarias en el sub-documento
+# `onboarding_progress` via el $set con clave construida a partir de input.
+ALLOWED_STEP_IDS = {
+    "company_data",
+    "branches",
+    "users",
+    "inventory",
+    "first_patient",
+    "first_sale",
+    "change_password",
+}
+
 
 class OnboardingUpdate(BaseModel):
     step_id: str
@@ -29,6 +42,8 @@ async def get_onboarding_status(user: dict = Depends(get_current_user)):
 @router.put("/status")
 async def update_onboarding_step(data: OnboardingUpdate, user: dict = Depends(get_current_user)):
     """Marca un paso del onboarding como completado/pendiente."""
+    if data.step_id not in ALLOWED_STEP_IDS:
+        raise HTTPException(status_code=400, detail="step_id invalido")
     await db.users.update_one(
         {"_id": ObjectId(user["_id"])},
         {"$set": {f"onboarding_progress.{data.step_id}": data.completed}}

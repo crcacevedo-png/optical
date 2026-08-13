@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from bson import ObjectId
 from datetime import datetime, timezone
 from typing import Optional
+import re
 
 from db import db, serialize_doc, calculate_age
 from auth_utils import get_current_user
@@ -56,12 +57,13 @@ async def list_patients(
     
     query = {"company_id": ObjectId(user["company_id"]), "is_deleted": {"$ne": True}}
     if search:
+        safe = re.escape(search[:100])
         query["$or"] = [
-            {"first_name": {"$regex": search, "$options": "i"}},
-            {"last_name": {"$regex": search, "$options": "i"}},
-            {"phone": {"$regex": search, "$options": "i"}},
-            {"whatsapp": {"$regex": search, "$options": "i"}},
-            {"dpi": {"$regex": search, "$options": "i"}}
+            {"first_name": {"$regex": safe, "$options": "i"}},
+            {"last_name": {"$regex": safe, "$options": "i"}},
+            {"phone": {"$regex": safe, "$options": "i"}},
+            {"whatsapp": {"$regex": safe, "$options": "i"}},
+            {"dpi": {"$regex": safe, "$options": "i"}}
         ]
     
     total = await db.patients.count_documents(query)
