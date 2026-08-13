@@ -8,9 +8,9 @@ BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or "").rstrip("/")
 API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "admin@cortexia.gt"
-ADMIN_PASSWORD = "Demo123!"
+ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD") or os.getenv("DEMO_PASSWORD","")
 SUPERADMIN_EMAIL = "superadmin@cortexia.com"
-SUPERADMIN_PASSWORD = "Montecristo2026"
+SUPERADMIN_PASSWORD = os.getenv("TEST_SUPERADMIN_PASSWORD") or os.getenv("ADMIN_PASSWORD","")
 
 JORNADA_ACTIVE_ID = "6a793f0e1c71bc5b4d9c98ba"
 PATIENT_ID = "6a7943f350b4d516a5cb0fec"

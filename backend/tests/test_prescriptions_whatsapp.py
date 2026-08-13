@@ -9,7 +9,7 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://eyecare-erp.preview.
 API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = os.getenv("TEST_ADMIN_EMAIL", "admin@cortexia.gt")
-ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD", "Demo123!")
+ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD", os.getenv("TEST_ADMIN_PASSWORD") or os.getenv("DEMO_PASSWORD",""))
 
 
 @pytest.fixture(scope="module")

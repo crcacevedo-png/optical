@@ -58,7 +58,9 @@ async def create_product(data: ProductCreate, user: dict = Depends(get_current_u
         "company_id": ObjectId(user["company_id"]),
         "name": data.name, "sku": data.sku, "category": data.category, "brand": data.brand,
         "description": data.description, "cost_price": data.cost_price, "sale_price": data.sale_price,
-        "min_stock": data.min_stock, "is_active": True,
+        "min_stock": data.min_stock,
+        "is_external_supplier": bool(data.is_external_supplier),
+        "is_active": True,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     result = await db.products.insert_one(product_doc)
@@ -245,11 +247,19 @@ async def get_stock_alerts(user: dict = Depends(get_current_user), branch_id: Op
     product_ids = list({s["product_id"] for s in stock_items if s.get("product_id")})
     alerts = []
     if product_ids:
-        products = await db.products.find({"_id": {"$in": product_ids}}, {"name": 1, "min_stock": 1, "sku": 1}).to_list(len(product_ids))
+        products = await db.products.find(
+            {"_id": {"$in": product_ids}},
+            {"name": 1, "min_stock": 1, "sku": 1, "is_external_supplier": 1}
+        ).to_list(len(product_ids))
         product_map = {p["_id"]: p for p in products}
         for s in stock_items:
             product = product_map.get(s["product_id"])
-            if product and s["quantity"] <= product.get("min_stock", 5):
+            if not product:
+                continue
+            # Proveedor externo: se pide bajo demanda a laboratorio, no aplica stock minimo.
+            if product.get("is_external_supplier"):
+                continue
+            if s["quantity"] <= product.get("min_stock", 5):
                 alerts.append({
                     "product_id": str(s["product_id"]),
                     "product_name": product["name"],

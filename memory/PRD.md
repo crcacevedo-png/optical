@@ -112,7 +112,32 @@ Modulo nuevo de brigadas visuales / eventos fuera de sucursal. Multi-tenant, opc
 
 ## Lo Implementado
 
-### Caja embebida en modulo Ventas (Feb 2026)
+### Agendar proxima cita + Tracking activacion admin (Feb 2026)
+**Fix bug agenda**: El modal "Agendar proxima cita" al terminar consulta antes solo aparecia en `/consultations`. Ahora tambien aparece cuando la consulta se crea desde el card del paciente en `/patients`.
+- Nuevo componente compartido `components/appointments/NextAppointmentDialog.jsx` (props: open, onOpenChange, patientId, professionalId, professionalName, onSaved). Fecha default = hoy+6 meses, botones rapidos 7/30/90/180/365 dias.
+- `PatientsPage.js::handleCreateConsultation` y `ConsultationsPage.js::handleSave` disparan el modal via `setNextApptCtx()` con delay 300ms.
+
+**Feature tracking de activacion del admin (Issue 2)**:
+- **Backend `auth.py`**: cada login exitoso actualiza `users.last_login_at`. En el PRIMER login se setea `users.first_login_at`. Si el usuario es `role=admin` y es su primer login, se dispara:
+  - Update `companies.admin_activated_at = now`.
+  - Notificacion push al SuperAdmin (`event_type=admin_first_login`, titulo "Optica activada").
+  - Audit log `ADMIN_FIRST_LOGIN`.
+- **Backend `companies.py` `GET /api/companies`**: nueva aggregacion batch de users con role=admin. Cada company retorna: `admin_email`, `admin_name`, `admin_first_login_at`, `admin_last_login_at`, `admin_activated` (bool), `days_since_last_login`, `days_since_created`.
+- **Backend `email_service.py`**: nuevos templates `render_activation_reminder(days_remaining)` y `render_deactivation_notice()`. `render_welcome_company` ahora incluye warning de 30 dias.
+- **Backend `activation_task.py`** (nuevo, ~180 lineas): loop async que corre cada 12h (`ACTIVATION_CHECK_INTERVAL`). Umbral configurable `ACTIVATION_DEADLINE_DAYS=30`.
+  - Dia 23 (7d restantes): envia recordatorio con `tag=reminder_7d`, marca `reminder_7d_sent_at`.
+  - Dia 28 (2d restantes): envia recordatorio urgente `tag=reminder_2d`, marca `reminder_2d_sent_at`.
+  - Dia 30+: desactiva company (`is_active=False`, `deactivated_reason=activation_expired`) + desactiva admin + envia email + notifica al superadmin + audit `COMPANY_DEACTIVATED_ACTIVATION_EXPIRED`.
+  - Filtra admins con `$or:[{first_login_at:None},{exists:False}]` (robusto).
+- **Backend `server.py` startup**: migracion idempotente de backfill — para todos los admins existentes sin `first_login_at`, se setea `first_login_at=$created_at`. Evita que ópticas antiguas se desactiven por error (bug detectado y corregido en la sesion: 5 opticas fueron desactivadas erroneamente y luego restauradas manualmente + backfill agregado).
+- **Frontend `AdminOpticasPage.js`**:
+  - Nuevo helper `getActivationBadge(company)` con logica de estados: `Activo` (login <=7d), `Hace Xd` (7-30d), `Inactivo` (>30d), `Sin activar` (nunca ingreso), `Por expirar` (dia 23-29), `Expirada` (dia 30+).
+  - Filtros clickeables: `Todas / Sin activar / Activas / Inactivas` (data-testid=`activation-filter-{key}`).
+  - Badge en cada card (data-testid=`activation-badge-{company_id}`).
+  - Seccion "Activacion del Administrador" en tab Info del detalle: estado, admin name/email, primer login, ultimo acceso con "hace Xd".
+- **Testing**: 6/6 tests backend PASS + validacion UI end-to-end del testing agent. Test en `/app/backend/tests/test_activation_tracking.py`.
+
+
 - Componente `SalesCashBar` integrado en `SalesPage.js`: muestra estado de caja (abierta/cerrada) con acciones para abrir/cerrar sin salir del modulo.
 - Business rule: `Nueva Venta` queda **deshabilitado** cuando la caja esta cerrada (tooltip "Abre la caja para poder registrar ventas") y el dialog no se abre.
 - Sincronizacion: cada apertura/cierre de caja refresca la lista de ventas.
@@ -259,7 +284,7 @@ Modulo nuevo de brigadas visuales / eventos fuera de sucursal. Multi-tenant, opc
 
 ### Fix Login Produccion - Hardcode SuperAdmin (Mayo 2026)
 - Eliminado el lookup de env var ADMIN_PASSWORD en server.py seed
-- Password hardcodeado "Montecristo2026" para evitar corrupcion de shell ($ expansion) en deploy
+- Password del seed inicial se lee de env var `ADMIN_PASSWORD` (backend/.env). Evita characters especiales de shell (`$`, `!`) si vas a exportarlo sin comillas simples
 - Seed resetea password en cada startup garantizando acceso
 - Verificado en preview: login + /me HTTP 200 OK
 - Requiere REDEPLOY en cortexiaoptical.com para aplicar

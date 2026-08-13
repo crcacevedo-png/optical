@@ -37,13 +37,13 @@ def superadmin():
 
 @pytest.fixture(scope="module")
 def altavista_admin():
-    s, u = login("analuhs@gmail.com", "Alta2026$")
+    s, u = login("analuhs@gmail.com", os.getenv("TEST_ENTERPRISE_ADMIN_PASSWORD",""))
     return s, u
 
 
 @pytest.fixture(scope="module")
 def demo_admin():
-    s, u = login("admin@cortexia.gt", "Demo123!")
+    s, u = login("admin@cortexia.gt", os.getenv("TEST_ADMIN_PASSWORD") or os.getenv("DEMO_PASSWORD",""))
     return s, u
 
 

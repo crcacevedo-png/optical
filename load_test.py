@@ -16,11 +16,14 @@ import statistics
 import time
 from collections import defaultdict
 
+import os
 import httpx
 
+# Credenciales leidas de env vars — nunca hardcodees passwords.
+_DEMO_PASSWORD = os.getenv("DEMO_PASSWORD", "")
 DEFAULT_USERS = [
-    ("admin@cortexia.gt", "Demo123!"),
-    ("vendedor@cortexia.gt", "Demo123!"),
+    ("admin@cortexia.gt", _DEMO_PASSWORD),
+    ("vendedor@cortexia.gt", _DEMO_PASSWORD),
 ]
 
 # Mix realista: mas lecturas que escrituras (patron ERP)

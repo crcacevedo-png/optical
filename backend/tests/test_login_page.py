@@ -25,7 +25,7 @@ class TestLoginAPI:
         """Test successful admin login"""
         response = requests.post(f"{BASE_URL}/api/auth/login", json={
             "email": "admin@cortexia.gt",
-            "password": "Demo123!"
+            "password": os.getenv("TEST_ADMIN_PASSWORD") or os.getenv("DEMO_PASSWORD","")
         })
         assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
         
@@ -55,7 +55,7 @@ class TestLoginAPI:
         """Test successful user login"""
         response = requests.post(f"{BASE_URL}/api/auth/login", json={
             "email": "vendedor@cortexia.gt",
-            "password": "Demo123!"
+            "password": os.getenv("TEST_ADMIN_PASSWORD") or os.getenv("DEMO_PASSWORD","")
         })
         assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
         
@@ -94,7 +94,7 @@ class TestLoginAPI:
         session = requests.Session()
         response = session.post(f"{BASE_URL}/api/auth/login", json={
             "email": "admin@cortexia.gt",
-            "password": "Demo123!"
+            "password": os.getenv("TEST_ADMIN_PASSWORD") or os.getenv("DEMO_PASSWORD","")
         })
         assert response.status_code == 200
         
@@ -112,7 +112,7 @@ class TestLoginAPI:
         # Login first
         login_response = session.post(f"{BASE_URL}/api/auth/login", json={
             "email": "admin@cortexia.gt",
-            "password": "Demo123!"
+            "password": os.getenv("TEST_ADMIN_PASSWORD") or os.getenv("DEMO_PASSWORD","")
         })
         assert login_response.status_code == 200
         

@@ -14,7 +14,7 @@ API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "admin@cortexia.gt"
 VENDEDOR_EMAIL = "vendedor@cortexia.gt"
-PASSWORD = "Demo123!"
+PASSWORD = os.getenv("TEST_ADMIN_PASSWORD") or os.getenv("DEMO_PASSWORD","")
 
 
 def _login(email: str, password: str) -> requests.Session:

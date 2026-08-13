@@ -24,7 +24,7 @@ BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or "https://eyecare-erp.prev
 API = f"{BASE_URL}/api"
 
 BASIC_ADMIN_EMAIL = "admin@cortexia.gt"
-BASIC_ADMIN_PASSWORD = "Demo123!"
+BASIC_ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD") or os.getenv("DEMO_PASSWORD","")
 
 # Jornada existente con consignment ya habilitado (por review request)
 JORNADA_WITH_CONSIGN = "6a793f0e1c71bc5b4d9c98ba"

@@ -37,6 +37,7 @@ export default function AdminOpticasPage() {
     contact_name: '', contact_phone: '', contact_email: '',
     admin_name: '', admin_email: '', admin_password: ''
   });
+  const [activationFilter, setActivationFilter] = useState('todas'); // todas | sin_activar | activas | inactivas
   const [branchForm, setBranchForm] = useState({ name: '', address: '', phone: '', email: '' });
   const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'user', branch_id: '' });
   const [showCompanyPassword, setShowCompanyPassword] = useState(false);
@@ -215,6 +216,37 @@ export default function AdminOpticasPage() {
     return <Badge className={cfg[role] || cfg.user}>{lbl[role] || role}</Badge>;
   };
 
+  // Estado de activacion del admin (Issue 2)
+  const getActivationBadge = (c) => {
+    if (!c.admin_activated) {
+      const daysCreated = c.days_since_created ?? 0;
+      if (daysCreated >= 30) {
+        return { label: 'Expirada', cls: 'bg-red-200 text-red-900 border-red-300', title: `No activo en ${daysCreated} dias` };
+      }
+      if (daysCreated >= 23) {
+        return { label: `Por expirar (${30 - daysCreated}d)`, cls: 'bg-amber-100 text-amber-800 border-amber-200', title: 'Faltan menos de 7 dias para desactivarse' };
+      }
+      return { label: 'Sin activar', cls: 'bg-slate-100 text-slate-600 border-slate-200', title: `Creada hace ${daysCreated} dia(s), admin sin ingresar` };
+    }
+    const days = c.days_since_last_login;
+    if (days === null || days === undefined) return null;
+    if (days <= 7) return { label: 'Activo', cls: 'bg-green-100 text-green-700 border-green-200', title: `Ultimo acceso hace ${days} dia(s)` };
+    if (days <= 30) return { label: `Hace ${days}d`, cls: 'bg-amber-100 text-amber-700 border-amber-200', title: `Ultimo acceso hace ${days} dia(s)` };
+    return { label: 'Inactivo', cls: 'bg-red-100 text-red-700 border-red-200', title: `Ultimo acceso hace ${days} dia(s)` };
+  };
+
+  const filteredCompanies = companies.filter((c) => {
+    if (activationFilter === 'todas') return true;
+    if (activationFilter === 'sin_activar') return !c.admin_activated;
+    if (activationFilter === 'activas') {
+      return c.admin_activated && (c.days_since_last_login ?? 999) <= 7;
+    }
+    if (activationFilter === 'inactivas') {
+      return c.admin_activated && (c.days_since_last_login ?? 0) > 30;
+    }
+    return true;
+  });
+
   const handlePlanChange = async (companyId, planId) => {
     try {
       await api.put(`/api/plans/assign/${companyId}?plan_id=${planId}`);
@@ -249,18 +281,40 @@ export default function AdminOpticasPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Companies List */}
         <div className="lg:col-span-1 space-y-3">
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider px-1">Opticas ({companies.length})</h2>
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Opticas ({filteredCompanies.length}/{companies.length})</h2>
+          </div>
+          {/* Filtro por estado de activacion */}
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { k: 'todas', l: 'Todas' },
+              { k: 'sin_activar', l: 'Sin activar' },
+              { k: 'activas', l: 'Activas' },
+              { k: 'inactivas', l: 'Inactivas' },
+            ].map((opt) => (
+              <button
+                key={opt.k}
+                onClick={() => setActivationFilter(opt.k)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${activationFilter === opt.k ? 'bg-pine-700 text-white border-pine-700' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                data-testid={`activation-filter-${opt.k}`}
+              >
+                {opt.l}
+              </button>
+            ))}
+          </div>
           {loading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pine-900"></div>
             </div>
-          ) : companies.length === 0 ? (
+          ) : filteredCompanies.length === 0 ? (
             <Card><CardContent className="py-8 text-center text-slate-400">
               <Store className="w-10 h-10 mx-auto mb-2 opacity-30" />
-              <p>No hay opticas registradas</p>
+              <p>No hay opticas para este filtro</p>
             </CardContent></Card>
           ) : (
-            companies.map((c) => (
+            filteredCompanies.map((c) => {
+              const actBadge = getActivationBadge(c);
+              return (
               <Card
                 key={c._id}
                 className={`cursor-pointer transition-all hover:shadow-md ${
@@ -292,6 +346,15 @@ export default function AdminOpticasPage() {
                     }`}>
                       {c.is_active !== false ? 'Activa' : 'Inactiva'}
                     </span>
+                    {actBadge && (
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium border ${actBadge.cls}`}
+                        title={actBadge.title}
+                        data-testid={`activation-badge-${c._id}`}
+                      >
+                        {actBadge.label}
+                      </span>
+                    )}
                     <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700">
                       <CreditCard className="w-2.5 h-2.5 mr-1" /> {c.plan_name || 'Sin plan'}
                     </span>
@@ -303,7 +366,8 @@ export default function AdminOpticasPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -358,6 +422,49 @@ export default function AdminOpticasPage() {
                       <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-slate-400" /> {selectedCompany.address || '-'}</div>
                       <div><span className="text-slate-400">Pacientes:</span> <span className="font-medium ml-2">{selectedCompany.patients_count || 0}{selectedCompany.max_patients > 0 ? ` / ${selectedCompany.max_patients}` : ''}</span></div>
                       <div><span className="text-slate-400">Creada:</span> <span className="font-medium ml-2">{selectedCompany.created_at?.slice(0, 10)}</span></div>
+                    </div>
+                    {/* Activacion del admin */}
+                    <div className="mt-4 pt-3 border-t" data-testid="admin-activation-section">
+                      <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Activacion del Administrador</p>
+                      {(() => {
+                        const b = getActivationBadge(selectedCompany);
+                        return (
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <span className="text-slate-400 text-xs">Estado:</span>
+                              <div className="mt-1">
+                                {b ? (
+                                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium border ${b.cls}`}>{b.label}</span>
+                                ) : <span className="text-slate-500 text-xs">-</span>}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 text-xs">Admin:</span>
+                              <div className="font-medium text-slate-700 truncate">{selectedCompany.admin_name || '-'}</div>
+                              <div className="text-xs text-slate-500 truncate">{selectedCompany.admin_email || '-'}</div>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 text-xs">Primer login:</span>
+                              <div className="font-medium text-slate-700">
+                                {selectedCompany.admin_first_login_at ? selectedCompany.admin_first_login_at.slice(0, 16).replace('T', ' ') : <span className="text-slate-400">Aun no ingresa</span>}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 text-xs">Ultimo acceso:</span>
+                              <div className="font-medium text-slate-700">
+                                {selectedCompany.admin_last_login_at ? (
+                                  <>
+                                    {selectedCompany.admin_last_login_at.slice(0, 16).replace('T', ' ')}
+                                    {typeof selectedCompany.days_since_last_login === 'number' && (
+                                      <span className="text-xs text-slate-400 ml-1">(hace {selectedCompany.days_since_last_login}d)</span>
+                                    )}
+                                  </>
+                                ) : <span className="text-slate-400">-</span>}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                     {/* Plan Selector */}
                     <div className="mt-4 pt-3 border-t">

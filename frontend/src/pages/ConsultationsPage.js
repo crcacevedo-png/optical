@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EyeglassRxDialog, MedicalRxDialog } from '../components/patients/PatientDialogs';
+import { NextAppointmentDialog } from '../components/appointments/NextAppointmentDialog';
 
 const CONSULTATION_TYPES = [
   { value: 'general', label: 'Consulta General' },
@@ -162,46 +163,7 @@ export default function ConsultationsPage() {
 
   // Iter Agenda mejorada - agendar proxima cita al terminar consulta
   const [showNextApptDialog, setShowNextApptDialog] = useState(false);
-  const [nextApptForm, setNextApptForm] = useState({
-    date: '', time: '09:00', duration: 30, type: 'general', notes: '',
-  });
-  const [savingNextAppt, setSavingNextAppt] = useState(false);
-
-  const openNextAppointmentModal = () => {
-    const in6mo = new Date();
-    in6mo.setMonth(in6mo.getMonth() + 6);
-    setNextApptForm({
-      date: in6mo.toISOString().slice(0, 10),
-      time: '09:00', duration: 30, type: 'general', notes: 'Control de rutina',
-    });
-    setShowNextApptDialog(true);
-  };
-
-  const saveNextAppointment = async () => {
-    if (!selectedConsultation) return;
-    if (!nextApptForm.date || !nextApptForm.time) {
-      toast.error('Fecha y hora obligatorias');
-      return;
-    }
-    setSavingNextAppt(true);
-    try {
-      await api.post('/api/appointments', {
-        patient_id: selectedConsultation.patient_id,
-        date: nextApptForm.date,
-        time: nextApptForm.time,
-        duration: parseInt(nextApptForm.duration, 10) || 30,
-        type: nextApptForm.type,
-        status: 'pendiente',
-        notes: nextApptForm.notes,
-        professional_id: selectedConsultation.professional_id,
-        professional_name: selectedConsultation.professional_name || user?.name,
-      });
-      toast.success(`Proxima cita agendada para ${nextApptForm.date} ${nextApptForm.time}`);
-      setShowNextApptDialog(false);
-    } catch (err) {
-      toast.error(formatApiErrorDetail(err?.response?.data?.detail));
-    } finally { setSavingNextAppt(false); }
-  };
+  const [nextApptCtx, setNextApptCtx] = useState({ patient_id: null, professional_id: null, professional_name: null });
 
   const handleSave = async () => {
     if (!form.patient_id) return toast.error('Seleccione un paciente');
@@ -223,7 +185,12 @@ export default function ConsultationsPage() {
         toast.success('Consulta registrada');
         await openDetail(res.data._id);
         // Auto-abrir modal para agendar proxima cita
-        setTimeout(() => openNextAppointmentModal(), 300);
+        setNextApptCtx({
+          patient_id: res.data.patient_id || form.patient_id,
+          professional_id: res.data.professional_id || null,
+          professional_name: res.data.professional_name || user?.name || null,
+        });
+        setTimeout(() => setShowNextApptDialog(true), 300);
       }
       loadData();
     } catch (err) {
@@ -936,73 +903,13 @@ export default function ConsultationsPage() {
       />
 
       {/* Modal: Agendar proxima cita al terminar consulta */}
-      <Dialog open={showNextApptDialog} onOpenChange={setShowNextApptDialog}>
-        <DialogContent className="sm:max-w-md" data-testid="next-appt-dialog">
-          <DialogHeader>
-            <DialogTitle>Agendar proxima cita</DialogTitle>
-            <DialogDescription>
-              La consulta se guardo correctamente. Reserva la siguiente cita del paciente ahora — o saltalo si no aplica.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1.5">
-                <Label>Fecha *</Label>
-                <Input type="date" value={nextApptForm.date} onChange={(e) => setNextApptForm({ ...nextApptForm, date: e.target.value })} data-testid="next-appt-date" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Hora *</Label>
-                <Input type="time" value={nextApptForm.time} onChange={(e) => setNextApptForm({ ...nextApptForm, time: e.target.value })} data-testid="next-appt-time" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1.5">
-                <Label>Duracion (min)</Label>
-                <Input type="number" min="15" step="15" value={nextApptForm.duration} onChange={(e) => setNextApptForm({ ...nextApptForm, duration: e.target.value })} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Tipo</Label>
-                <Select value={nextApptForm.type} onValueChange={(v) => setNextApptForm({ ...nextApptForm, type: v })}>
-                  <SelectTrigger data-testid="next-appt-type"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="general">Control</SelectItem>
-                    <SelectItem value="revision">Revision</SelectItem>
-                    <SelectItem value="postoperatorio">Postoperatorio</SelectItem>
-                    <SelectItem value="entrega">Entrega de lentes</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Motivo / Notas</Label>
-              <Input value={nextApptForm.notes} onChange={(e) => setNextApptForm({ ...nextApptForm, notes: e.target.value })} placeholder="Ej. Control de rutina" data-testid="next-appt-notes" />
-            </div>
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {[
-                { l: '1 semana', d: 7 }, { l: '1 mes', d: 30 }, { l: '3 meses', d: 90 },
-                { l: '6 meses', d: 180 }, { l: '1 ano', d: 365 },
-              ].map(o => (
-                <Button key={o.d} type="button" size="sm" variant="outline"
-                  onClick={() => {
-                    const dt = new Date();
-                    dt.setDate(dt.getDate() + o.d);
-                    setNextApptForm({ ...nextApptForm, date: dt.toISOString().slice(0, 10) });
-                  }}
-                  data-testid={`next-appt-quick-${o.d}`}
-                >
-                  {o.l}
-                </Button>
-              ))}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNextApptDialog(false)} data-testid="next-appt-skip">Ahora no</Button>
-            <Button className="bg-pine-900 hover:bg-pine-800" disabled={savingNextAppt} onClick={saveNextAppointment} data-testid="next-appt-save">
-              {savingNextAppt ? 'Agendando...' : 'Agendar cita'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NextAppointmentDialog
+        open={showNextApptDialog}
+        onOpenChange={setShowNextApptDialog}
+        patientId={nextApptCtx.patient_id}
+        professionalId={nextApptCtx.professional_id}
+        professionalName={nextApptCtx.professional_name}
+      />
     </div>
   );
 }

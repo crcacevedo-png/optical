@@ -34,7 +34,7 @@ export default function InventoryPage() {
 
   const [productForm, setProductForm] = useState({
     name: '', sku: '', category: '', brand: '', description: '',
-    cost_price: '', sale_price: '', min_stock: 1, initial_stock: 0
+    cost_price: '', sale_price: '', min_stock: 1, initial_stock: 0, is_external_supplier: false
   });
 
   const [movementForm, setMovementForm] = useState({
@@ -79,12 +79,13 @@ export default function InventoryPage() {
         ...productForm,
         cost_price: parseFloat(productForm.cost_price),
         sale_price: parseFloat(productForm.sale_price),
-        min_stock: parseInt(productForm.min_stock),
-        initial_stock: parseInt(productForm.initial_stock) || 0
+        min_stock: productForm.is_external_supplier ? 0 : parseInt(productForm.min_stock),
+        initial_stock: parseInt(productForm.initial_stock) || 0,
+        is_external_supplier: Boolean(productForm.is_external_supplier),
       });
       toast.success('Producto creado exitosamente');
       setShowProductDialog(false);
-      setProductForm({ name: '', sku: '', category: '', brand: '', description: '', cost_price: '', sale_price: '', min_stock: 1 });
+      setProductForm({ name: '', sku: '', category: '', brand: '', description: '', cost_price: '', sale_price: '', min_stock: 1, initial_stock: 0, is_external_supplier: false });
       fetchData();
     } catch (error) {
       toast.error(formatApiErrorDetail(error.response?.data?.detail));
@@ -352,10 +353,24 @@ export default function InventoryPage() {
                       min="0"
                       value={productForm.min_stock}
                       onChange={(e) => setProductForm({...productForm, min_stock: e.target.value})}
+                      disabled={productForm.is_external_supplier}
                       data-testid="product-min-stock"
                     />
                   </div>
                 </div>
+                <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 bg-slate-50 cursor-pointer hover:border-pine-400 transition-colors" data-testid="product-external-supplier-wrap">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 w-4 h-4 accent-pine-900"
+                    checked={Boolean(productForm.is_external_supplier)}
+                    onChange={(e) => setProductForm({...productForm, is_external_supplier: e.target.checked, min_stock: e.target.checked ? 0 : productForm.min_stock})}
+                    data-testid="product-external-supplier"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-slate-800">Proveedor externo</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Marca este producto como fabricado o pedido a laboratorio externo (ej. lentes graduados). No se aplicara stock minimo ni aparecera en alertas.</p>
+                  </div>
+                </label>
                 <div className="flex justify-end gap-2 pt-4">
                   <Button type="button" variant="outline" onClick={() => setShowProductDialog(false)}>Cancelar</Button>
                   <Button type="submit" className="bg-pine-900 hover:bg-pine-700" data-testid="save-product">Guardar</Button>
@@ -447,7 +462,14 @@ export default function InventoryPage() {
                   <TableRow key={product._id} className="data-table-row" data-testid={`product-row-${product._id}`}>
                     <TableCell>
                       <div>
-                        <p className="font-medium text-slate-900">{product.name}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-medium text-slate-900">{product.name}</p>
+                          {product.is_external_supplier && (
+                            <Badge variant="outline" className="bg-violet-50 text-violet-700 border-violet-200 text-[10px] px-1.5 py-0" data-testid={`ext-badge-${product._id}`}>
+                              Proveedor externo
+                            </Badge>
+                          )}
+                        </div>
                         {product.brand && <p className="text-sm text-slate-500">{product.brand}</p>}
                       </div>
                     </TableCell>

@@ -55,6 +55,36 @@ async def list_companies(
     users_counts = await _counts_by_company(db.users)
     patients_counts = await _counts_by_company(db.patients, {"is_deleted": {"$ne": True}})
 
+    # Batch fetch admin activity (first/last login) para cada company
+    admin_activity = {}
+    admin_pipeline = [
+        {"$match": {"company_id": {"$in": cids}, "role": "admin"}},
+        {"$sort": {"created_at": 1}},
+        {"$group": {
+            "_id": "$company_id",
+            "admin_email": {"$first": "$email"},
+            "admin_name": {"$first": "$name"},
+            "admin_id": {"$first": "$_id"},
+            "first_login_at": {"$min": "$first_login_at"},
+            "last_login_at": {"$max": "$last_login_at"},
+        }}
+    ]
+    async for row in db.users.aggregate(admin_pipeline):
+        admin_activity[str(row["_id"])] = row
+
+    now = datetime.now(timezone.utc)
+
+    def _days_since(iso_str):
+        if not iso_str:
+            return None
+        try:
+            dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return int((now - dt).total_seconds() // 86400)
+        except Exception:
+            return None
+
     for c in companies:
         serialize_doc(c)
         cid_str = c["_id"]
@@ -70,6 +100,24 @@ async def list_companies(
             c["branches_warning"] = plan.get("max_branches", 0) > 0 and c["branches_count"] >= plan["max_branches"] * 0.8
         else:
             c["plan_name"] = "Sin plan"
+
+        # Datos de activacion del admin
+        act = admin_activity.get(cid_str)
+        if act:
+            c["admin_email"] = act.get("admin_email")
+            c["admin_name"] = act.get("admin_name")
+            c["admin_first_login_at"] = act.get("first_login_at")
+            c["admin_last_login_at"] = act.get("last_login_at")
+            c["admin_activated"] = bool(act.get("first_login_at"))
+            c["days_since_last_login"] = _days_since(act.get("last_login_at"))
+        else:
+            c["admin_email"] = None
+            c["admin_name"] = None
+            c["admin_first_login_at"] = None
+            c["admin_last_login_at"] = None
+            c["admin_activated"] = False
+            c["days_since_last_login"] = None
+        c["days_since_created"] = _days_since(c.get("created_at"))
 
     return companies
 

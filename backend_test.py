@@ -348,9 +348,12 @@ def main():
     
     tester = OpticasSaaSAPITester()
     
-    # Test admin login
+    # Test admin login (usa env vars, sin hardcode)
+    import os as _os
+    admin_email = _os.getenv("TEST_ADMIN_EMAIL", "admin@visionclara.gt")
+    admin_pw = _os.getenv("TEST_ADMIN_PASSWORD") or _os.getenv("DEMO_PASSWORD", "")
     print("\n📋 Testing Admin Login...")
-    if not tester.test_login("admin@visionclara.gt", "Demo123!"):
+    if not tester.test_login(admin_email, admin_pw):
         print("❌ Admin login failed, stopping tests")
         return 1
     

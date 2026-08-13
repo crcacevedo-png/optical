@@ -149,3 +149,10 @@ frontend/node_modules/.cache/default-development/25.pack
 frontend/node_modules/.cache/default-development/26.pack
 frontend/node_modules/.cache/default-development/36.pack
 frontend/node_modules/.cache/default-development/27.pack
+
+# ─── Test reports & credentials (nunca commit) ────────────────
+/test_reports/
+/backend/.env.test
+/backend/.env.local
+.env.test
+.env.local

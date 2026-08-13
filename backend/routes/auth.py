@@ -115,6 +115,41 @@ async def login(data: UserLogin, response: Response, request: Request):
     
     user_id = str(user["_id"])
     company_id = str(user["company_id"]) if user.get("company_id") else None
+    
+    # Tracking de activacion / actividad
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    is_first_login = not user.get("first_login_at")
+    login_updates = {"last_login_at": now_iso}
+    if is_first_login:
+        login_updates["first_login_at"] = now_iso
+    try:
+        await db.users.update_one({"_id": user["_id"]}, {"$set": login_updates})
+    except Exception:
+        pass
+    # Notificar al SuperAdmin cuando el admin de una nueva optica hace su PRIMER login
+    if is_first_login and user.get("role") == "admin" and user.get("company_id"):
+        try:
+            company = await db.companies.find_one({"_id": user["company_id"]}, {"name": 1})
+            company_name = company.get("name", "Optica") if company else "Optica"
+            await db.companies.update_one(
+                {"_id": user["company_id"]},
+                {"$set": {"admin_activated_at": now_iso}}
+            )
+            from routes.notifications import create_notification
+            await create_notification(
+                event_type="admin_first_login",
+                title="Optica activada",
+                message=f"El administrador de {company_name} ({email}) inicio sesion por primera vez",
+                metadata={"company_id": str(user["company_id"]), "company_name": company_name, "admin_email": email}
+            )
+            await log_audit("ADMIN_FIRST_LOGIN", actor_id=user_id, actor_email=email,
+                            actor_role="admin", company_id=str(user["company_id"]),
+                            metadata={"company_name": company_name}, request=request)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"admin_first_login side-effects failed: {e}")
+    
     access_token = create_access_token(user_id, email, user["role"], company_id)
     refresh_token = create_refresh_token(user_id)
     

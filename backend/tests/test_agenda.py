@@ -21,7 +21,7 @@ class TestAgendaAPI:
         # Login as admin
         login_response = self.session.post(f"{BASE_URL}/api/auth/login", json={
             "email": "admin@cortexia.gt",
-            "password": "Demo123!"
+            "password": os.getenv("TEST_ADMIN_PASSWORD") or os.getenv("DEMO_PASSWORD","")
         })
         assert login_response.status_code == 200, f"Login failed: {login_response.text}"
         self.user = login_response.json()

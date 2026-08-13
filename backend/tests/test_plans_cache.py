@@ -28,9 +28,9 @@ BASE_URL = _load_backend_url()
 API = f"{BASE_URL}/api"
 
 SUPER_EMAIL = "superadmin@cortexia.com"
-SUPER_PASS = "Montecristo2026"
+SUPER_PASS = os.getenv("TEST_SUPERADMIN_PASSWORD") or os.getenv("ADMIN_PASSWORD","")
 ADMIN_EMAIL = "admin@cortexia.gt"
-ADMIN_PASS = "Demo123!"
+ADMIN_PASS = os.getenv("TEST_ADMIN_PASSWORD") or os.getenv("DEMO_PASSWORD","")
 
 
 def _session(email, password):

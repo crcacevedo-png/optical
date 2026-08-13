@@ -22,6 +22,7 @@ import {
 } from '../components/patients/PatientDialogs';
 import { ConsultationViewDialog } from '../components/patients/ConsultationViewDialog';
 import { ConsultationFormDialog } from '../components/patients/ConsultationFormDialog';
+import { NextAppointmentDialog } from '../components/appointments/NextAppointmentDialog';
 
 const VA_METHODS = ['Snellen', 'logMAR', 'ETDRS'];
 
@@ -115,6 +116,9 @@ export default function PatientsPage() {
   const [showEditPatient, setShowEditPatient] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // Modal para agendar proxima cita al terminar consulta
+  const [showNextAppt, setShowNextAppt] = useState(false);
+  const [nextApptCtx, setNextApptCtx] = useState({ patient_id: null, professional_id: null, professional_name: null });
 
   const fetchPatients = useCallback(async (searchTerm = '') => {
     try {
@@ -185,6 +189,13 @@ export default function PatientsPage() {
       const newId = data._id || data.id;
       setSavedConsultationId(newId);
       fetchPatientDetails(selectedPatient._id);
+      // Auto-abrir modal para agendar proxima cita
+      setNextApptCtx({
+        patient_id: selectedPatient._id,
+        professional_id: user?._id || null,
+        professional_name: user?.name || null,
+      });
+      setTimeout(() => setShowNextAppt(true), 300);
     } catch (error) {
       toast.error(formatApiErrorDetail(error.response?.data?.detail));
     } finally {
@@ -777,6 +788,13 @@ export default function PatientsPage() {
         onOpenChange={setShowDeleteConfirm}
         patient={selectedPatient}
         onConfirm={handleDeletePatient}
+      />
+      <NextAppointmentDialog
+        open={showNextAppt}
+        onOpenChange={setShowNextAppt}
+        patientId={nextApptCtx.patient_id}
+        professionalId={nextApptCtx.professional_id}
+        professionalName={nextApptCtx.professional_name}
       />
     </div>
   );

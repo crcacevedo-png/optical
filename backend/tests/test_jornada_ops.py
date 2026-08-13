@@ -18,9 +18,9 @@ BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or "https://eyecare-erp.prev
 API = f"{BASE_URL}/api"
 
 BASIC_ADMIN_EMAIL = "admin@cortexia.gt"
-BASIC_ADMIN_PASSWORD = "Demo123!"
+BASIC_ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD") or os.getenv("DEMO_PASSWORD","")
 SUPERADMIN_EMAIL = "superadmin@cortexia.com"
-SUPERADMIN_PASSWORD = "Montecristo2026"
+SUPERADMIN_PASSWORD = os.getenv("TEST_SUPERADMIN_PASSWORD") or os.getenv("ADMIN_PASSWORD","")
 
 BRANCH_ID = "69d458bb6a6b539b3084f0a3"
 PRODUCT_ID = "69cac743cf7c7911e128250a"  # Ray-Ban RB5154

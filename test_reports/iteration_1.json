@@ -1,63 +1,41 @@
 {
-  "summary": "Comprehensive testing of Ópticas SaaS platform completed successfully. Backend APIs working at 100% success rate after fixing dashboard ObjectId serialization issue. Frontend UI and navigation working perfectly with all major features functional.",
-  
+  "summary": "Tested BUG 1 (modal proxima cita desde /patients y /consultations) y FEATURE 2 (tracking first_login/last_login, notificacion admin_first_login al superadmin, campos de activacion en GET /api/companies, AdminOpticasPage UI). Todo funciona correctamente. 6/6 tests backend PASS. Ambos flujos UI del modal next-appt-dialog funcionan (guardar crea /api/appointments 200 y Ahora no cierra sin crear). AdminOpticasPage muestra filtros, badges y seccion 'Activacion del Administrador'.",
   "backend_issues": {
-    "critical_bugs": [],
-    "fixed_bugs": [
-      {
-        "endpoint": "/api/reports/dashboard",
-        "issue": "ObjectId serialization error causing 500 status",
-        "impact": "Dashboard metrics not loading",
-        "fix_priority": "FIXED",
-        "fix_applied": "Added proper ObjectId to string conversion for all appointment fields in dashboard response"
-      }
+    "critical": [],
+    "minor": [
+      {"endpoint": "DELETE /api/companies/{id}", "issue": "Es soft delete (is_active=False) — el test cleanup no elimina fisicamente. Las opticas TEST_* quedan visibles en la lista para superadmin. Cleanup manual via mongo requerido despues de tests. Considerar un endpoint hard-delete o filtro por is_active en la lista superadmin."}
     ]
   },
-  
   "frontend_issues": {
-    "ui_bugs": [
-      {
-        "component": "Patient Creation Modal - Gender Dropdown",
-        "issue": "Gender dropdown selection requires specific click handling for Shadcn Select component",
-        "selector": "[data-testid='patient-gender']",
-        "fix_priority": "LOW",
-        "workaround": "Dropdown is functional, just needs proper SelectItem click instead of option element"
-      }
-    ],
+    "ui_bugs": [],
     "integration_issues": [],
-    "design_issues": []
+    "design_issues": [
+      {"screen": "AdminOpticasPage - card de company", "issues": ["Card muestra dos badges que se pueden confundir visualmente: 'Inactiva'/'Activa' (estado de la company) y 'Activo'/'Sin activar'/'Inactivo' (estado de activacion del admin). Un usuario podria pensar que se contradicen. Sugerencia: agrupar bajo etiquetas 'Company:' y 'Admin:' o usar iconografia distinta."]}
+    ]
   },
-  
-  "passed_tests": [
-    "Login with demo credentials (admin@visionclara.gt / Demo123!)",
-    "Dashboard metrics display (appointments, patients, sales, finance)",
-    "Patient management (list, search functionality)",
-    "Navigation to all pages (Agenda, Recetas, Inventario, Ventas, Finanzas, Sucursales, Usuarios, Reportes)",
-    "Authentication flow (login/logout)",
-    "All backend API endpoints (16/16 passing)",
-    "Dashboard data loading with proper metrics",
-    "Patient creation form (partial - all fields except gender dropdown)",
-    "Upcoming appointments display",
-    "Stock alerts display",
-    "Finance summary display",
-    "User session management",
-    "Logout functionality with proper redirect"
+  "test_report_links": [
+    "/app/backend/tests/test_activation_tracking.py",
+    "/app/test_reports/pytest/activation_tracking.xml"
   ],
-  
-  "test_report_links": ["/app/backend_test.py"],
-  
-  "success_percentage": {
-    "backend": "100%",
-    "frontend": "95%"
-  },
-  
+  "action_items": [
+    "IMPORTANTE - Discrepancia entre review request y codigo: el review dice data-testid 'activation-filter-{all|pending|active|inactive}' pero el codigo real usa 'activation-filter-{todas|sin_activar|activas|inactivas}'. Ambos funcionan (los 4 filtros estan presentes con esos IDs), pero si otro sistema o test depende de las claves en ingles, actualizar la clave en AdminOpticasPage.js linea 289-293 (opt.k) o actualizar la especificacion.",
+    "Considerar limpiar de la BD las opticas TEST_UI_Optica_1775523451 y TEST_Optica_1775523355 (leftovers de tests previos, ambas inactivas). No fueron creadas por este iteracion — ya existian.",
+    "Opcional: agregar filtro predeterminado 'ocultar TEST_*' en AdminOpticasPage para superadmin en produccion."
+  ],
+  "critical_code_review_comments": [
+    "activation_task._process_reminders/_process_deactivations usan {'$in': [None]} para filtrar first_login_at. Esto solo matchea documentos donde first_login_at existe y es None; NO matchea documentos sin el campo. Con el backfill en startup esto es correcto, pero es fragil: si alguien crea un admin sin el campo (bypass del startup) no seria procesado. Considerar '$or': [{'first_login_at': None}, {'first_login_at': {'$exists': False}}].",
+    "activation_task usa (now - created_at).days para calcular dias. Diferencia de <24h resulta en 0 dias — OK, pero considerar total_seconds()//86400 para consistencia con /api/companies.",
+    "PatientsPage.js: 800+ lineas. Deberia dividirse en subcomponentes (ya tiene componentes extraidos, pero puede modularizarse mas). No bloqueante.",
+    "auth.py login: side-effects (tracking + notificacion admin_first_login) estan en el critical path del login. Si create_notification o log_audit se cuelgan (aunque tienen try/except), podrian degradar latencia. Considerar disparar via BackgroundTasks."
+  ],
   "updated_files": [
-    "/app/backend/server.py",
-    "/app/backend_test.py"
+    "/app/backend/tests/test_activation_tracking.py"
   ],
-  
-  "action_item_for_main_agent": "",
-  
-  "should_call_test_agent_after_fix": "false",
-  "should_main_agent_test_itself": "true"
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "SuperAdmin: superadmin@cortexia.com / Montecristo2026 | Admin: admin@cortexia.gt / DemoAdmin2026!",
+  "seed_data_creation": "Test crea TEST_ActivationOptica_{uuid} company + admin, lo elimina via DELETE (soft) y hard-delete via script post-test. La BD queda limpia.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Los data-testid del filtro de activacion en AdminOpticasPage usan claves en Espanol (todas, sin_activar, activas, inactivas), NO las claves en ingles del spec (all, pending, active, inactive). Al escribir tests UI usar las claves en Espanol. Los 5 quick-range buttons del NextAppointmentDialog usan 7/30/90/180/365 dias correctamente. DELETE /api/companies solo desactiva (soft delete), para limpiar test data hay que borrar via mongo.",
+  "rca of the issue": "N/A - No bugs found. Todos los features y bugs reportados funcionan correctamente. El bug reportado del modal 'Agendar proxima cita' que ya no aparecia esta resuelto: aparece en ambos flujos (/patients y /consultations) despues de guardar la consulta con un delay de 300ms. El tracking de login funciona: last_login_at se actualiza en cada login, first_login_at se setea solo en primer login. La notificacion admin_first_login se crea correctamente cuando el admin de una optica nueva ingresa por primera vez. GET /api/companies incluye admin_activated, admin_first_login_at, admin_last_login_at, days_since_last_login, days_since_created, admin_email, admin_name. El backfill en startup evita que opticas antiguas sean desactivadas por el activation_task."
 }

@@ -20,9 +20,9 @@ BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or "").rstrip("/")
 API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "admin@cortexia.gt"
-ADMIN_PASSWORD = "Demo123!"
+ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD") or os.getenv("DEMO_PASSWORD","")
 SUPER_EMAIL = "superadmin@cortexia.com"
-SUPER_PASSWORD = "Montecristo2026"
+SUPER_PASSWORD = os.getenv("TEST_SUPERADMIN_PASSWORD") or os.getenv("ADMIN_PASSWORD","")
 
 BRANCH_ID = "69d458bb6a6b539b3084f0a3"
 PRODUCT_ID = "69cac743cf7c7911e128250a"  # Ray-Ban RB5154 existente

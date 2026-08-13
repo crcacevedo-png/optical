@@ -290,6 +290,32 @@ async def startup():
     await db.patients.create_index([("company_id", 1), ("jornada_ids", 1)])
 
     logger.info("MongoDB indexes verified/created OK")
+
+    # ═══════════════════════════════════════════════════════════════════
+    # Migracion: backfill first_login_at para admins existentes.
+    # Sin esto, el activation_task_loop desactivaria ópticas antiguas
+    # asumiendo que nunca activaron su cuenta (first_login_at es un
+    # campo nuevo introducido en Feb 2026).
+    # ═══════════════════════════════════════════════════════════════════
+    try:
+        # Admins sin first_login_at: usan created_at como fallback
+        res_bf = await db.users.update_many(
+            {"role": "admin", "first_login_at": {"$exists": False}, "created_at": {"$exists": True}},
+            [{"$set": {"first_login_at": "$created_at"}}]
+        )
+        res_bf_null = await db.users.update_many(
+            {"role": "admin", "first_login_at": None, "created_at": {"$exists": True}},
+            [{"$set": {"first_login_at": "$created_at"}}]
+        )
+        res_cbf = await db.companies.update_many(
+            {"admin_activated_at": {"$exists": False}, "created_at": {"$exists": True}},
+            [{"$set": {"admin_activated_at": "$created_at"}}]
+        )
+        total_bf = res_bf.modified_count + res_bf_null.modified_count
+        if total_bf > 0 or res_cbf.modified_count > 0:
+            logger.info(f"Activation backfill: admins.first_login_at={total_bf}, companies.admin_activated_at={res_cbf.modified_count}")
+    except Exception as e:
+        logger.warning(f"Activation backfill error (non-fatal): {e}")
     
     # Seed superadmin - lee credenciales SOLO de env vars. Si no estan presentes,
     # NO crea ni resetea el SuperAdmin (evita hardcodear secretos en el repo).
@@ -325,6 +351,16 @@ async def startup():
     # Seed demo company
     demo_company = await db.companies.find_one({"name": "Cortexia Optical Demo"})
     if not demo_company:
+        # Demo password se toma de env DEMO_PASSWORD; si no existe, generamos una
+        # aleatoria segura y la logueamos (visible SOLO en logs del primer boot).
+        demo_password = (os.environ.get("DEMO_PASSWORD") or "").strip()
+        if not demo_password:
+            import secrets
+            demo_password = secrets.token_urlsafe(12)
+            logger.warning(
+                "DEMO_PASSWORD no configurada — generada aleatoriamente para primer seed: "
+                f"{demo_password} (guardala si necesitas login demo)"
+            )
         company_result = await db.companies.insert_one({
             "name": "Cortexia Optical Demo", "legal_name": "Cortexia Optical S.A.",
             "tax_id": "12345678-9", "address": "6ta Avenida 12-34, Zona 1, Ciudad de Guatemala",
@@ -333,7 +369,7 @@ async def startup():
         })
         company_id = company_result.inserted_id
         await db.users.insert_one({
-            "email": "admin@cortexia.gt", "password_hash": hash_password("Demo123!"),
+            "email": "admin@cortexia.gt", "password_hash": hash_password(demo_password),
             "name": "Dr. Carlos Mendoza", "role": "admin", "company_id": company_id,
             "branch_id": None, "is_active": True, "created_at": datetime.now(timezone.utc).isoformat()
         })
@@ -345,7 +381,7 @@ async def startup():
         })
         branch_id = branch_result.inserted_id
         await db.users.insert_one({
-            "email": "vendedor@cortexia.gt", "password_hash": hash_password("Demo123!"),
+            "email": "vendedor@cortexia.gt", "password_hash": hash_password(demo_password),
             "name": "Maria Lopez", "role": "user", "company_id": company_id,
             "branch_id": branch_id, "is_active": True, "created_at": datetime.now(timezone.utc).isoformat()
         })
@@ -464,6 +500,17 @@ async def startup():
         await _cache.init_cache()
     except Exception as e:
         logger.error(f"Cache init error: {e}")
+
+    # ═══════════════════════════════════════════════════════════════════
+    # Task de activacion de opticas (recordatorios + desactivacion 30 dias)
+    # ═══════════════════════════════════════════════════════════════════
+    try:
+        import asyncio as _asyncio
+        from activation_task import activation_task_loop
+        _asyncio.create_task(activation_task_loop())
+        logger.info("Activation task loop started (deadline=30d, checks every 12h)")
+    except Exception as e:
+        logger.error(f"Activation task init error: {e}")
 
 @app.on_event("shutdown")
 async def shutdown():

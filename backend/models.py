@@ -193,6 +193,7 @@ class ProductCreate(BaseModel):
     min_stock: int = 0
     initial_stock: int = 0
     branch_id: Optional[str] = None
+    is_external_supplier: bool = False  # Se fabrica/pide a laboratorio externo — sin stock minimo
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -203,6 +204,7 @@ class ProductUpdate(BaseModel):
     cost_price: Optional[float] = None
     sale_price: Optional[float] = None
     min_stock: Optional[int] = None
+    is_external_supplier: Optional[bool] = None
 
 class InventoryMovement(BaseModel):
     product_id: str

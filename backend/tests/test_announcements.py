@@ -6,8 +6,8 @@ import requests
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://eyecare-erp.preview.emergentagent.com').rstrip('/')
 
 SUPERADMIN = {"email": "superadmin@cortexia.com", "password": "Admin123!"}
-ADMIN_ENTERPRISE = {"email": "analuhs@gmail.com", "password": "Alta2026$"}
-ADMIN_FREE = {"email": "admin@cortexia.gt", "password": "Demo123!"}
+ADMIN_ENTERPRISE = {"email": "analuhs@gmail.com", "password": os.getenv("TEST_ENTERPRISE_ADMIN_PASSWORD","")}
+ADMIN_FREE = {"email": "admin@cortexia.gt", "password": os.getenv("TEST_ADMIN_PASSWORD") or os.getenv("DEMO_PASSWORD","")}
 
 
 def _login(creds):
