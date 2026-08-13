@@ -9,7 +9,7 @@ import { ScrollArea } from '../components/ui/scroll-area';
 import { 
   LayoutDashboard, Users, Calendar, FileText, Package, 
   ShoppingCart, DollarSign, Building2, UserCog, BarChart3,
-  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone, Key, ShieldAlert, Rocket, Activity, HandCoins, LifeBuoy, Tent
+  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone, Key, ShieldAlert, Rocket, Activity, HandCoins, LifeBuoy, Tent, Sparkles
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -46,6 +46,7 @@ export default function MainLayout() {
   const navItems = isSuperAdmin ? [
     { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/admin/opticas', icon: Store, label: 'Opticas' },
+    { path: '/admin/retencion', icon: Sparkles, label: 'Retencion' },
     { path: '/admin/planes', icon: CreditCard, label: 'Planes' },
     { path: '/admin/comunicacion', icon: Megaphone, label: 'Comunicacion' },
     { path: '/admin/soporte', icon: LifeBuoy, label: 'Soporte' },

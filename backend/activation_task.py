@@ -13,7 +13,10 @@ from datetime import datetime, timezone
 from bson import ObjectId
 
 from db import db
-from email_service import queue_email, render_activation_reminder, render_deactivation_notice
+from email_service import (
+    queue_email, render_activation_reminder, render_deactivation_notice,
+    render_onboarding_tips,
+)
 from routes.notifications import create_notification
 from audit import log_audit
 
@@ -21,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Config
 DEADLINE_DAYS = int(os.environ.get("ACTIVATION_DEADLINE_DAYS", "30"))
+WELCOME_TIPS_DAY = int(os.environ.get("WELCOME_TIPS_DAY", "3"))
 REMINDER_STAGES = [
     # (min_days_since_created, max_days, tag, remaining, marker)
     (DEADLINE_DAYS - 7, DEADLINE_DAYS - 5, "reminder_7d", 7, "reminder_7d_sent_at"),
@@ -39,6 +43,59 @@ def _parse_iso(iso_str):
         return dt
     except Exception:
         return None
+
+
+async def _process_welcome_tips(now: datetime, app_url: str):
+    """Envia email de bienvenida con tips el dia N (default 3) SOLO si el admin
+    aun no ha ingresado (motivador). Marcado con welcome_tips_sent_at para idempotencia."""
+    pipeline = [
+        {"$match": {
+            "role": "admin",
+            "$or": [{"first_login_at": None}, {"first_login_at": {"$exists": False}}],
+            "is_active": True,
+            "welcome_tips_sent_at": {"$exists": False},
+        }},
+        {"$lookup": {
+            "from": "companies",
+            "localField": "company_id",
+            "foreignField": "_id",
+            "as": "company",
+        }},
+        {"$unwind": "$company"},
+        {"$match": {"company.is_active": True}},
+    ]
+    async for admin in db.users.aggregate(pipeline):
+        company = admin["company"]
+        created_at = _parse_iso(company.get("created_at"))
+        if not created_at:
+            continue
+        days_old = (now - created_at).days
+        # Solo se envia si el admin lleva AL MENOS WELCOME_TIPS_DAY dias creado
+        # y aun no ha ingresado. Sirve tambien para "atrasados" (dias 4, 5, 6...).
+        if days_old < WELCOME_TIPS_DAY:
+            continue
+        # No enviar si ya cae en la ventana del recordatorio de 7 dias (evita spam)
+        if days_old >= DEADLINE_DAYS - 7:
+            continue
+        try:
+            html = render_onboarding_tips(
+                admin_name=admin.get("name", "Administrador"),
+                company_name=company.get("name", "tu optica"),
+                login_link=app_url,
+            )
+            queue_email(
+                admin["email"],
+                f"[Cortexia] 5 tips para empezar con {company.get('name', 'tu optica')}",
+                html,
+                tag="welcome_tips",
+            )
+            await db.users.update_one(
+                {"_id": admin["_id"]},
+                {"$set": {"welcome_tips_sent_at": now.isoformat()}}
+            )
+            logger.info(f"[activation] Enviado welcome_tips a {admin['email']} (company={company.get('name')}, dias={days_old})")
+        except Exception as e:
+            logger.warning(f"[activation] Error enviando welcome_tips a {admin.get('email')}: {e}")
 
 
 async def _process_reminders(now: datetime, app_url: str):
@@ -186,6 +243,7 @@ async def run_once():
     now = datetime.now(timezone.utc)
     app_url = os.environ.get("APP_URL", "https://cortexiaoptical.com")
     logger.info(f"[activation] Ciclo iniciado at {now.isoformat()}")
+    await _process_welcome_tips(now, app_url)
     await _process_reminders(now, app_url)
     await _process_deactivations(now)
     logger.info("[activation] Ciclo completado")

@@ -35,6 +35,7 @@ import JornadaFormPage from './pages/JornadaFormPage';
 import JornadaPanelPage from './pages/JornadaPanelPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import RetentionDashboard from './pages/RetentionDashboard';
 import './App.css';
 
 function App() {
@@ -70,6 +71,7 @@ function App() {
             <Route path="jornadas/:id" element={<JornadaPanelPage />} />
             <Route path="jornadas/:id/edit" element={<JornadaFormPage />} />
             <Route path="admin/opticas" element={<AdminOpticasPage />} />
+            <Route path="admin/retencion" element={<RetentionDashboard />} />
             <Route path="admin/planes" element={<PlansPage />} />
             <Route path="admin/dashboard" element={<SuperAdminDashboard />} />
             <Route path="admin/comunicacion" element={<AnnouncementsPage />} />

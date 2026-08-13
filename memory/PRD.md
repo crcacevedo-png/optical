@@ -112,6 +112,22 @@ Modulo nuevo de brigadas visuales / eventos fuera de sucursal. Multi-tenant, opc
 
 ## Lo Implementado
 
+### Bienvenida Programada + Panel Retencion Opticas (Feb 2026)
+
+**Bienvenida programada (dia 3)**:
+- `activation_task.py::_process_welcome_tips`: nueva stage del loop que envia email amigable con 5 tips practicos + CTA "Inicio Rapido" al admin en dia 3-22 SOLO si aun no ha ingresado. Marcado con `users.welcome_tips_sent_at` para idempotencia. Se excluye si `days_since_created >= DEADLINE_DAYS-7` para no solapar con recordatorio de 7d.
+- Nuevo template `email_service.py::render_onboarding_tips(admin_name, company_name, login_link)`: template con 5 tips (registrar 5 pacientes, configurar logo, cargar 10 armazones/5 lentes, venta de prueba, invitar equipo) y CTA gradient a `/onboarding`. Sin video (por decision del usuario).
+- Config: `WELCOME_TIPS_DAY=3` (env override).
+
+**Panel Retencion Opticas (SuperAdmin)**:
+- Nueva ruta `/admin/retencion` con item sidebar 'Retencion' (icono Sparkles).
+- **Backend `routes/superadmin_retention.py`**:
+  - `GET /api/superadmin/retention`: retorna KPIs (total, active, inactive, never_activated, at_risk, expired, recently_activated, activation_rate) + thresholds (at_risk_days=15, deadline_days=30) + segmentos con lista de opticas (never_activated, at_risk, expired, recently_activated). Batch aggregation admin_activity + patients_count + plans + companies en O(4) queries constantes.
+  - `POST /api/companies/{id}/reactivate`: reactiva optica + admins, genera password reset token (24h TTL, source='reactivation'), envia email al admin con link para nueva contrasena, resetea markers de activation_task (reminder_7d, reminder_2d, welcome_tips) para reiniciar el ciclo. Audit `COMPANY_REACTIVATED`. Solo superadmin (403 para otros roles).
+- Nuevo template `render_reactivation_notice(admin_name, company_name, reset_link)`.
+- **Frontend `RetentionDashboard.jsx`**: 6 stat cards con color-code (`kpi-{total|activation-rate|recently|never|at-risk|expired}`), 4 tabs (`tab-{never|at-risk|expired|recent}`), tabla por segmento con optica/admin/creada/estado/accion. Tab Expiradas tiene boton verde "Reactivar" que abre AlertDialog de confirmacion (`reactivate-dialog`) → llamada POST /reactivate → toast + refresh. Otros tabs tienen boton mailto con mensaje pre-armado por segmento.
+- **Testing**: 19/19 tests backend PASS + frontend E2E OK. Fix menor aplicado: HTML hydration warning por `<ul>` dentro de `<AlertDialogDescription>` → separado en dos elementos.
+
 ### Agendar proxima cita + Tracking activacion admin (Feb 2026)
 **Fix bug agenda**: El modal "Agendar proxima cita" al terminar consulta antes solo aparecia en `/consultations`. Ahora tambien aparece cuando la consulta se crea desde el card del paciente en `/patients`.
 - Nuevo componente compartido `components/appointments/NextAppointmentDialog.jsx` (props: open, onOpenChange, patientId, professionalId, professionalName, onSaved). Fecha default = hoy+6 meses, botones rapidos 7/30/90/180/365 dias.

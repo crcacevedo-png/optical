@@ -281,6 +281,94 @@ def render_deactivation_notice(admin_name: str, company_name: str) -> str:
     return _wrapper(content, "Tu optica fue desactivada")
 
 
+def render_onboarding_tips(admin_name: str, company_name: str, login_link: str) -> str:
+    """Email amigable dia 3 al admin que aun no ha ingresado - motivador con tips practicos."""
+    content = f"""
+      <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{admin_name}</strong>,</p>
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+        Notamos que aun no has empezado a explorar Cortexia Optical con
+        <strong style="color:{BRAND_DARK};">{company_name}</strong>.
+        No te preocupes, es normal — sabemos que estas ocupado atendiendo tu optica.
+      </p>
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+        Te comparto <strong>5 tips</strong> que otras opticas usaron para dejar Cortexia
+        <strong>operativo en menos de 30 minutos</strong>:
+      </p>
+      <div style="background-color:#F8FAFC;border-radius:10px;padding:20px 22px;margin:24px 0;">
+        <div style="margin-bottom:14px;">
+          <p style="color:{BRAND_DARK};font-size:14px;margin:0 0 4px 0;font-weight:bold;">1. Empieza por lo esencial</p>
+          <p style="color:#475569;font-size:13px;margin:0;line-height:1.5;">Registra 5 pacientes reales de esta semana. No necesitas migrar todos de golpe.</p>
+        </div>
+        <div style="margin-bottom:14px;">
+          <p style="color:{BRAND_DARK};font-size:14px;margin:0 0 4px 0;font-weight:bold;">2. Configura tu logo y datos de la optica</p>
+          <p style="color:#475569;font-size:13px;margin:0;line-height:1.5;">Ve a Configuracion &rarr; Empresa y sube tu logo. Aparecera en PDFs, recetas y cotizaciones.</p>
+        </div>
+        <div style="margin-bottom:14px;">
+          <p style="color:{BRAND_DARK};font-size:14px;margin:0 0 4px 0;font-weight:bold;">3. Crea tu primer inventario</p>
+          <p style="color:#475569;font-size:13px;margin:0;line-height:1.5;">Registra 10 armazones y 5 lentes que mas vendes. Puedes agregar el resto despues.</p>
+        </div>
+        <div style="margin-bottom:14px;">
+          <p style="color:{BRAND_DARK};font-size:14px;margin:0 0 4px 0;font-weight:bold;">4. Registra una venta de prueba</p>
+          <p style="color:#475569;font-size:13px;margin:0;line-height:1.5;">Simula una venta real con multi-pago. Veras como el ticket, la caja y el stock se actualizan solos.</p>
+        </div>
+        <div>
+          <p style="color:{BRAND_DARK};font-size:14px;margin:0 0 4px 0;font-weight:bold;">5. Invita a tu equipo</p>
+          <p style="color:#475569;font-size:13px;margin:0;line-height:1.5;">Da de alta a tus optometristas y vendedores. Cada uno tendra su propio acceso con permisos.</p>
+        </div>
+      </div>
+      <div style="background:linear-gradient(135deg,#6D35D8 0%,#13B8B0 100%);border-radius:10px;padding:20px 22px;margin:24px 0 8px 0;">
+        <p style="color:#FFFFFF;font-size:13px;margin:0 0 4px 0;font-weight:bold;text-transform:uppercase;letter-spacing:0.6px;opacity:0.85;">Recomendacion</p>
+        <p style="color:#FFFFFF;font-size:15px;line-height:1.5;margin:0 0 14px 0;font-weight:600;">
+          Sigue nuestra guia "Inicio Rapido" — son 7 pasos con checklist y toma menos de 30 minutos.
+        </p>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+          <td style="background-color:#FFFFFF;border-radius:8px;">
+            <a href="{login_link}/onboarding" style="display:inline-block;padding:11px 22px;color:#0F172A;text-decoration:none;font-size:14px;font-weight:bold;font-family:Helvetica,Arial,sans-serif;">
+              Empezar Inicio Rapido &rarr;
+            </a>
+          </td>
+        </tr></table>
+      </div>
+      {_button("Ingresar a Cortexia", login_link, BRAND_EMERALD)}
+      <p style="color:{TEXT_MUTED};font-size:12px;line-height:1.5;margin:24px 0 0 0;">
+        Recuerda que tienes hasta el <strong>dia 30</strong> desde tu registro para activar la cuenta.
+        Si necesitas ayuda, escribenos a
+        <a href="mailto:info@cortexiagt.com" style="color:{BRAND_TEAL};">info@cortexiagt.com</a>.
+      </p>
+    """
+    return _wrapper(content, f"Tips para empezar con {company_name}")
+
+
+def render_reactivation_notice(admin_name: str, company_name: str, reset_link: str) -> str:
+    """Email cuando el SuperAdmin reactiva una optica manualmente."""
+    content = f"""
+      <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{admin_name}</strong>,</p>
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+        Buenas noticias — tu optica <strong style="color:{BRAND_DARK};">{company_name}</strong> ha sido
+        <strong>reactivada</strong> por el equipo de Cortexia Optical.
+      </p>
+      <div style="background-color:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:16px 20px;margin:24px 0;">
+        <p style="color:#065F46;font-size:13px;margin:0 0 8px 0;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">Ultimo paso</p>
+        <p style="color:#0F172A;font-size:14px;margin:0;line-height:1.6;">
+          Por seguridad, necesitas establecer una <strong>nueva contrasena</strong>. Haz clic en el boton
+          y en pocos segundos podras ingresar a tu cuenta.
+        </p>
+      </div>
+      {_button("Establecer nueva contrasena", reset_link, BRAND_EMERALD)}
+      <div style="background-color:#FEF3C7;border-left:3px solid #F59E0B;padding:12px 16px;border-radius:6px;margin:24px 0;">
+        <p style="color:#92400E;font-size:13px;margin:0;line-height:1.5;">
+          <strong>Importante:</strong> este enlace expira en <strong>24 horas</strong>. Si necesitas otro,
+          escribenos a <a href="mailto:info@cortexiagt.com" style="color:{BRAND_TEAL};">info@cortexiagt.com</a>.
+        </p>
+      </div>
+      <p style="color:{TEXT_MUTED};font-size:12px;line-height:1.5;margin:24px 0 0 0;">
+        Si el boton no funciona, copia y pega este enlace en tu navegador:<br>
+        <span style="word-break:break-all;color:#475569;">{reset_link}</span>
+      </p>
+    """
+    return _wrapper(content, f"Tu optica {company_name} fue reactivada")
+
+
 def render_security_alert(name: str, event_title: str, event_description: str, event_meta: dict, app_url: str) -> str:
     """Email de alerta de seguridad."""
     meta_rows = ""
