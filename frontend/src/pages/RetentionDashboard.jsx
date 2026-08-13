@@ -59,6 +59,7 @@ const CompanyRow = ({ c, extraCol, actionSlot }) => (
 
 export default function RetentionDashboard() {
   const [data, setData] = useState(null);
+  const [feedbacks, setFeedbacks] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('never_activated');
   const [reactivateTarget, setReactivateTarget] = useState(null);
@@ -67,8 +68,12 @@ export default function RetentionDashboard() {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const { data } = await api.get('/api/superadmin/retention');
-      setData(data);
+      const [{ data: retention }, { data: fb }] = await Promise.all([
+        api.get('/api/superadmin/retention'),
+        api.get('/api/reactivation-feedback/list').catch(() => ({ data: { items: [], breakdown: {}, reason_labels: {}, total: 0 } })),
+      ]);
+      setData(retention);
+      setFeedbacks(fb);
     } catch (err) {
       toast.error(formatApiErrorDetail(err?.response?.data?.detail) || 'Error al cargar');
     } finally {
@@ -191,6 +196,9 @@ export default function RetentionDashboard() {
               <TabsTrigger value="recently_activated" data-testid="tab-recent">
                 Recien activadas ({segments.recently_activated.length})
               </TabsTrigger>
+              <TabsTrigger value="feedback" data-testid="tab-feedback">
+                Feedback ({feedbacks?.total || 0})
+              </TabsTrigger>
             </TabsList>
 
             {/* NEVER ACTIVATED */}
@@ -299,6 +307,11 @@ export default function RetentionDashboard() {
                 />
               )}
             </TabsContent>
+
+            {/* FEEDBACK */}
+            <TabsContent value="feedback">
+              <FeedbackPanel data={feedbacks} />
+            </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
@@ -362,3 +375,77 @@ const ListTable = ({ rows, extra, extraLabel, action }) => (
     </table>
   </div>
 );
+
+const FeedbackPanel = ({ data }) => {
+  if (!data || !data.items || data.items.length === 0) {
+    return <EmptyState msg="Aun no hay feedback recibido de reactivaciones." />;
+  }
+  const labels = data.reason_labels || {};
+  const breakdown = data.breakdown || {};
+  const total = data.total || 0;
+  return (
+    <div className="space-y-4" data-testid="feedback-panel">
+      {/* Breakdown por motivo */}
+      <div>
+        <p className="text-xs uppercase font-semibold text-slate-500 mb-2">
+          Distribucion por motivo ({total} feedbacks)
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(breakdown).map(([k, v]) => {
+            const pct = total > 0 ? Math.round((v / total) * 100) : 0;
+            return (
+              <div key={k} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-50 border border-purple-200">
+                <span className="text-xs font-medium text-purple-900">{labels[k] || k}</span>
+                <span className="text-xs font-bold text-purple-700">{v} ({pct}%)</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Lista de feedbacks */}
+      <div className="space-y-3">
+        {data.items.map(fb => (
+          <div key={fb._id} className="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-sm transition-shadow" data-testid={`feedback-${fb._id}`}>
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-slate-900 text-sm truncate">{fb.company_name}</span>
+                  <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                    {fb.reason_label}
+                  </span>
+                  {fb.allow_contact && (
+                    <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 border border-green-200">
+                      Autoriza contacto
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {fb.admin_name} · {fb.admin_email}
+                </p>
+              </div>
+              <span className="text-xs text-slate-400 whitespace-nowrap">
+                {fb.submitted_at?.slice(0, 16).replace('T', ' ')}
+              </span>
+            </div>
+            {fb.comment && (
+              <div className="mt-2 pl-3 border-l-2 border-purple-200 text-sm text-slate-600 italic">
+                &ldquo;{fb.comment}&rdquo;
+              </div>
+            )}
+            {fb.allow_contact && fb.admin_email && (
+              <div className="mt-2">
+                <a
+                  href={`mailto:${fb.admin_email}?subject=Hola%20${encodeURIComponent(fb.admin_name || '')}%20-%20Cortexia%20aqui&body=Gracias%20por%20tu%20feedback.%20Nos%20encantaria%20ayudarte%20a%20empezar.`}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-purple-700 hover:text-purple-900"
+                >
+                  <Mail className="w-3 h-3" /> Contactar al admin
+                </a>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};

@@ -151,7 +151,17 @@ async def _process_reminders(now: datetime, app_url: str):
 
 
 async def _process_deactivations(now: datetime):
-    """Desactiva opticas donde el admin no ha ingresado despues del deadline."""
+    """Desactiva opticas SOLO cuando el admin NUNCA ha ingresado por primera vez
+    despues del deadline (30 dias).
+
+    IMPORTANTE (regla de negocio Feb 2026):
+    - Esta desactivacion aplica UNICAMENTE a ópticas con first_login_at == None.
+    - Ópticas ya activadas (con first_login_at establecido) NO se desactivan
+      por inactividad — se dejan activas y se muestran en el Panel Retencion
+      como "En riesgo" para que el SuperAdmin las contacte manualmente.
+    - Otras reglas de desactivacion (falta de pago Stripe, etc.) se
+      definiran cuando el modulo de pagos este completamente operativo.
+    """
     pipeline = [
         {"$match": {
             "role": "admin",

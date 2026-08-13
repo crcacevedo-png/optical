@@ -164,24 +164,31 @@ async def login(data: UserLogin, response: Response, request: Request):
     # Attach plan info (non-blocking — login must never fail due to plan queries)
     if company_id and user["role"] != "superadmin":
         try:
-            company = await db.companies.find_one({"_id": ObjectId(company_id)}, {"plan_id": 1})
-            if company and company.get("plan_id"):
-                plan = await db.plans.find_one({"_id": company["plan_id"]})
-                if plan:
-                    result["plan_name"] = plan["name"]
-                    result["plan_modules"] = plan.get("modules", [])
-                    result["max_patients"] = plan.get("max_patients", 0)
-                    result["max_branches"] = plan.get("max_branches", 0)
-                    patients_count = await db.patients.count_documents({"company_id": ObjectId(company_id), "is_deleted": {"$ne": True}})
-                    branches_count = await db.branches.count_documents({"company_id": ObjectId(company_id)})
-                    result["patients_count"] = patients_count
-                    result["branches_count"] = branches_count
-                    max_p = plan.get("max_patients", 0)
-                    max_b = plan.get("max_branches", 0)
-                    result["patients_warning"] = max_p > 0 and patients_count >= max_p * 0.8
-                    result["branches_warning"] = max_b > 0 and branches_count >= max_b * 0.8
-                    result["patients_limit_reached"] = max_p > 0 and patients_count >= max_p
-                    result["branches_limit_reached"] = max_b > 0 and branches_count >= max_b
+            company = await db.companies.find_one(
+                {"_id": ObjectId(company_id)},
+                {"plan_id": 1, "needs_reactivation_feedback": 1}
+            )
+            if company:
+                # Flag para dialogo de feedback post-reactivacion (solo admins)
+                if user["role"] == "admin" and company.get("needs_reactivation_feedback"):
+                    result["needs_reactivation_feedback"] = True
+                if company.get("plan_id"):
+                    plan = await db.plans.find_one({"_id": company["plan_id"]})
+                    if plan:
+                        result["plan_name"] = plan["name"]
+                        result["plan_modules"] = plan.get("modules", [])
+                        result["max_patients"] = plan.get("max_patients", 0)
+                        result["max_branches"] = plan.get("max_branches", 0)
+                        patients_count = await db.patients.count_documents({"company_id": ObjectId(company_id), "is_deleted": {"$ne": True}})
+                        branches_count = await db.branches.count_documents({"company_id": ObjectId(company_id)})
+                        result["patients_count"] = patients_count
+                        result["branches_count"] = branches_count
+                        max_p = plan.get("max_patients", 0)
+                        max_b = plan.get("max_branches", 0)
+                        result["patients_warning"] = max_p > 0 and patients_count >= max_p * 0.8
+                        result["branches_warning"] = max_b > 0 and branches_count >= max_b * 0.8
+                        result["patients_limit_reached"] = max_p > 0 and patients_count >= max_p
+                        result["branches_limit_reached"] = max_b > 0 and branches_count >= max_b
             # Permisos por rol (allowed_menu_items = null si admin)
             try:
                 result["allowed_menu_items"] = await get_role_permissions(ObjectId(company_id), user["role"])
@@ -240,24 +247,31 @@ async def get_me(user: dict = Depends(get_current_user)):
     # Attach plan info for non-superadmin users (non-blocking)
     if user.get("company_id") and user["role"] != "superadmin":
         try:
-            company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"plan_id": 1})
-            if company and company.get("plan_id"):
-                plan = await db.plans.find_one({"_id": company["plan_id"]})
-                if plan:
-                    user["plan_name"] = plan["name"]
-                    user["plan_modules"] = plan.get("modules", [])
-                    user["max_patients"] = plan.get("max_patients", 0)
-                    user["max_branches"] = plan.get("max_branches", 0)
-                    patients_count = await db.patients.count_documents({"company_id": ObjectId(user["company_id"]), "is_deleted": {"$ne": True}})
-                    branches_count = await db.branches.count_documents({"company_id": ObjectId(user["company_id"])})
-                    user["patients_count"] = patients_count
-                    user["branches_count"] = branches_count
-                    max_p = plan.get("max_patients", 0)
-                    max_b = plan.get("max_branches", 0)
-                    user["patients_warning"] = max_p > 0 and patients_count >= max_p * 0.8
-                    user["branches_warning"] = max_b > 0 and branches_count >= max_b * 0.8
-                    user["patients_limit_reached"] = max_p > 0 and patients_count >= max_p
-                    user["branches_limit_reached"] = max_b > 0 and branches_count >= max_b
+            company = await db.companies.find_one(
+                {"_id": ObjectId(user["company_id"])},
+                {"plan_id": 1, "needs_reactivation_feedback": 1}
+            )
+            if company:
+                # Flag para dialogo de feedback post-reactivacion (solo admins)
+                if user["role"] == "admin" and company.get("needs_reactivation_feedback"):
+                    user["needs_reactivation_feedback"] = True
+                if company.get("plan_id"):
+                    plan = await db.plans.find_one({"_id": company["plan_id"]})
+                    if plan:
+                        user["plan_name"] = plan["name"]
+                        user["plan_modules"] = plan.get("modules", [])
+                        user["max_patients"] = plan.get("max_patients", 0)
+                        user["max_branches"] = plan.get("max_branches", 0)
+                        patients_count = await db.patients.count_documents({"company_id": ObjectId(user["company_id"]), "is_deleted": {"$ne": True}})
+                        branches_count = await db.branches.count_documents({"company_id": ObjectId(user["company_id"])})
+                        user["patients_count"] = patients_count
+                        user["branches_count"] = branches_count
+                        max_p = plan.get("max_patients", 0)
+                        max_b = plan.get("max_branches", 0)
+                        user["patients_warning"] = max_p > 0 and patients_count >= max_p * 0.8
+                        user["branches_warning"] = max_b > 0 and branches_count >= max_b * 0.8
+                        user["patients_limit_reached"] = max_p > 0 and patients_count >= max_p
+                        user["branches_limit_reached"] = max_b > 0 and branches_count >= max_b
             # Permisos por rol
             try:
                 user["allowed_menu_items"] = await get_role_permissions(ObjectId(user["company_id"]), user["role"])

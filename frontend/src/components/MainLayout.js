@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { GlobalSearch } from './GlobalSearch';
 import { NotificationBell } from './NotificationBell';
 import { ChangeMyPasswordDialog } from './ChangeMyPasswordDialog';
+import { ReactivationFeedbackDialog } from './retention/ReactivationFeedbackDialog';
 import { Button } from '../components/ui/button';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { 
@@ -265,6 +266,7 @@ export default function MainLayout() {
         </div>
       </main>
       <ChangeMyPasswordDialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog} />
+      <ReactivationFeedbackDialog />
     </div>
   );
 }

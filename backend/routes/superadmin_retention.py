@@ -192,7 +192,12 @@ async def reactivate_company(company_id: str, request: Request, user: dict = Dep
     await db.companies.update_one(
         {"_id": cid},
         {
-            "$set": {"is_active": True, "reactivated_at": now_iso, "reactivated_by": user["_id"]},
+            "$set": {
+                "is_active": True,
+                "reactivated_at": now_iso,
+                "reactivated_by": user["_id"],
+                "needs_reactivation_feedback": True,
+            },
             "$unset": {"deactivated_reason": "", "deactivated_at": ""},
         }
     )

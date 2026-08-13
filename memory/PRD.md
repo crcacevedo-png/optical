@@ -112,6 +112,25 @@ Modulo nuevo de brigadas visuales / eventos fuera de sucursal. Multi-tenant, opc
 
 ## Lo Implementado
 
+### Feedback rapido post-reactivacion + Nota de reglas de desactivacion (Feb 2026)
+
+**Feedback rapido cuando se reactiva una optica**:
+- **Backend `routes/reactivation_feedback.py`**: nuevo endpoint que captura por que el admin no ingreso la primera vez.
+  - `POST /api/reactivation-feedback` (auth admin) — recibe {reason, comment, allow_contact}. Guarda en `reactivation_feedbacks`. Motivos validos: `sin_tiempo`, `no_supe_empezar`, `olvide_password`, `precio`, `no_lo_necesitaba`, `otro`. Crea notificacion push al SuperAdmin + audit `REACTIVATION_FEEDBACK_SUBMITTED`. Limpia el flag `companies.needs_reactivation_feedback` para no volver a mostrar el dialog.
+  - `POST /api/reactivation-feedback/skip` — descarta el dialog sin enviar. Limpia el flag.
+  - `GET /api/reactivation-feedback/list` (superadmin only) — retorna items + breakdown por reason + reason_labels.
+- **`routes/superadmin_retention.py::reactivate_company`**: al reactivar setea `needs_reactivation_feedback: true`.
+- **`routes/auth.py`**: `/login` y `/me` retornan `needs_reactivation_feedback: bool` en el user payload (solo si role=admin y el flag esta true).
+- **Frontend `components/retention/ReactivationFeedbackDialog.jsx`**: dialog automatico que aparece con delay de 1.2s al cargar la app si `user.needs_reactivation_feedback == true`. Include: 6 radios de motivo, textarea opcional (max 1000 char), checkbox "Autoriza contacto", botones "Ahora no"/"Enviar feedback". Incluido en `MainLayout.js` para todas las paginas del admin. Refresca `checkAuth()` post-submit para limpiar el flag localmente.
+- **Frontend `RetentionDashboard.jsx`**: nueva tab "Feedback (N)" (`tab-feedback`) con breakdown por motivo (pills purple) y lista de cards de feedback (`feedback-{id}`) con optica/admin/motivo/comment/badge autoriza-contacto/mailto para contactar.
+- **Notificacion push al SuperAdmin** con `event_type=reactivation_feedback` al enviar cada feedback.
+
+**IMPORTANTE - Regla de desactivacion aclarada (Feb 2026)**:
+- El `activation_task._process_deactivations` (dia 30) **SOLO desactiva ópticas donde el admin NUNCA ha ingresado por primera vez** (`first_login_at is None`).
+- Opticas ya activadas (con `first_login_at` establecido) NO se desactivan por inactividad — se muestran en Panel Retencion como "En riesgo" para contacto manual.
+- Otras reglas de inactivacion (falta de pago Stripe, etc.) se definiran cuando el modulo de pagos este completamente operativo.
+- Docstring de `_process_deactivations` actualizado con esta regla de negocio.
+
 ### Bienvenida Programada + Panel Retencion Opticas (Feb 2026)
 
 **Bienvenida programada (dia 3)**:
