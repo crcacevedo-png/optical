@@ -112,6 +112,40 @@ Modulo nuevo de brigadas visuales / eventos fuera de sucursal. Multi-tenant, opc
 
 ## Lo Implementado
 
+### Panel Sesiones Activas + Session-based JWT revocation (Feb 2026)
+
+**Feature "Sesiones Activas"** - permite al admin ver todos los dispositivos logueados en su optica y revocar sesiones sospechosas con un click.
+
+**Backend**:
+- Nueva coleccion `sessions` con TTL 7d en `last_activity_at`:
+  ```
+  {session_id (uuid), user_id, company_id, user_email, user_name, user_role,
+   ip (X-Forwarded-For aware), user_agent (raw, max 500), created_at,
+   last_activity_at, revoked, revoked_at, revoked_by, revoked_reason}
+  ```
+- `auth_utils.create_access_token/create_refresh_token`: aceptan `session_id` opcional que va como claim `sid` en el JWT.
+- `auth_utils.get_current_user`: valida que la sesion no este revocada (401 si lo esta) + refresca `last_activity_at` con throttling de 30s para reducir carga de escritura.
+- `routes/auth.py::login`: inserta doc en `sessions` al login y emite JWT con `sid`.
+- `routes/auth.py::refresh`: preserva `sid` en el nuevo access_token.
+- `routes/auth.py::logout`: **CAMBIO** — antes invalidaba todas las sesiones via `password_changed_at`; ahora solo revoca la sesion actual. Habilita sesiones concurrentes de forma segura.
+- Nueva ruta `routes/sessions.py`:
+  - `GET /api/sessions` — Lista sesiones activas con RBAC: user/doctor ve las propias, admin ve todas de su company, superadmin ve todas.
+  - `POST /api/sessions/{id}/revoke` — Revoca una sesion (403 si no tiene permiso; 400 si es la sesion actual). Audit `SESSION_REVOKED`.
+  - `POST /api/sessions/revoke-all-mine` — Cierra todas mis otras sesiones. Audit `SESSION_REVOKE_ALL_MINE`.
+- Indices Mongo: `session_id` unique, compound (user_id, revoked, last_activity_at), compound (company_id, revoked, last_activity_at), TTL 7d sobre `last_activity_at`.
+
+**Frontend**:
+- Nuevo componente `components/security/SessionsPanel.jsx` con detector de icono simple (`Smartphone/Tablet/Monitor/Globe` basado en user-agent).
+- Card visual verde para la sesion actual con badge "Esta sesion" (no revocable).
+- Boton rojo `<ShieldOff />` en las otras sesiones que abre `AlertDialog` de confirmacion.
+- Boton "Cerrar mis otras sesiones (N)" cuando hay >0 sesiones propias adicionales.
+- Warning cuando hay >10 sesiones activas.
+- Formato de tiempo relativo: "hace segundos/X min/X h/X d".
+- Integrado en `SettingsPage.js` como una nueva Card "Sesiones Activas" dentro de Configuracion. Admin ve titulo "Sesiones activas del equipo"; otros roles ven "Mis sesiones activas".
+- Fix menor: `SettingsPage.js::fetchCompany` no muestra toast de error si 403 (permite a vendedores entrar a /settings para ver Sesiones Activas sin ver un mensaje confuso).
+
+**Testing**: 15/15 tests backend PASS + frontend E2E OK.
+
 ### Security Audit + Hardening (Feb 2026)
 Auditoria de seguridad completa (read-only) con 2 findings CRITICOS (P0) y varios P3. Todos los fixes de codigo aplicados y verificados.
 

@@ -19,7 +19,7 @@ from routes import (
     finance, reports, users, suppliers, plans, superadmin, announcements,
     notifications, security, data_export, audit_log, onboarding, health_metrics,
     cash_register, support_tickets, billing, jornadas, jornada_ops, jornada_consignment,
-    superadmin_retention, reactivation_feedback
+    superadmin_retention, reactivation_feedback, sessions
 )
 
 app = FastAPI(title="Cortexia Optical API")
@@ -64,6 +64,7 @@ api_router.include_router(jornada_ops.router)
 api_router.include_router(jornada_consignment.router)
 api_router.include_router(superadmin_retention.router)
 api_router.include_router(reactivation_feedback.router)
+api_router.include_router(sessions.router)
 # Webhook Stripe: se registra a nivel raiz (no dentro de /api) porque el path
 # ya incluye /api/webhook/stripe segun la libreria emergentintegrations.
 app.include_router(billing.webhook_router)
@@ -194,6 +195,16 @@ async def startup():
     # --- Login attempts (brute-force protection) ---
     await db.login_attempts.create_index("identifier")
     await db.login_attempts.create_index("created_at", expireAfterSeconds=86400)  # 24h TTL
+
+    # Sessions (Panel Sesiones Activas)
+    await db.sessions.create_index("session_id", unique=True)
+    await db.sessions.create_index([("user_id", 1), ("revoked", 1), ("last_activity_at", -1)])
+    await db.sessions.create_index([("company_id", 1), ("revoked", 1), ("last_activity_at", -1)])
+    # TTL: purga sesiones tras 7d de inactividad
+    try:
+        await db.sessions.create_index("last_activity_at", expireAfterSeconds=604800, name="sessions_ttl")
+    except Exception:
+        pass
 
     # --- Audit log (TTL: 180 dias) ---
     await db.audit_log.create_index([("created_at", -1)])

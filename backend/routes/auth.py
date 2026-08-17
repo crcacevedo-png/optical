@@ -150,8 +150,29 @@ async def login(data: UserLogin, response: Response, request: Request):
             import logging
             logging.getLogger(__name__).warning(f"admin_first_login side-effects failed: {e}")
     
-    access_token = create_access_token(user_id, email, user["role"], company_id)
-    refresh_token = create_refresh_token(user_id)
+    # Crear registro de sesion en Mongo con TTL 7d (auto-purga por Mongo)
+    import uuid
+    session_id = str(uuid.uuid4())
+    try:
+        await db.sessions.insert_one({
+            "session_id": session_id,
+            "user_id": ObjectId(user_id),
+            "company_id": ObjectId(company_id) if company_id else None,
+            "user_email": email,
+            "user_name": user.get("name"),
+            "user_role": user["role"],
+            "ip": get_real_ip(request),
+            "user_agent": (request.headers.get("User-Agent") or "")[:500],
+            "created_at": datetime.now(timezone.utc),
+            "last_activity_at": datetime.now(timezone.utc),
+            "revoked": False,
+        })
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"session create failed: {e}")
+
+    access_token = create_access_token(user_id, email, user["role"], company_id, session_id=session_id)
+    refresh_token = create_refresh_token(user_id, session_id=session_id)
     
     _set_auth_cookies(response, access_token, refresh_token)
     await log_audit("LOGIN_SUCCESS", actor_id=user_id, actor_email=email,
@@ -217,6 +238,7 @@ async def logout(request: Request, response: Response):
     user_id = None
     email = None
     role = None
+    session_id = None
     try:
         token = request.cookies.get("access_token")
         if token:
@@ -224,20 +246,20 @@ async def logout(request: Request, response: Response):
             user_id = payload.get("sub")
             email = payload.get("email")
             role = payload.get("role")
+            session_id = payload.get("sid")
     except Exception:
         pass
-    # Invalida TODOS los tokens del usuario incrementando password_changed_at
-    # (efectivamente revoca access + refresh tokens emitidos antes de este momento)
-    # Usamos +1s para garantizar que cualquier token con iat <= now sea invalidado
-    if user_id:
+    # Revoca SOLO la sesion actual (no otros dispositivos).
+    # Para "cerrar sesion en todos lados" el usuario usa el panel de Sesiones Activas.
+    if session_id:
         try:
-            now_ts = int(datetime.now(timezone.utc).timestamp()) + 1
-            await db.users.update_one(
-                {"_id": ObjectId(user_id)},
-                {"$set": {"password_changed_at": now_ts}}
+            await db.sessions.update_one(
+                {"session_id": session_id},
+                {"$set": {"revoked": True, "revoked_at": datetime.now(timezone.utc), "revoked_reason": "logout"}}
             )
         except Exception:
             pass
+    if user_id:
         await log_audit("LOGOUT", actor_id=user_id, actor_email=email, actor_role=role, request=request)
     _clear_auth_cookies(response)
     return {"message": "Sesion cerrada"}
@@ -423,10 +445,16 @@ async def refresh_token(request: Request, response: Response):
         pw_changed_at = user.get("password_changed_at", 0)
         if pw_changed_at and token_iat < pw_changed_at:
             raise HTTPException(status_code=401, detail="Sesion invalidada. Inicie sesion nuevamente.")
-        
+        # Verificar que la sesion no este revocada (si el refresh trae sid)
+        session_id = payload.get("sid")
+        if session_id:
+            session = await db.sessions.find_one({"session_id": session_id})
+            if session and session.get("revoked"):
+                raise HTTPException(status_code=401, detail="Sesion revocada. Inicie sesion nuevamente.")
+
         user_id = str(user["_id"])
         company_id = str(user["company_id"]) if user.get("company_id") else None
-        access_token = create_access_token(user_id, user["email"], user["role"], company_id)
+        access_token = create_access_token(user_id, user["email"], user["role"], company_id, session_id=session_id)
         ss = _get_cookie_samesite()
         response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite=ss, max_age=86400, path="/")
         return {"message": "Token renovado"}

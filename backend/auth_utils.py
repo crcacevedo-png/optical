@@ -49,7 +49,7 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
-def create_access_token(user_id: str, email: str, role: str, company_id: str = None) -> str:
+def create_access_token(user_id: str, email: str, role: str, company_id: str = None, session_id: str = None) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub": user_id, "email": email, "role": role, "company_id": company_id,
@@ -57,9 +57,11 @@ def create_access_token(user_id: str, email: str, role: str, company_id: str = N
         "exp": now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
         "type": "access"
     }
+    if session_id:
+        payload["sid"] = session_id
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
-def create_refresh_token(user_id: str) -> str:
+def create_refresh_token(user_id: str, session_id: str = None) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub": user_id,
@@ -67,6 +69,8 @@ def create_refresh_token(user_id: str) -> str:
         "exp": now + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
         "type": "refresh"
     }
+    if session_id:
+        payload["sid"] = session_id
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 async def get_current_user(request: Request) -> dict:
@@ -92,6 +96,36 @@ async def get_current_user(request: Request) -> dict:
         pw_changed_at = user.get("password_changed_at", 0)
         if pw_changed_at and token_iat < pw_changed_at:
             raise HTTPException(status_code=401, detail="Sesion invalidada. Inicie sesion nuevamente.")
+        # Validacion de sesion: si el JWT tiene sid, verificar que la sesion no este revocada
+        session_id = payload.get("sid")
+        if session_id:
+            try:
+                session = await db.sessions.find_one({"session_id": session_id})
+            except Exception:
+                session = None
+            if session and session.get("revoked"):
+                raise HTTPException(status_code=401, detail="Sesion revocada. Inicie sesion nuevamente.")
+            # Refresca last_activity_at con throttling: solo si han pasado >30s desde el ultimo update.
+            # Reduce carga de escrituras en apps chatty sin perder precision para el panel.
+            if session:
+                now_utc = datetime.now(timezone.utc)
+                last_act = session.get("last_activity_at")
+                should_update = True
+                if isinstance(last_act, datetime):
+                    if last_act.tzinfo is None:
+                        last_act = last_act.replace(tzinfo=timezone.utc)
+                    if (now_utc - last_act).total_seconds() < 30:
+                        should_update = False
+                if should_update:
+                    try:
+                        await db.sessions.update_one(
+                            {"session_id": session_id},
+                            {"$set": {"last_activity_at": now_utc}}
+                        )
+                    except Exception:
+                        pass
+            # Guardar sid en el user context para uso downstream (endpoints de sesiones)
+            user["current_session_id"] = session_id
         user["_id"] = str(user["_id"])
         user.pop("password_hash", None)
         if user.get("company_id"):

@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { toast } from 'sonner';
 import { Settings, Building2, Upload, FileText, Save, ImageIcon, Glasses, Pill, ShieldCheck, Lock, KeyRound, Server, Users as UsersIcon, Activity, Database, Download } from 'lucide-react';
 import { RolePermissionsSection } from '../components/RolePermissionsSection';
+import SessionsPanel from '../components/security/SessionsPanel';
+import { Monitor } from 'lucide-react';
 
 const PRESCRIPTION_FONTS = [
   { value: 'Helvetica', label: 'Helvetica (Moderno)' },
@@ -77,7 +79,11 @@ export default function SettingsPage() {
         template: medica.template || 'clasico',
       });
     } catch (error) {
-      toast.error('Error al cargar configuracion');
+      // No mostrar toast si es 403 (rol sin permisos para settings de company).
+      // El vendedor entra a /settings para ver Sesiones Activas y no necesita datos de la empresa.
+      if (error?.response?.status !== 403) {
+        toast.error('Error al cargar configuracion');
+      }
     } finally {
       setLoading(false);
     }
@@ -596,6 +602,19 @@ export default function SettingsPage() {
                 Descargar Manifiesto PDF
               </a>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* SESIONES ACTIVAS (para admin: ve todas del equipo; para otros: solo las suyas) */}
+        <Card className="border-slate-200/80" data-testid="sessions-card">
+          <CardHeader>
+            <CardTitle className="font-heading text-lg flex items-center gap-2">
+              <Monitor className="w-5 h-5 text-pine-700" />
+              Sesiones Activas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SessionsPanel />
           </CardContent>
         </Card>
       </div>
