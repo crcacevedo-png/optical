@@ -65,7 +65,7 @@ export default function MainLayout() {
     { path: '/prescriptions', icon: FileText, label: 'Recetas', key: 'prescriptions' },
     { path: '/quotations', icon: ClipboardList, label: 'Cotizaciones', key: 'quotations' },
     ...(hasModule('inventario') ? [{ path: '/inventory', icon: Package, label: 'Inventario', key: 'inventory' }] : []),
-    ...(hasModule('ventas') ? [{ path: '/sales', icon: ShoppingCart, label: 'Ventas', key: 'sales' }] : []),
+    ...(hasModule('ventas') ? [{ path: '/sales', icon: ShoppingCart, label: 'Punto de Venta', key: 'sales' }] : []),
     ...(hasModule('ventas') ? [{ path: '/receivables', icon: HandCoins, label: 'Cuentas por Cobrar', key: 'receivables' }] : []),
     ...(hasModule('jornadas') ? [{ path: '/jornadas', icon: Tent, label: 'Jornadas', key: 'jornadas' }] : []),
     ...(hasModule('proveedores') ? [{ path: '/suppliers', icon: Truck, label: 'Proveedores', key: 'suppliers' }] : []),
