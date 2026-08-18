@@ -112,6 +112,45 @@ Modulo nuevo de brigadas visuales / eventos fuera de sucursal. Multi-tenant, opc
 
 ## Lo Implementado
 
+### Auto-block IP + Widget de IPs bloqueadas (Feb 2026)
+Escalada del sistema CSP: cuando una IP individual supera un umbral en la ventana, se bloquea automaticamente en el rate limiter para detener el ataque en tiempo real.
+
+**Backend `blocked_ips.py`** (modulo nuevo):
+- Cache in-memory Set con refresh cada 30s + invalidacion on-write para checkeo O(1) desde el middleware.
+- `is_ip_blocked(ip)`, `block_ip(ip, reason, metadata, hours)`, `unblock_ip(ip)`, `list_blocked_ips(limit)`.
+- TTL: 24h por defecto (env `BLOCKED_IP_TTL_HOURS`). Auto-unblock via indice TTL de Mongo sobre `blocked_until`.
+- Coleccion `db.blocked_ips` con indice unico en `ip` + TTL en `blocked_until`.
+
+**Backend `server.py` middleware**:
+- Chequeo temprano de `is_ip_blocked(client_ip)` para todo `/api/*`. Retorna 403 "IP bloqueada por comportamiento anomalo. Contacta soporte." antes de cualquier otra logica.
+- Extrae IP desde `X-Forwarded-For` (primer valor, cortex de proxies).
+
+**Backend `routes/security_reports.py`**:
+- `_check_and_alert_spike()` ahora corre PRIMERO la deteccion por IP. Agrega violaciones agrupadas por IP en la ventana, si alguna supera `CSP_IP_BLOCK_THRESHOLD` (default 2x el global = 10), se bloquea automaticamente con razon `csp_spike_{count}_violations`.
+- Crea notification push al SuperAdmin (`event_type=ip_auto_blocked`) por cada IP nueva.
+- El email del spike ahora incluye la lista de IPs auto-bloqueadas en el `event_meta`.
+- Nuevos endpoints (SuperAdmin only):
+  - `GET /api/security/blocked-ips` — lista con `active` flag calculado.
+  - `DELETE /api/security/blocked-ips/{ip}` — unblock manual. Audit `IP_UNBLOCKED`.
+- `/api/security/csp-report` agregado a `_CSRF_EXEMPT_PATHS` (los navegadores envian reports automaticamente sin JS, no pueden setear X-CSRF-Token).
+
+**Frontend `SuperAdminDashboard.js`**:
+- Widget extendido con seccion "IPs auto-bloqueadas" cuando hay activas. Card completo cambia a borde rojo si hay IP bloqueadas.
+- Cada IP muestra: direccion, razon, hora de expiracion, boton "Desbloquear" con confirmacion.
+- Data-testids: `blocked-ip-{ip}`, `unblock-{ip}`.
+
+**Testing E2E**:
+- 10 CSP reports desde `203.0.113.99` → IP bloqueada automaticamente con razon `csp_spike_10_violations` y TTL 24h.
+- Request desde IP bloqueada → 403 middleware.
+- Request desde IP legitima → 401/200 (normal).
+- Unblock manual funciona y la IP vuelve a poder acceder.
+
+**Config env vars**:
+- `CSP_IP_BLOCK_THRESHOLD=10` (default 2x global)
+- `CSP_IP_BLOCK_HOURS=24`
+- `BLOCKED_IP_TTL_HOURS=24`
+- `BLOCKED_IP_CACHE_REFRESH=30`
+
 ### CSP Spike Alerts al equipo Cortexia (Feb 2026)
 Alertas proactivas cuando se detectan picos anormales de violaciones CSP — signal fuerte de intento activo de XSS/inyeccion.
 

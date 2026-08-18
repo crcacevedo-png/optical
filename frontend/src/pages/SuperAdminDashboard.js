@@ -319,30 +319,62 @@ export default function SuperAdminDashboard() {
 
 function CspViolationsWidget() {
   const [violations, setViolations] = useState(null);
-  useEffect(() => {
-    api.get('/api/security/csp-violations?limit=50&hours=24')
-      .then((res) => setViolations(res.data))
-      .catch(() => setViolations({ items: [], total: 0, breakdown_by_directive: {}, breakdown_by_blocked_uri: {} }));
-  }, []);
+  const [blockedIps, setBlockedIps] = useState({ items: [], active: 0 });
+  const [unblocking, setUnblocking] = useState(null);
+
+  const load = async () => {
+    try {
+      const [v, b] = await Promise.all([
+        api.get('/api/security/csp-violations?limit=50&hours=24'),
+        api.get('/api/security/blocked-ips?limit=20'),
+      ]);
+      setViolations(v.data);
+      setBlockedIps(b.data);
+    } catch {
+      setViolations({ items: [], total: 0, breakdown_by_directive: {}, breakdown_by_blocked_uri: {} });
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const doUnblock = async (ip) => {
+    if (!window.confirm(`Desbloquear ${ip}?`)) return;
+    setUnblocking(ip);
+    try {
+      await api.delete(`/api/security/blocked-ips/${encodeURIComponent(ip)}`);
+      await load();
+    } catch (e) {
+      alert('Error al desbloquear: ' + (e?.response?.data?.detail || e.message));
+    } finally {
+      setUnblocking(null);
+    }
+  };
+
   if (!violations) return null;
   const dirs = violations.breakdown_by_directive || {};
   const dirEntries = Object.entries(dirs).sort((a, b) => b[1] - a[1]);
   const isEmpty = violations.total === 0;
+  const activeIps = (blockedIps.items || []).filter(b => b.active);
   return (
-    <Card className={`border-slate-200/80 ${isEmpty ? '' : 'border-amber-200'}`} data-testid="csp-widget">
+    <Card className={`border-slate-200/80 ${activeIps.length > 0 ? 'border-red-300' : (isEmpty ? '' : 'border-amber-200')}`} data-testid="csp-widget">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold text-slate-600 flex items-center gap-2">
-          <Activity className={`w-4 h-4 ${isEmpty ? 'text-slate-400' : 'text-amber-500'}`} />
+          <Activity className={`w-4 h-4 ${activeIps.length > 0 ? 'text-red-500' : (isEmpty ? 'text-slate-400' : 'text-amber-500')}`} />
           Violaciones CSP (ultimas 24h) — {violations.total}
+          {activeIps.length > 0 && (
+            <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 border border-red-200 text-xs font-bold text-red-700">
+              {activeIps.length} IP{activeIps.length !== 1 ? 's' : ''} bloqueada{activeIps.length !== 1 ? 's' : ''}
+            </span>
+          )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
+      <CardContent className="pt-0 space-y-3">
         {isEmpty ? (
           <p className="text-sm text-slate-400 text-center py-4">
-            Sin violaciones de CSP en las ultimas 24h. Los navegadores no bloquearon ningun recurso.
+            Sin violaciones de CSP en las ultimas 24h.
           </p>
         ) : (
-          <div className="space-y-3">
+          <>
             <div className="flex flex-wrap gap-1.5">
               {dirEntries.slice(0, 8).map(([d, c]) => (
                 <span key={d} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-xs">
@@ -351,12 +383,36 @@ function CspViolationsWidget() {
                 </span>
               ))}
             </div>
-            <div className="max-h-[180px] overflow-y-auto space-y-1.5 pr-1">
+            <div className="max-h-[140px] overflow-y-auto space-y-1.5 pr-1">
               {violations.items.slice(0, 10).map((v) => (
                 <div key={v._id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 text-xs" data-testid={`csp-violation-${v._id}`}>
                   <span className="font-mono text-amber-800 truncate max-w-[140px]">{v.violated_directive}</span>
                   <span className="text-slate-500 truncate flex-1" title={v.blocked_uri}>{v.blocked_uri || '(inline)'}</span>
+                  {v.ip && <span className="text-slate-400 font-mono text-[10px]">{v.ip}</span>}
                   <span className="text-slate-400 whitespace-nowrap">{v.created_at?.slice(11, 16)}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        {/* Sub-panel: IPs bloqueadas activas */}
+        {activeIps.length > 0 && (
+          <div className="pt-3 border-t border-slate-200">
+            <p className="text-xs font-semibold text-slate-500 mb-2 uppercase">IPs auto-bloqueadas</p>
+            <div className="space-y-1.5">
+              {activeIps.map((b) => (
+                <div key={b._id} className="flex items-center gap-2 p-2 rounded-lg bg-red-50 border border-red-100 text-xs" data-testid={`blocked-ip-${b.ip}`}>
+                  <span className="font-mono font-semibold text-red-900">{b.ip}</span>
+                  <span className="text-red-700 flex-1 truncate">{b.reason}</span>
+                  <span className="text-red-500 whitespace-nowrap">expira {b.blocked_until?.slice(11, 16)}</span>
+                  <button
+                    onClick={() => doUnblock(b.ip)}
+                    disabled={unblocking === b.ip}
+                    className="text-[10px] px-2 py-0.5 rounded bg-white border border-red-200 text-red-700 hover:bg-red-100"
+                    data-testid={`unblock-${b.ip}`}
+                  >
+                    {unblocking === b.ip ? '...' : 'Desbloquear'}
+                  </button>
                 </div>
               ))}
             </div>

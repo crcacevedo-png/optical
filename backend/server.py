@@ -178,7 +178,26 @@ def _origin_matches_host(origin: str, request: Request) -> bool:
 async def cors_middleware(request: Request, call_next):
     origin = request.headers.get("origin", "")
     allowed = _is_allowed_origin(origin)
-    
+
+    # IP block check (Feb 2026): bloquea requests desde IPs marcadas por comportamiento anomalo.
+    # Aplica solo a paths /api (no bloqueamos el HTML de la SPA para no romper UX de usuarios legitimos
+    # que quedaron atrapados por false-positive; ellos veran errores en las API calls y sabran).
+    if request.url.path.startswith("/api"):
+        client_ip = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+        if not client_ip and request.client:
+            client_ip = request.client.host
+        if client_ip:
+            try:
+                from blocked_ips import is_ip_blocked
+                if await is_ip_blocked(client_ip):
+                    return Response(
+                        status_code=403,
+                        content='{"detail":"IP bloqueada por comportamiento anomalo. Contacta soporte."}',
+                        media_type="application/json",
+                    )
+            except Exception as e:
+                logger.warning(f"blocked_ips check failed: {e}")
+
     if request.method == "OPTIONS":
         response = Response(status_code=200 if allowed else 403)
         if allowed:
@@ -198,7 +217,12 @@ async def cors_middleware(request: Request, call_next):
     if request.method in ("POST", "PUT", "PATCH", "DELETE"):
         path = request.url.path
         # Whitelist de paths server-to-server sin auth cookie (Stripe webhook verifica via signature)
-        _CSRF_EXEMPT_PATHS = ("/api/webhook/stripe",)
+        # y endpoints que reciben reportes del navegador (no pueden usar X-CSRF-Token porque
+        # el propio navegador los envia sin intervencion de JS).
+        _CSRF_EXEMPT_PATHS = (
+            "/api/webhook/stripe",
+            "/api/security/csp-report",
+        )
         is_exempt = any(path.startswith(p) for p in _CSRF_EXEMPT_PATHS)
         if not is_exempt:
             referer = request.headers.get("referer", "")
@@ -336,6 +360,14 @@ async def startup():
     try:
         await db.csp_violations.create_index("created_at", expireAfterSeconds=2592000, name="csp_ttl")
         await db.csp_violations.create_index([("violated_directive", 1), ("created_at", -1)])
+        await db.csp_violations.create_index([("ip", 1), ("created_at", -1)])
+    except Exception:
+        pass
+
+    # --- Blocked IPs (TTL sobre blocked_until para auto-unblock) ---
+    try:
+        await db.blocked_ips.create_index("ip", unique=True)
+        await db.blocked_ips.create_index("blocked_until", expireAfterSeconds=0, name="blocked_ips_ttl")
     except Exception:
         pass
 
