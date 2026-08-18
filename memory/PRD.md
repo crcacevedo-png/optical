@@ -112,6 +112,25 @@ Modulo nuevo de brigadas visuales / eventos fuera de sucursal. Multi-tenant, opc
 
 ## Lo Implementado
 
+### CSP Spike Alerts al equipo Cortexia (Feb 2026)
+Alertas proactivas cuando se detectan picos anormales de violaciones CSP — signal fuerte de intento activo de XSS/inyeccion.
+
+**Backend `routes/security_reports.py`**:
+- Nueva funcion `_check_and_alert_spike()` que corre best-effort tras cada report guardado (no bloquea la respuesta HTTP).
+- Umbrales configurables via env:
+  - `CSP_SPIKE_THRESHOLD=5` (default) — cantidad minima de violaciones en la ventana para disparar alerta.
+  - `CSP_SPIKE_WINDOW_MIN=15` (default) — ventana temporal.
+  - `CSP_ALERT_COOLDOWN_MIN=60` (default) — periodo minimo entre alertas para evitar spam.
+- Cuando se detecta pico:
+  1. Agrega top 5 `violated_directive` y top 5 `blocked_uri` para dar contexto en el alerta.
+  2. Envia email al equipo (`CORTEXIA_ALERTS_TO` o `ADMIN_EMAIL`) usando template `render_security_alert` con event_meta detallado (cantidad, umbral, directives, URIs).
+  3. Crea push notification al SuperAdmin (`event_type=csp_spike`).
+  4. Guarda doc en `db.csp_alerts` con `scope=global, last_alert_at, last_count, last_top_directives` (upsert).
+  5. En el siguiente report dentro de `ALERT_COOLDOWN_MIN`, la funcion detecta la alerta reciente y NO envia otra.
+- Colecccion `csp_alerts` sirve como state machine minimalista para dedup — no tiene TTL (borrado manual solo).
+
+**Testing E2E**: 4 reports bajo umbral → sin alerta, 5to report (=umbral) → email + notification + doc creado, siguientes 5 reports → cooldown activo, sin duplicados. Verificado con curls.
+
 ### CSP + Report-To + Security Headers Telemetry (Feb 2026)
 Defense-in-depth adicional para telemetria de intentos de XSS/inyeccion cross-site.
 
