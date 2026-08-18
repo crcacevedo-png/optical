@@ -153,6 +153,26 @@ def _is_allowed_origin(origin: str) -> bool:
         return False
     return origin in ALLOWED_ORIGINS
 
+
+def _origin_matches_host(origin: str, request: Request) -> bool:
+    """Verifica si el Origin coincide con el Host/X-Forwarded-Host del request.
+    Util cuando el proxy reescribe Origin al hostname interno del cluster
+    (ej. Emergent CF: proxy publica en emergentagent.com pero backend recibe
+    Origin=emergentcf.cloud interno). Un ataque cross-site NO puede forjar
+    coincidencia entre Origin y Host, por eso este check es equivalente a
+    validar contra whitelist para requests same-origin.
+    """
+    if not origin:
+        return False
+    from urllib.parse import urlparse
+    try:
+        origin_host = urlparse(origin).netloc.lower()
+        req_host = (request.headers.get("host") or "").lower()
+        xfh = (request.headers.get("x-forwarded-host") or "").lower()
+        return origin_host and (origin_host == req_host or origin_host == xfh)
+    except Exception:
+        return False
+
 @app.middleware("http")
 async def cors_middleware(request: Request, call_next):
     origin = request.headers.get("origin", "")
@@ -168,7 +188,60 @@ async def cors_middleware(request: Request, call_next):
             response.headers["Access-Control-Max-Age"] = "600"
             response.headers["Vary"] = "Origin"
         return response
-    
+
+    # SEC-001 CSRF protection (Feb 2026): validar Origin en state-changing requests.
+    # Necesario porque el proxy fuerza SameSite=None+Partitioned. Cloudflare a veces reescribe
+    # el header Origin al hostname interno del cluster; validamos que Origin/Referer coincidan
+    # con la whitelist O con el Host/X-Forwarded-Host (equivalente a same-origin desde el punto
+    # de vista del cliente). Excepciones: webhooks server-to-server.
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        path = request.url.path
+        # Whitelist de paths server-to-server sin auth cookie (Stripe webhook verifica via signature)
+        _CSRF_EXEMPT_PATHS = ("/api/webhook/stripe",)
+        is_exempt = any(path.startswith(p) for p in _CSRF_EXEMPT_PATHS)
+        if not is_exempt:
+            referer = request.headers.get("referer", "")
+            has_auth_cookie = bool(request.cookies.get("access_token") or request.cookies.get("refresh_token"))
+            # CSRF Double-Submit: si existe csrf_token cookie, exigimos header X-CSRF-Token
+            # que coincida (attacker cross-site NO puede leer la cookie via JS por SOP).
+            # Es la defensa mas robusta contra CSRF cuando el proxy reescribe el Origin header.
+            csrf_cookie = request.cookies.get("csrf_token")
+            csrf_header = request.headers.get("x-csrf-token")
+            csrf_ok = bool(csrf_cookie and csrf_header and csrf_cookie == csrf_header)
+
+            # Origin/Referer fallback (para clientes legacy sin csrf_token cookie aun)
+            origin_ok = _is_allowed_origin(origin) or _origin_matches_host(origin, request)
+            referer_ok = False
+            if referer:
+                from urllib.parse import urlparse
+                try:
+                    p = urlparse(referer)
+                    ref_origin = f"{p.scheme}://{p.netloc}"
+                    referer_ok = _is_allowed_origin(ref_origin) or _origin_matches_host(ref_origin, request)
+                except Exception:
+                    referer_ok = False
+
+            # Politica:
+            # - Si no hay cookie de auth, permitir (endpoint publico como /auth/login).
+            # - Si hay auth cookie + csrf_token cookie => obligar CSRF header match (estricto).
+            # - Si hay auth cookie sin csrf cookie (legacy) => permitir con origen valido.
+            if has_auth_cookie:
+                if csrf_cookie:
+                    if not csrf_ok:
+                        logger.warning(f"CSRF block (double-submit): {request.method} {path} csrf_cookie_present={bool(csrf_cookie)} header_present={bool(csrf_header)} match={csrf_ok}")
+                        return Response(
+                            status_code=403,
+                            content='{"detail":"CSRF token invalido"}',
+                            media_type="application/json",
+                        )
+                elif not (origin_ok or referer_ok):
+                    logger.warning(f"CSRF block (origin fallback): {request.method} {path} origin='{origin}' referer='{referer[:100]}' host='{request.headers.get('host', '')}' xfh='{request.headers.get('x-forwarded-host', '')}'")
+                    return Response(
+                        status_code=403,
+                        content='{"detail":"Origen no autorizado"}',
+                        media_type="application/json",
+                    )
+
     response = await call_next(request)
     if allowed:
         response.headers["Access-Control-Allow-Origin"] = origin

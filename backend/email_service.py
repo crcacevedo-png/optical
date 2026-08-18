@@ -5,6 +5,7 @@ para maxima compatibilidad con clientes de email.
 import os
 import asyncio
 import logging
+import html
 from typing import Optional
 import resend
 
@@ -15,6 +16,15 @@ BRAND_TEAL = "#1ABC9C"
 BRAND_EMERALD = "#059669"
 BRAND_RED = "#DC2626"
 TEXT_MUTED = "#64748B"
+
+
+def _e(s) -> str:
+    """HTML-escape para prevenir HTML injection en interpolaciones de nombres/company/etc.
+    (P3 hardening Feb 2026). Uso: interpolar variables externas dentro de plantillas HTML.
+    """
+    if s is None:
+        return ""
+    return html.escape(str(s), quote=True)
 
 
 def _get_config():
@@ -120,9 +130,11 @@ def _button(text: str, href: str, color: str = BRAND_EMERALD) -> str:
 
 def render_quotation_email(patient_name: str, company_name: str, quotation_number: str, total_str: str, expiry_date: str, notes: Optional[str] = None) -> str:
     """Email para enviar la cotizacion (con PDF adjunto) al paciente."""
+    patient_name, company_name = _e(patient_name), _e(company_name)
+    quotation_number, total_str, expiry_date = _e(quotation_number), _e(total_str), _e(expiry_date)
     notes_block = ""
     if notes:
-        notes_block = f'<p style="color:#475569;font-size:14px;line-height:1.6;margin:16px 0 0 0;"><strong>Notas:</strong> {notes[:300]}</p>'
+        notes_block = f'<p style="color:#475569;font-size:14px;line-height:1.6;margin:16px 0 0 0;"><strong>Notas:</strong> {_e(notes[:300])}</p>'
     content = f"""
       <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{patient_name}</strong>,</p>
       <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
@@ -146,6 +158,7 @@ def render_quotation_email(patient_name: str, company_name: str, quotation_numbe
 
 def render_password_reset(name: str, reset_link: str) -> str:
     """Email de restablecimiento de contrasena."""
+    name = _e(name)
     content = f"""
       <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{name}</strong>,</p>
       <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
@@ -172,6 +185,9 @@ def render_password_reset(name: str, reset_link: str) -> str:
 
 def render_welcome_company(admin_name: str, company_name: str, admin_email: str, admin_password: str, login_link: str) -> str:
     """Email de bienvenida cuando se crea una nueva optica."""
+    admin_name, company_name, admin_email = _e(admin_name), _e(company_name), _e(admin_email)
+    # admin_password NO se escapa: se muestra en <span monospace>; contiene solo chars alfanumerciso generados por servidor
+    admin_password = _e(admin_password)
     content = f"""
       <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{admin_name}</strong>,</p>
       <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
@@ -232,6 +248,7 @@ def render_welcome_company(admin_name: str, company_name: str, admin_email: str,
 
 def render_activation_reminder(admin_name: str, company_name: str, days_remaining: int, login_link: str) -> str:
     """Recordatorio al admin cuando faltan pocos dias para desactivar la optica por falta de activacion."""
+    admin_name, company_name = _e(admin_name), _e(company_name)
     urgency = "urgente" if days_remaining <= 3 else "importante"
     content = f"""
       <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{admin_name}</strong>,</p>
@@ -259,6 +276,7 @@ def render_activation_reminder(admin_name: str, company_name: str, days_remainin
 
 def render_deactivation_notice(admin_name: str, company_name: str) -> str:
     """Email cuando la optica se desactiva por no haber sido activada en 30 dias."""
+    admin_name, company_name = _e(admin_name), _e(company_name)
     content = f"""
       <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{admin_name}</strong>,</p>
       <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
@@ -283,6 +301,7 @@ def render_deactivation_notice(admin_name: str, company_name: str) -> str:
 
 def render_onboarding_tips(admin_name: str, company_name: str, login_link: str) -> str:
     """Email amigable dia 3 al admin que aun no ha ingresado - motivador con tips practicos."""
+    admin_name, company_name = _e(admin_name), _e(company_name)
     content = f"""
       <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{admin_name}</strong>,</p>
       <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
@@ -341,6 +360,7 @@ def render_onboarding_tips(admin_name: str, company_name: str, login_link: str) 
 
 def render_reactivation_notice(admin_name: str, company_name: str, reset_link: str) -> str:
     """Email cuando el SuperAdmin reactiva una optica manualmente."""
+    admin_name, company_name = _e(admin_name), _e(company_name)
     content = f"""
       <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{admin_name}</strong>,</p>
       <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
@@ -371,11 +391,12 @@ def render_reactivation_notice(admin_name: str, company_name: str, reset_link: s
 
 def render_security_alert(name: str, event_title: str, event_description: str, event_meta: dict, app_url: str) -> str:
     """Email de alerta de seguridad."""
+    name, event_title, event_description = _e(name), _e(event_title), _e(event_description)
     meta_rows = ""
     for k, v in event_meta.items():
         meta_rows += f"""<tr>
-          <td style="padding:6px 12px 6px 0;color:{TEXT_MUTED};font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;vertical-align:top;">{k}</td>
-          <td style="padding:6px 0;color:#0F172A;font-size:13px;word-break:break-word;">{v}</td>
+          <td style="padding:6px 12px 6px 0;color:{TEXT_MUTED};font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;vertical-align:top;">{_e(k)}</td>
+          <td style="padding:6px 0;color:#0F172A;font-size:13px;word-break:break-word;">{_e(v)}</td>
         </tr>"""
     content = f"""
       <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{name}</strong>,</p>
@@ -406,6 +427,10 @@ def render_security_alert(name: str, event_title: str, event_description: str, e
 def render_support_ticket(*, ticket_id: str, subject: str, message: str, category: str, priority: str,
                           creator_name: str, creator_email: str, company_name: str) -> str:
     """Email al equipo Cortexia cuando llega un ticket nuevo."""
+    subject_e, message_e = _e(subject), _e(message)
+    category_e, priority_e = _e(category), _e(priority)
+    creator_name_e, creator_email_e, company_name_e = _e(creator_name), _e(creator_email), _e(company_name)
+    ticket_id_e = _e(ticket_id)
     _, _, app_url = _get_config()
     priority_colors = {
         "alta": ("#DC2626", "#FEE2E2"),
@@ -420,19 +445,19 @@ def render_support_ticket(*, ticket_id: str, subject: str, message: str, categor
       </p>
       <div style="background-color:{bg};border-left:4px solid {color};padding:16px 20px;border-radius:6px;margin:16px 0;">
         <p style="color:{color};font-size:11px;margin:0 0 4px 0;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">
-          Prioridad: {priority}  ·  {category}
+          Prioridad: {priority_e}  ·  {category_e}
         </p>
-        <p style="color:#0F172A;font-size:16px;margin:0;font-weight:bold;">{subject}</p>
+        <p style="color:#0F172A;font-size:16px;margin:0;font-weight:bold;">{subject_e}</p>
       </div>
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="width:100%;background-color:#F8FAFC;border-radius:8px;padding:14px 18px;margin:16px 0;">
-        <tr><td style="padding:4px 0;color:#64748B;font-size:13px;">Optica:</td><td style="padding:4px 0;color:#0F172A;font-size:13px;font-weight:bold;text-align:right;">{company_name}</td></tr>
-        <tr><td style="padding:4px 0;color:#64748B;font-size:13px;">Usuario:</td><td style="padding:4px 0;color:#0F172A;font-size:13px;text-align:right;">{creator_name}</td></tr>
-        <tr><td style="padding:4px 0;color:#64748B;font-size:13px;">Email:</td><td style="padding:4px 0;color:#0F172A;font-size:13px;text-align:right;"><a href="mailto:{creator_email}" style="color:{BRAND_TEAL};text-decoration:none;">{creator_email}</a></td></tr>
-        <tr><td style="padding:4px 0;color:#64748B;font-size:13px;">Ticket ID:</td><td style="padding:4px 0;color:#0F172A;font-size:11px;text-align:right;font-family:monospace;">{ticket_id}</td></tr>
+        <tr><td style="padding:4px 0;color:#64748B;font-size:13px;">Optica:</td><td style="padding:4px 0;color:#0F172A;font-size:13px;font-weight:bold;text-align:right;">{company_name_e}</td></tr>
+        <tr><td style="padding:4px 0;color:#64748B;font-size:13px;">Usuario:</td><td style="padding:4px 0;color:#0F172A;font-size:13px;text-align:right;">{creator_name_e}</td></tr>
+        <tr><td style="padding:4px 0;color:#64748B;font-size:13px;">Email:</td><td style="padding:4px 0;color:#0F172A;font-size:13px;text-align:right;"><a href="mailto:{creator_email_e}" style="color:{BRAND_TEAL};text-decoration:none;">{creator_email_e}</a></td></tr>
+        <tr><td style="padding:4px 0;color:#64748B;font-size:13px;">Ticket ID:</td><td style="padding:4px 0;color:#0F172A;font-size:11px;text-align:right;font-family:monospace;">{ticket_id_e}</td></tr>
       </table>
       <div style="background-color:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:16px 20px;margin:16px 0;">
         <p style="color:#64748B;font-size:11px;margin:0 0 8px 0;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">Mensaje</p>
-        <p style="color:#0F172A;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">{message}</p>
+        <p style="color:#0F172A;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">{message_e}</p>
       </div>
       {_button("Abrir el ticket", detail_url, BRAND_DARK)}
     """

@@ -91,6 +91,20 @@ async def get_current_user(request: Request) -> dict:
         # Verificacion de cuenta activa
         if not user.get("is_active", True):
             raise HTTPException(status_code=401, detail="Cuenta desactivada")
+        # Verificacion de company activa (P3 hardening Feb 2026):
+        # si la optica esta desactivada, bloquea a TODOS los usuarios (incluyendo staff no-admin)
+        # excepto superadmin. Sin esto, staff podia seguir operando en una optica deshabilitada.
+        if user.get("company_id") and user.get("role") != "superadmin":
+            try:
+                company = await db.companies.find_one(
+                    {"_id": ObjectId(user["company_id"])}, {"is_active": 1}
+                )
+                if company and company.get("is_active") is False:
+                    raise HTTPException(status_code=401, detail="Optica desactivada. Contacta al equipo de Cortexia.")
+            except HTTPException:
+                raise
+            except Exception:
+                pass
         # Revocacion de tokens emitidos antes del ultimo cambio de password
         token_iat = payload.get("iat", 0)
         pw_changed_at = user.get("password_changed_at", 0)

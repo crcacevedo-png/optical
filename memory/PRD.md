@@ -112,6 +112,27 @@ Modulo nuevo de brigadas visuales / eventos fuera de sucursal. Multi-tenant, opc
 
 ## Lo Implementado
 
+### Security Audit Round 2 + CSRF Double-Submit + Hardening (Feb 2026)
+Segunda auditoria completa. 1 finding MEDIUM (P2) CSRF + varios P3. Verdict: **PASS - NO MATERIAL FUNCTIONAL ISSUES FOUND**.
+
+**SEC-001 CSRF (P2 - RESUELTO)**: cookies con SameSite=None (forzado por Cloudflare proxy) permitirian ataques CSRF cross-site. Fix con patron CSRF Double-Submit Cookie:
+- `routes/auth.py::_set_auth_cookies`: nuevo cookie `csrf_token` con `secrets.token_urlsafe(32)` (256-bit entropy), `httponly=False` (JS-readable), `samesite=none`, `secure=True`. Se envia cross-site pero atacante no puede LEER via JS (SOP).
+- `server.py` middleware: para POST/PUT/PATCH/DELETE con auth cookie, exige header `X-CSRF-Token` que coincida con cookie. Sino → 403 "CSRF token invalido". Fallback Origin/Referer para transicion.
+- Frontend `AuthContext.js`: axios request interceptor lee cookie via `document.cookie` y agrega header en todos los state-changing requests.
+- `/auth/refresh` reemite csrf_token para mantener consistencia con access_token.
+- Webhook Stripe `/api/webhook/stripe` en `_CSRF_EXEMPT_PATHS` (server-to-server, verificado via signature).
+- Verificado: POST sin header → 403, con header incorrecto → 403, con header correcto → 200.
+
+**SEC-002 Logout tokens sid-less (P3 - RESUELTO)**: logout ahora revoca la sesion actual Y (fallback) bumpea `password_changed_at` si el token no tiene sid (compatibilidad con tokens emitidos antes del deploy).
+
+**SEC-003 Session existence disclosure (P3 - RESUELTO)**: `sessions::revoke_session` valida autorizacion ANTES del check de revoked → 404 uniforme sin filtrar existencia.
+
+**P3 Hardenings adicionales (RESUELTOS)**:
+- `auth_utils.get_current_user`: bloquea usuarios de ópticas inactivas (`company.is_active=False`) con 401 para no-superadmin. Antes staff podia seguir operando en optica desactivada.
+- `email_service.py`: nuevo helper `_e()` (HTML-escape). Aplicado a interpolaciones de nombres/company/comentarios en TODOS los templates de email (render_welcome_company, render_activation_reminder, render_deactivation_notice, render_onboarding_tips, render_reactivation_notice, render_security_alert, render_support_ticket, render_quotation_email, render_password_reset).
+- `routes/reactivation_feedback::submit_feedback`: precondition idempotente — 400 si `needs_reactivation_feedback` flag no esta seteado. Previene spam al SuperAdmin en recargas.
+- Default `SameSite=lax` en cookies (previously `none`). CF sigue reescribiendo httpOnly cookies a None+Partitioned pero csrf_token se mantiene con la config correcta.
+
 ### Panel Sesiones Activas + Session-based JWT revocation (Feb 2026)
 
 **Feature "Sesiones Activas"** - permite al admin ver todos los dispositivos logueados en su optica y revocar sesiones sospechosas con un click.

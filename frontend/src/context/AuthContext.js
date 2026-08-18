@@ -20,6 +20,31 @@ const api = axios.create({
   }
 });
 
+// CSRF double-submit: leer csrf_token cookie e injectar en cada request state-changing.
+// Se combina con el backend middleware que exige que el header X-CSRF-Token
+// coincida con la cookie. Un atacante cross-site NO puede leer la cookie via JS
+// (SOP), por eso no puede forjar el header y su request es rechazado 403.
+function _getCsrfToken() {
+  try {
+    const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+api.interceptors.request.use((config) => {
+  const method = (config.method || 'get').toLowerCase();
+  if (['post', 'put', 'patch', 'delete'].includes(method)) {
+    const token = _getCsrfToken();
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers['X-CSRF-Token'] = token;
+    }
+  }
+  return config;
+});
+
 // Auto-refresh interceptor: retry once with refreshed token on 401
 let isRefreshing = false;
 let failedQueue = [];

@@ -56,6 +56,11 @@ async def submit_feedback(data: FeedbackSubmit, user: dict = Depends(get_current
     if not company:
         raise HTTPException(status_code=404, detail="Optica no encontrada")
 
+    # H3 hardening (Feb 2026): precondition idempotente para prevenir feedback
+    # repetido y spam al SuperAdmin cuando el usuario recarga o el flag ya se limpio.
+    if not company.get("needs_reactivation_feedback"):
+        raise HTTPException(status_code=400, detail="No hay feedback pendiente para esta optica")
+
     now = datetime.now(timezone.utc)
     doc = {
         "company_id": cid,

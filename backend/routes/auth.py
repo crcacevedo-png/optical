@@ -20,20 +20,33 @@ import secrets
 router = APIRouter(prefix="/auth", tags=["Autenticacion"])
 
 def _get_cookie_samesite():
-    """Get SameSite cookie value. 'none' works for both same-origin and cross-origin with Secure=true."""
-    return os.environ.get("COOKIE_SAMESITE", "none")
+    """Get SameSite cookie value.
+    SEC-001 fix (Feb 2026): default a 'lax' para bloquear CSRF cross-site.
+    Antes era 'none' (permitia cross-site con Secure). En Emergent frontend y backend
+    comparten dominio asi que 'lax' no rompe el flujo. Override via env COOKIE_SAMESITE
+    solo si el deployment necesita cross-site (ej. subdominios distintos sin ingress).
+    """
+    return os.environ.get("COOKIE_SAMESITE", "lax")
 
 def _set_auth_cookies(response: Response, access_token: str, refresh_token: str):
     """Set auth cookies with production-compatible settings."""
     ss = _get_cookie_samesite()
     response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite=ss, max_age=86400, path="/")
     response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite=ss, max_age=604800, path="/")
+    # CSRF token double-submit: readable by JS (no httponly).
+    # SameSite='none' + Secure = se envia cross-site (donde el ataque CSRF ocurre).
+    # El attacker NO puede leer el valor via JS (SOP), asi que no puede forjar el header X-CSRF-Token.
+    # Este es el patron correcto para SPAs detras de proxies que fuerzan SameSite=None en httpOnly.
+    import secrets as _secrets
+    csrf_token = _secrets.token_urlsafe(32)
+    response.set_cookie(key="csrf_token", value=csrf_token, httponly=False, secure=True, samesite="none", max_age=86400, path="/")
 
 def _clear_auth_cookies(response: Response):
     """Clear auth cookies with production-compatible settings."""
     ss = _get_cookie_samesite()
     response.delete_cookie("access_token", path="/", secure=True, samesite=ss)
     response.delete_cookie("refresh_token", path="/", secure=True, samesite=ss)
+    response.delete_cookie("csrf_token", path="/", secure=True, samesite=ss)
 
 @router.post("/register")
 async def register(data: UserRegister, response: Response):
@@ -249,13 +262,24 @@ async def logout(request: Request, response: Response):
             session_id = payload.get("sid")
     except Exception:
         pass
-    # Revoca SOLO la sesion actual (no otros dispositivos).
-    # Para "cerrar sesion en todos lados" el usuario usa el panel de Sesiones Activas.
+    # Revoca la sesion actual. Si el token no tiene sid (tokens de transicion post-deploy),
+    # tambien bumpea password_changed_at como fallback para invalidar cualquier token
+    # emitido antes de esta feature. (SEC-002 fix Feb 2026)
     if session_id:
         try:
             await db.sessions.update_one(
                 {"session_id": session_id},
                 {"$set": {"revoked": True, "revoked_at": datetime.now(timezone.utc), "revoked_reason": "logout"}}
+            )
+        except Exception:
+            pass
+    elif user_id:
+        # Token sin sid (transicion): fallback al mecanismo previo password_changed_at
+        try:
+            now_ts = int(datetime.now(timezone.utc).timestamp()) + 1
+            await db.users.update_one(
+                {"_id": ObjectId(user_id)},
+                {"$set": {"password_changed_at": now_ts}}
             )
         except Exception:
             pass
@@ -457,6 +481,11 @@ async def refresh_token(request: Request, response: Response):
         access_token = create_access_token(user_id, user["email"], user["role"], company_id, session_id=session_id)
         ss = _get_cookie_samesite()
         response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite=ss, max_age=86400, path="/")
+        # Reissue csrf_token para mantener consistencia con el access_token (P3 hardening Feb 2026).
+        # SameSite='none' + Secure = se envia cross-site; attacker no puede leerlo (SOP).
+        import secrets as _secrets
+        new_csrf = _secrets.token_urlsafe(32)
+        response.set_cookie(key="csrf_token", value=new_csrf, httponly=False, secure=True, samesite="none", max_age=86400, path="/")
         return {"message": "Token renovado"}
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expirado")

@@ -82,10 +82,9 @@ async def revoke_session(session_id: str, request: Request, user: dict = Depends
     session = await db.sessions.find_one({"session_id": session_id})
     if not session:
         raise HTTPException(status_code=404, detail="Sesion no encontrada")
-    if session.get("revoked"):
-        return {"ok": True, "message": "La sesion ya estaba revocada"}
 
-    # Autorizacion
+    # SEC-003 fix (Feb 2026): verificar autorizacion ANTES de exponer estado
+    # revoked/existencia. Si no tiene permiso -> 404 uniforme (no filtra existencia).
     sess_user_id = str(session.get("user_id")) if session.get("user_id") else None
     sess_company_id = str(session.get("company_id")) if session.get("company_id") else None
     caller_id = user["_id"]
@@ -101,7 +100,11 @@ async def revoke_session(session_id: str, request: Request, user: dict = Depends
         allowed = True
 
     if not allowed:
-        raise HTTPException(status_code=403, detail="No autorizado para revocar esta sesion")
+        # Retorna 404 en lugar de 403 para no filtrar existencia del session_id
+        raise HTTPException(status_code=404, detail="Sesion no encontrada")
+
+    if session.get("revoked"):
+        return {"ok": True, "message": "La sesion ya estaba revocada"}
 
     # Bloquear autoauto-revocacion de la sesion actual (para eso existe /auth/logout)
     if session_id == user.get("current_session_id"):
