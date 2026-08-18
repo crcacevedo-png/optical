@@ -310,7 +310,60 @@ export default function SuperAdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* === CSP Violations Widget === */}
+      <CspViolationsWidget />
     </div>
+  );
+}
+
+function CspViolationsWidget() {
+  const [violations, setViolations] = useState(null);
+  useEffect(() => {
+    api.get('/api/security/csp-violations?limit=50&hours=24')
+      .then((res) => setViolations(res.data))
+      .catch(() => setViolations({ items: [], total: 0, breakdown_by_directive: {}, breakdown_by_blocked_uri: {} }));
+  }, []);
+  if (!violations) return null;
+  const dirs = violations.breakdown_by_directive || {};
+  const dirEntries = Object.entries(dirs).sort((a, b) => b[1] - a[1]);
+  const isEmpty = violations.total === 0;
+  return (
+    <Card className={`border-slate-200/80 ${isEmpty ? '' : 'border-amber-200'}`} data-testid="csp-widget">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold text-slate-600 flex items-center gap-2">
+          <Activity className={`w-4 h-4 ${isEmpty ? 'text-slate-400' : 'text-amber-500'}`} />
+          Violaciones CSP (ultimas 24h) — {violations.total}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {isEmpty ? (
+          <p className="text-sm text-slate-400 text-center py-4">
+            Sin violaciones de CSP en las ultimas 24h. Los navegadores no bloquearon ningun recurso.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-1.5">
+              {dirEntries.slice(0, 8).map(([d, c]) => (
+                <span key={d} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-xs">
+                  <span className="font-mono text-amber-900">{d}</span>
+                  <span className="font-bold text-amber-700">{c}</span>
+                </span>
+              ))}
+            </div>
+            <div className="max-h-[180px] overflow-y-auto space-y-1.5 pr-1">
+              {violations.items.slice(0, 10).map((v) => (
+                <div key={v._id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 text-xs" data-testid={`csp-violation-${v._id}`}>
+                  <span className="font-mono text-amber-800 truncate max-w-[140px]">{v.violated_directive}</span>
+                  <span className="text-slate-500 truncate flex-1" title={v.blocked_uri}>{v.blocked_uri || '(inline)'}</span>
+                  <span className="text-slate-400 whitespace-nowrap">{v.created_at?.slice(11, 16)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

@@ -112,6 +112,31 @@ Modulo nuevo de brigadas visuales / eventos fuera de sucursal. Multi-tenant, opc
 
 ## Lo Implementado
 
+### CSP + Report-To + Security Headers Telemetry (Feb 2026)
+Defense-in-depth adicional para telemetria de intentos de XSS/inyeccion cross-site.
+
+**Backend security headers** (`server.py` middleware, aplicado en todas las responses):
+- **API responses (JSON, prefix `/api/`)**:
+  - `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'` (bloquea absolutamente todo — APIs no cargan recursos)
+  - `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+- **HTML SPA responses**:
+  - CSP moderno con `default-src 'self'`, allowlist para Stripe (`js.stripe.com`, `hooks.stripe.com`, `checkout.stripe.com`), Google Fonts (`fonts.googleapis.com`, `fonts.gstatic.com`), `frame-ancestors 'none'`, `object-src 'none'`, `upgrade-insecure-requests`.
+  - `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com` (unsafe-inline necesario para CRA bootstrap; TODO nonce en v2).
+  - `report-uri /api/security/csp-report` + `Report-To` header con el mismo endpoint.
+  - Adicional: HSTS `max-age=31536000; includeSubDomains`.
+
+**Backend `routes/security_reports.py`** (nuevo):
+- `POST /api/security/csp-report`: publico, sin auth (asi lo envian los navegadores). Rate limited 60/min. Acepta ambos formatos: CSP Level 2 (`application/csp-report`) y Reporting API (`application/reports+json`). Extrae `violated_directive`, `blocked_uri`, `document_uri`, `source_file`, etc. Guarda en `db.csp_violations`.
+- `GET /api/security/csp-violations` (superadmin only): retorna items + breakdown por directive + breakdown por blocked_uri, filtrado por hours (max 720).
+- Indice TTL 30 dias sobre `created_at` para auto-purga.
+
+**Frontend `SuperAdminDashboard.js`**:
+- Nuevo widget `CspViolationsWidget` (data-testid=`csp-widget`) al final del dashboard SaaS.
+- Muestra total 24h, pills con top directives (bg-amber), lista scrollable con las ultimas 10 violaciones (directive + blocked_uri + hora).
+- Card cambia a borde amber cuando hay violaciones (>0); estado vacio muestra mensaje amigable.
+
+**Testing**: Simulacion CSP report → guardado OK, GET violations retorna con breakdown correcto, widget muestra amber cuando hay violation, empty state correcto.
+
 ### Security Audit Round 2 + CSRF Double-Submit + Hardening (Feb 2026)
 Segunda auditoria completa. 1 finding MEDIUM (P2) CSRF + varios P3. Verdict: **PASS - NO MATERIAL FUNCTIONAL ISSUES FOUND**.
 

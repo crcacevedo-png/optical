@@ -19,7 +19,7 @@ from routes import (
     finance, reports, users, suppliers, plans, superadmin, announcements,
     notifications, security, data_export, audit_log, onboarding, health_metrics,
     cash_register, support_tickets, billing, jornadas, jornada_ops, jornada_consignment,
-    superadmin_retention, reactivation_feedback, sessions
+    superadmin_retention, reactivation_feedback, sessions, security_reports
 )
 
 app = FastAPI(title="Cortexia Optical API")
@@ -65,6 +65,7 @@ api_router.include_router(jornada_consignment.router)
 api_router.include_router(superadmin_retention.router)
 api_router.include_router(reactivation_feedback.router)
 api_router.include_router(sessions.router)
+api_router.include_router(security_reports.router)
 # Webhook Stripe: se registra a nivel raiz (no dentro de /api) porque el path
 # ya incluye /api/webhook/stripe segun la libreria emergentintegrations.
 app.include_router(billing.webhook_router)
@@ -248,6 +249,58 @@ async def cors_middleware(request: Request, call_next):
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
         response.headers["Vary"] = "Origin"
+
+    # Security headers (Feb 2026): defense in depth para XSS/clickjacking/MIME sniffing.
+    # No re-aplicar si la respuesta es de assets estaticos servidos por otro proxy.
+    path = request.url.path
+    if path.startswith("/api"):
+        # Solo para responses de la API (que son JSON): headers minimos
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        # CSP para responses del API - restrictivo (no debe cargar recursos):
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+        )
+    else:
+        # HTML del frontend (React SPA) - CSP mas permisivo pero con reporting
+        # Recursos externos permitidos:
+        # - Google Fonts (fonts.googleapis.com CSS, fonts.gstatic.com WOFF2)
+        # - Stripe (js.stripe.com + api.stripe.com para checkout)
+        # - customer-assets.emergentagent.com (assets del cliente)
+        # - Emergent object storage (imagenes de logos y attachments)
+        # - wa.me (whatsapp links via <a href>)
+        # 'unsafe-inline' requerido por Create React App (bootstrap scripts) y Tailwind.
+        csp_directives = [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "font-src 'self' data: https://fonts.gstatic.com",
+            "img-src 'self' data: blob: https:",
+            "connect-src 'self' https: wss:",
+            "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
+            "frame-ancestors 'none'",
+            "base-uri 'self'",
+            "form-action 'self' https://checkout.stripe.com",
+            "object-src 'none'",
+            "upgrade-insecure-requests",
+            "report-uri /api/security/csp-report",
+            "report-to csp-endpoint",
+        ]
+        response.headers.setdefault("Content-Security-Policy", "; ".join(csp_directives))
+        # Reporting API endpoint
+        response.headers.setdefault(
+            "Report-To",
+            '{"group":"csp-endpoint","max_age":10886400,"endpoints":[{"url":"/api/security/csp-report"}]}'
+        )
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+
     return response
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -276,6 +329,13 @@ async def startup():
     # TTL: purga sesiones tras 7d de inactividad
     try:
         await db.sessions.create_index("last_activity_at", expireAfterSeconds=604800, name="sessions_ttl")
+    except Exception:
+        pass
+
+    # --- CSP violations (TTL 30 dias) ---
+    try:
+        await db.csp_violations.create_index("created_at", expireAfterSeconds=2592000, name="csp_ttl")
+        await db.csp_violations.create_index([("violated_directive", 1), ("created_at", -1)])
     except Exception:
         pass
 
