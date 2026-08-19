@@ -3,14 +3,20 @@ Genera la guia de uso de Cortexia Optical en PDF.
 Publico (auth requerido pero sin restriccion de rol) para que el equipo pueda descargarla
 y compartirla con prospectos comerciales.
 
-Endpoint: GET /api/docs/user-guide.pdf
+Endpoints:
+- GET /api/docs/user-guide.pdf (admin/superadmin)
+- POST /api/docs/share-link (admin/superadmin) -> genera URL firmada publica
+- GET /api/docs/public/user-guide?token=... (publico, valida JWT)
 """
 import io
-from fastapi import APIRouter, Depends, HTTPException
+import os
+import jwt as pyjwt
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from datetime import datetime
+from pydantic import BaseModel, Field
+from datetime import datetime, timezone, timedelta
 
-from auth_utils import get_current_user
+from auth_utils import get_current_user, get_jwt_secret, JWT_ALGORITHM
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch, cm, mm
@@ -23,6 +29,11 @@ from reportlab.platypus import (
 from reportlab.pdfgen import canvas
 
 router = APIRouter(prefix="/docs", tags=["Documentacion"])
+
+# Configuracion del share link publico
+SHARE_LINK_DEFAULT_HOURS = int(os.environ.get("USER_GUIDE_SHARE_HOURS", "720"))  # 30d
+SHARE_LINK_MAX_HOURS = int(os.environ.get("USER_GUIDE_SHARE_MAX_HOURS", "2160"))  # 90d
+GUIDE_SHARE_SUB = "guide-share"
 
 # Paleta de colores Cortexia
 BRAND_DARK = colors.HexColor("#1B2A49")
@@ -93,7 +104,7 @@ def _draw_page_frame(canv: canvas.Canvas, doc):
     canv.restoreState()
 
 
-def _cover_page(story, styles):
+def _cover_page(story, styles, prospect_name: str = None):
     story.append(Spacer(1, 5.5 * cm))
     story.append(Paragraph("CORTEXIA<br/>OPTICAL", styles["CoverTitle"]))
     story.append(Paragraph("Guia de Usuario para Opticas", styles["CoverSubtitle"]))
@@ -102,6 +113,26 @@ def _cover_page(story, styles):
         "en Guatemala, Latinoamerica y el mundo hispano.",
         styles["CoverTagline"]
     ))
+
+    # Marca personalizada del prospecto (opcional)
+    if prospect_name:
+        safe_name = _escape_prospect(prospect_name)
+        stamp_data = [[Paragraph(
+            f"<font size='10' color='#FFFFFF'>PREPARADA ESPECIALMENTE PARA</font><br/>"
+            f"<font size='18' color='#FFFFFF'><b>{safe_name}</b></font>",
+            ParagraphStyle("stamp", alignment=TA_CENTER, textColor=colors.white, leading=22)
+        )]]
+        stamp = Table(stamp_data, colWidths=[15 * cm])
+        stamp.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), BRAND_PURPLE),
+            ("LEFTPADDING", (0, 0), (-1, -1), 18),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 18),
+            ("TOPPADDING", (0, 0), (-1, -1), 12),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ]))
+        story.append(stamp)
+        story.append(Spacer(1, 20))
 
     # Callout box "Para quien es esta guia"
     callout_data = [[Paragraph(
@@ -122,7 +153,7 @@ def _cover_page(story, styles):
         ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
     ]))
     story.append(tbl)
-    story.append(Spacer(1, 4 * cm))
+    story.append(Spacer(1, 2 * cm if prospect_name else 4 * cm))
     story.append(Paragraph(
         f"<font color='#64748B'>Documento generado el {datetime.now().strftime('%d de %B, %Y')}</font>",
         ParagraphStyle("date", fontSize=9, alignment=TA_CENTER, textColor=TEXT_MUTED)
@@ -667,7 +698,27 @@ def _support(story, styles):
     ))
 
 
-def _build_pdf() -> bytes:
+def _escape_prospect(name: str) -> str:
+    """Escapa HTML/reportlab-unsafe chars y limita longitud."""
+    if not name:
+        return ""
+    s = str(name).strip()[:80]
+    # Escape XML/HTML entities para prevenir inyeccion en el markup de reportlab
+    s = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return s
+
+
+def _safe_filename_prospect(name: str) -> str:
+    """Sanitiza nombre para uso en filename."""
+    if not name:
+        return ""
+    import re as _re
+    s = _re.sub(r"[^\w\s\-]", "", str(name).strip())[:40]
+    s = _re.sub(r"\s+", "-", s).lower()
+    return s
+
+
+def _build_pdf(prospect_name: str = None) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=A4,
@@ -678,7 +729,7 @@ def _build_pdf() -> bytes:
     )
     styles = _make_styles()
     story = []
-    _cover_page(story, styles)
+    _cover_page(story, styles, prospect_name=prospect_name)
     _toc(story, styles)
     _intro(story, styles)
     _first_time(story, styles)
@@ -692,21 +743,101 @@ def _build_pdf() -> bytes:
     return buf.getvalue()
 
 
-@router.get("/user-guide.pdf")
-async def user_guide_pdf(user: dict = Depends(get_current_user)):
-    """Genera y descarga la guia completa de usuario en PDF.
-
-    Restringido a Admin de optica y Superadmin (uso comercial / onboarding).
-    """
-    if user.get("role") not in ("admin", "superadmin"):
-        raise HTTPException(status_code=403, detail="Solo administradores pueden descargar la guia.")
-    pdf_bytes = _build_pdf()
-    filename = f"cortexia-optical-guia-usuario-{datetime.now().strftime('%Y%m%d')}.pdf"
+def _stream_pdf(pdf_bytes: bytes, prospect_name: str = None) -> StreamingResponse:
+    date_str = datetime.now().strftime('%Y%m%d')
+    slug = _safe_filename_prospect(prospect_name)
+    filename = (
+        f"cortexia-optical-guia-{slug}-{date_str}.pdf"
+        if slug else f"cortexia-optical-guia-usuario-{date_str}.pdf"
+    )
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Content-Length": str(len(pdf_bytes)),
+        }
+    )
+
+
+@router.get("/user-guide.pdf")
+async def user_guide_pdf(
+    prospect: str = Query(None, max_length=80),
+    user: dict = Depends(get_current_user),
+):
+    """Genera y descarga la guia completa de usuario en PDF.
+
+    Restringido a Admin de optica y Superadmin (uso comercial / onboarding).
+    Query param opcional `prospect`: estampa el nombre del prospecto en la portada.
+    """
+    if user.get("role") not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Solo administradores pueden descargar la guia.")
+    pdf_bytes = _build_pdf(prospect_name=prospect)
+    return _stream_pdf(pdf_bytes, prospect_name=prospect)
+
+
+class ShareLinkRequest(BaseModel):
+    prospect_name: str = Field(..., min_length=1, max_length=80)
+    expires_hours: int = Field(default=SHARE_LINK_DEFAULT_HOURS, ge=1, le=SHARE_LINK_MAX_HOURS)
+
+
+@router.post("/share-link")
+async def create_share_link(payload: ShareLinkRequest, user: dict = Depends(get_current_user)):
+    """Genera un URL publico firmado para compartir la guia personalizada con un prospecto.
+
+    Restringido a admin/superadmin. El JWT contiene el nombre del prospecto y la expiracion.
+    """
+    if user.get("role") not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Solo administradores pueden generar links.")
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(hours=payload.expires_hours)
+    token_payload = {
+        "sub": GUIDE_SHARE_SUB,
+        "prospect": payload.prospect_name.strip()[:80],
+        "iat": int(now.timestamp()),
+        "exp": exp,
+        "generated_by": str(user.get("id") or user.get("_id") or ""),
+    }
+    token = pyjwt.encode(token_payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+    public_url_path = f"/api/docs/public/user-guide?token={token}"
+    return {
+        "path": public_url_path,
+        "token": token,
+        "expires_at": exp.isoformat(),
+        "prospect_name": payload.prospect_name,
+    }
+
+
+@router.get("/public/user-guide")
+async def public_user_guide(token: str = Query(..., min_length=10, max_length=2048)):
+    """Endpoint publico (sin auth) que valida un JWT firmado y sirve la guia personalizada.
+
+    Diseñado para compartir con prospectos comerciales via WhatsApp/email.
+    El token expira segun se configuro en /docs/share-link (default 30d).
+    """
+    try:
+        decoded = pyjwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+    except pyjwt.ExpiredSignatureError:
+        raise HTTPException(status_code=410, detail="El enlace expiro. Solicita uno nuevo.")
+    except pyjwt.InvalidTokenError:
+        raise HTTPException(status_code=403, detail="Enlace invalido.")
+    if decoded.get("sub") != GUIDE_SHARE_SUB:
+        raise HTTPException(status_code=403, detail="Enlace invalido.")
+    prospect = decoded.get("prospect")
+    pdf_bytes = _build_pdf(prospect_name=prospect)
+    # inline para preview en el navegador (mejor UX en WhatsApp Web)
+    date_str = datetime.now().strftime('%Y%m%d')
+    slug = _safe_filename_prospect(prospect)
+    filename = (
+        f"cortexia-optical-guia-{slug}-{date_str}.pdf"
+        if slug else f"cortexia-optical-guia-usuario-{date_str}.pdf"
+    )
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Content-Length": str(len(pdf_bytes)),
+            "Cache-Control": "public, max-age=3600",
         }
     )

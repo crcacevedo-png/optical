@@ -5,8 +5,10 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Textarea } from '../components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
 import { toast } from 'sonner';
-import { Settings, Building2, Upload, FileText, Save, ImageIcon, Glasses, Pill, ShieldCheck, Lock, KeyRound, Server, Users as UsersIcon, Activity, Database, Download, BookOpen } from 'lucide-react';
+import { Settings, Building2, Upload, FileText, Save, ImageIcon, Glasses, Pill, ShieldCheck, Lock, KeyRound, Server, Users as UsersIcon, Activity, Database, Download, BookOpen, MessageCircle, Copy, Link as LinkIcon } from 'lucide-react';
 import { RolePermissionsSection } from '../components/RolePermissionsSection';
 import SessionsPanel from '../components/security/SessionsPanel';
 import { Monitor } from 'lucide-react';
@@ -36,6 +38,10 @@ export default function SettingsPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [exportingDb, setExportingDb] = useState(false);
   const [downloadingGuide, setDownloadingGuide] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareForm, setShareForm] = useState({ prospect_name: '', phone: '', message: '' });
+  const [shareResult, setShareResult] = useState(null); // { url, expires_at, prospect_name }
+  const [generatingLink, setGeneratingLink] = useState(false);
   const [company, setCompany] = useState(null);
   const [form, setForm] = useState({
     name: '', legal_name: '', tax_id: '', address: '', phone: '', email: '',
@@ -167,6 +173,95 @@ export default function SettingsPage() {
       toast.success('Guia descargada', { id: toastId });
     } catch (error) {
       toast.error(formatApiErrorDetail(error.response?.data?.detail) || 'Error al descargar la guia', { id: toastId });
+    } finally {
+      setDownloadingGuide(false);
+    }
+  };
+
+  const openShareDialog = () => {
+    setShareForm({ prospect_name: '', phone: '', message: '' });
+    setShareResult(null);
+    setShareDialogOpen(true);
+  };
+
+  const handleGenerateShareLink = async () => {
+    const name = shareForm.prospect_name.trim();
+    if (!name) {
+      toast.error('Ingresa el nombre de la optica prospecto.');
+      return;
+    }
+    setGeneratingLink(true);
+    try {
+      const resp = await api.post('/api/docs/share-link', {
+        prospect_name: name,
+        expires_hours: 720,
+      });
+      const path = resp.data.path;
+      const fullUrl = `${window.location.origin}${path}`;
+      setShareResult({ url: fullUrl, expires_at: resp.data.expires_at, prospect_name: name });
+      toast.success('Enlace personalizado listo');
+    } catch (error) {
+      toast.error(formatApiErrorDetail(error.response?.data?.detail) || 'Error al generar el enlace');
+    } finally {
+      setGeneratingLink(false);
+    }
+  };
+
+  const sendShareViaWhatsApp = () => {
+    if (!shareResult) return;
+    const raw = (shareForm.phone || '').replace(/[^\d]/g, '');
+    const phone = raw.length === 8 ? `502${raw}` : raw; // Guatemala default
+    if (!phone) {
+      toast.error('Ingresa un numero de WhatsApp valido');
+      return;
+    }
+    const defaultMsg =
+      `Hola! Te comparto la guia completa de Cortexia Optical, el SaaS que digitaliza toda la operacion de una optica.\n\n` +
+      `Preparada especialmente para ${shareResult.prospect_name}:\n${shareResult.url}\n\n` +
+      `Cualquier duda escribeme por aqui. Saludos!`;
+    const msg = (shareForm.message || defaultMsg).trim();
+    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const copyShareUrl = async () => {
+    if (!shareResult) return;
+    try {
+      await navigator.clipboard.writeText(shareResult.url);
+      toast.success('Enlace copiado al portapapeles');
+    } catch {
+      toast.error('No se pudo copiar. Selecciona el enlace manualmente.');
+    }
+  };
+
+  const downloadPersonalizedGuide = async () => {
+    const name = shareForm.prospect_name.trim();
+    if (!name) {
+      toast.error('Ingresa el nombre de la optica prospecto.');
+      return;
+    }
+    setDownloadingGuide(true);
+    const toastId = toast.loading('Generando guia personalizada...');
+    try {
+      const response = await api.get('/api/docs/user-guide.pdf', {
+        params: { prospect: name },
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const cd = response.headers?.['content-disposition'] || '';
+      const match = cd.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : `cortexia-optical-guia-${name}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Guia personalizada descargada', { id: toastId });
+    } catch (error) {
+      toast.error(formatApiErrorDetail(error.response?.data?.detail) || 'Error al descargar', { id: toastId });
     } finally {
       setDownloadingGuide(false);
     }
@@ -603,7 +698,16 @@ export default function SettingsPage() {
                 material comercial para prospectos. Documento profesional listo para compartir.
               </div>
 
-              <div className="flex justify-end pt-1">
+              <div className="flex flex-col sm:flex-row justify-end gap-2 pt-1">
+                <Button
+                  onClick={openShareDialog}
+                  variant="outline"
+                  className="border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+                  data-testid="share-user-guide-btn"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Compartir personalizada por WhatsApp
+                </Button>
                 <Button
                   onClick={handleDownloadUserGuide}
                   disabled={downloadingGuide}
@@ -626,6 +730,150 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Dialog: Compartir guia personalizada por WhatsApp */}
+        <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+          <DialogContent className="max-w-lg" data-testid="share-guide-dialog">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <MessageCircle className="w-5 h-5 text-emerald-700" />
+                Compartir guia personalizada
+              </DialogTitle>
+              <DialogDescription>
+                Personaliza la portada del PDF con el nombre del prospecto y comparte el enlace por WhatsApp Web.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="prospect-name" className="text-sm font-medium text-slate-700">
+                  Nombre de la optica prospecto *
+                </Label>
+                <Input
+                  id="prospect-name"
+                  data-testid="share-prospect-name-input"
+                  placeholder="Ej. Optica Vision de Xela"
+                  value={shareForm.prospect_name}
+                  onChange={(e) => {
+                    setShareForm({ ...shareForm, prospect_name: e.target.value });
+                    setShareResult(null); // reset link cuando cambia el nombre
+                  }}
+                  maxLength={80}
+                  className="mt-1"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Aparecera en la portada del PDF (max 80 caracteres).
+                </p>
+              </div>
+
+              {!shareResult && (
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleGenerateShareLink}
+                    disabled={generatingLink || !shareForm.prospect_name.trim()}
+                    className="bg-purple-700 hover:bg-purple-800 text-white flex-1"
+                    data-testid="generate-share-link-btn"
+                  >
+                    {generatingLink ? (
+                      <>
+                        <div className="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Generando enlace...
+                      </>
+                    ) : (
+                      <>
+                        <LinkIcon className="w-4 h-4 mr-2" />
+                        Generar enlace personalizado
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={downloadPersonalizedGuide}
+                    disabled={downloadingGuide || !shareForm.prospect_name.trim()}
+                    variant="outline"
+                    data-testid="download-personalized-btn"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Solo descargar
+                  </Button>
+                </div>
+              )}
+
+              {shareResult && (
+                <>
+                  <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200" data-testid="share-link-result">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="text-xs text-emerald-800 font-medium">
+                        Enlace listo (valido 30 dias)
+                      </div>
+                      <button
+                        onClick={copyShareUrl}
+                        className="text-xs text-emerald-700 hover:text-emerald-900 flex items-center gap-1"
+                        data-testid="copy-share-url-btn"
+                      >
+                        <Copy className="w-3 h-3" /> Copiar
+                      </button>
+                    </div>
+                    <div className="text-xs text-slate-700 break-all font-mono bg-white p-2 rounded border border-emerald-200">
+                      {shareResult.url}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="wa-phone" className="text-sm font-medium text-slate-700">
+                      Numero WhatsApp del prospecto
+                    </Label>
+                    <Input
+                      id="wa-phone"
+                      data-testid="share-phone-input"
+                      placeholder="Ej. 55551234 (Guatemala) o 502xxxxxxxx"
+                      value={shareForm.phone}
+                      onChange={(e) => setShareForm({ ...shareForm, phone: e.target.value })}
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Solo digitos. Guatemala: 8 digitos (agregamos 502 automatico).
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="wa-message" className="text-sm font-medium text-slate-700">
+                      Mensaje (opcional)
+                    </Label>
+                    <Textarea
+                      id="wa-message"
+                      data-testid="share-message-input"
+                      rows={4}
+                      placeholder="Deja vacio para usar mensaje sugerido con el enlace incluido"
+                      value={shareForm.message}
+                      onChange={(e) => setShareForm({ ...shareForm, message: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShareDialogOpen(false)}
+                data-testid="share-dialog-close-btn"
+              >
+                Cerrar
+              </Button>
+              {shareResult && (
+                <Button
+                  onClick={sendShareViaWhatsApp}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  data-testid="send-whatsapp-btn"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Abrir WhatsApp
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Seguridad y Cumplimiento */}
         <Card className="border-slate-200/80" data-testid="security-compliance-card">

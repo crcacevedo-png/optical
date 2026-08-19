@@ -112,6 +112,15 @@ Modulo nuevo de brigadas visuales / eventos fuera de sucursal. Multi-tenant, opc
 
 ## Lo Implementado
 
+### Guia de Usuario en PDF — Personalizacion + Share WhatsApp (Feb 2026)
+- **Portada personalizada**: `GET /api/docs/user-guide.pdf?prospect={nombre}` estampa un banner morado en la portada con "PREPARADA ESPECIALMENTE PARA {nombre}" (max 80 chars, HTML-escaped). Verificado extrayendo el texto del PDF con pypdf.
+- **Share link publico firmado**: `POST /api/docs/share-link` (admin/superadmin) recibe `{prospect_name, expires_hours}` y devuelve un JWT firmado con HS256 (`sub=guide-share`, exp 30d default / 90d max). Retorna `{path, token, expires_at, prospect_name}`. Frontend construye URL absoluto con `window.location.origin`.
+- **Endpoint publico**: `GET /api/docs/public/user-guide?token={jwt}` (sin auth) valida el JWT y sirve el PDF personalizado inline. Errores: 410 si expirado, 403 si invalido.
+- **Frontend `SettingsPage.js`**: nuevo boton verde "Compartir personalizada por WhatsApp" al lado de la descarga estandar. Abre `Dialog` con: input prospecto, botones "Generar enlace" y "Solo descargar" (descarga PDF personalizado localmente sin enlace publico). Al generar: muestra URL con boton "Copiar", input de telefono (autocompleta +502 si es GT 8 digitos), textarea mensaje opcional (con mensaje sugerido pre-armado si vacio), boton "Abrir WhatsApp" que abre `wa.me/{phone}?text=...` en pestana nueva.
+- Data-testids: `share-user-guide-btn`, `share-guide-dialog`, `share-prospect-name-input`, `generate-share-link-btn`, `download-personalized-btn`, `share-link-result`, `copy-share-url-btn`, `share-phone-input`, `share-message-input`, `send-whatsapp-btn`.
+- Config env: `USER_GUIDE_SHARE_HOURS=720` (30d default), `USER_GUIDE_SHARE_MAX_HOURS=2160` (90d max).
+- Testing E2E: admin descarga personalizada 200 (35KB, "Optica Vision de Xela" verificado en PDF text extraction), share-link POST 200, endpoint publico 200 sin cookies, invalid token 403, vendedor 403 al intentar POST share-link.
+
 ### Guia de Usuario en PDF (Feb 2026)
 - **Backend** `routes/user_guide.py` (708 lineas, reportlab platypus):
   - `GET /api/docs/user-guide.pdf` restringido a `admin` y `superadmin` (403 para vendedor/doctor).
