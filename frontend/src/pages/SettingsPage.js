@@ -6,7 +6,7 @@ import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
-import { Settings, Building2, Upload, FileText, Save, ImageIcon, Glasses, Pill, ShieldCheck, Lock, KeyRound, Server, Users as UsersIcon, Activity, Database, Download } from 'lucide-react';
+import { Settings, Building2, Upload, FileText, Save, ImageIcon, Glasses, Pill, ShieldCheck, Lock, KeyRound, Server, Users as UsersIcon, Activity, Database, Download, BookOpen } from 'lucide-react';
 import { RolePermissionsSection } from '../components/RolePermissionsSection';
 import SessionsPanel from '../components/security/SessionsPanel';
 import { Monitor } from 'lucide-react';
@@ -35,6 +35,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [exportingDb, setExportingDb] = useState(false);
+  const [downloadingGuide, setDownloadingGuide] = useState(false);
   const [company, setCompany] = useState(null);
   const [form, setForm] = useState({
     name: '', legal_name: '', tax_id: '', address: '', phone: '', email: '',
@@ -143,6 +144,31 @@ export default function SettingsPage() {
       toast.error(formatApiErrorDetail(error.response?.data?.detail) || 'Error al exportar', { id: toastId });
     } finally {
       setExportingDb(false);
+    }
+  };
+
+  const handleDownloadUserGuide = async () => {
+    setDownloadingGuide(true);
+    const toastId = toast.loading('Generando guia de usuario...');
+    try {
+      const response = await api.get('/api/docs/user-guide.pdf', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const cd = response.headers?.['content-disposition'] || '';
+      const match = cd.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : `cortexia-optical-guia-usuario.pdf`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Guia descargada', { id: toastId });
+    } catch (error) {
+      toast.error(formatApiErrorDetail(error.response?.data?.detail) || 'Error al descargar la guia', { id: toastId });
+    } finally {
+      setDownloadingGuide(false);
     }
   };
 
@@ -531,6 +557,75 @@ export default function SettingsPage() {
 
         {/* Permisos por Rol (admin only) */}
         {user?.role === 'admin' && <RolePermissionsSection />}
+
+        {/* Documentacion (admin y superadmin) */}
+        {(user?.role === 'admin' || user?.role === 'superadmin') && (
+          <Card className="border-slate-200/80" data-testid="documentation-card">
+            <CardHeader>
+              <CardTitle className="font-heading text-lg flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-purple-700" />
+                Documentacion
+              </CardTitle>
+              <p className="text-sm text-slate-500 mt-1">
+                Guia completa de uso de Cortexia Optical con instrucciones detalladas para cada rol.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div className="flex items-center gap-2 text-slate-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                  Configuracion inicial de la optica
+                </div>
+                <div className="flex items-center gap-2 text-slate-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                  Guia paso a paso para el Vendedor
+                </div>
+                <div className="flex items-center gap-2 text-slate-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                  Guia paso a paso para el Doctor
+                </div>
+                <div className="flex items-center gap-2 text-slate-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                  Modulo especial de Jornadas
+                </div>
+                <div className="flex items-center gap-2 text-slate-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                  Buenas practicas y consejos
+                </div>
+                <div className="flex items-center gap-2 text-slate-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                  Contacto y soporte tecnico
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-purple-50/60 border border-purple-200/60 text-xs text-purple-900">
+                <strong>Ideal para:</strong> Onboarding de nuevos empleados, capacitacion de equipo,
+                material comercial para prospectos. Documento profesional listo para compartir.
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <Button
+                  onClick={handleDownloadUserGuide}
+                  disabled={downloadingGuide}
+                  className="bg-purple-700 hover:bg-purple-800 text-white"
+                  data-testid="download-user-guide-btn"
+                >
+                  {downloadingGuide ? (
+                    <>
+                      <div className="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Generando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 mr-2" />
+                      Descargar Guia de Usuario (PDF)
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Seguridad y Cumplimiento */}
         <Card className="border-slate-200/80" data-testid="security-compliance-card">

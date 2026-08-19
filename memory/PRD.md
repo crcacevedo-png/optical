@@ -112,6 +112,17 @@ Modulo nuevo de brigadas visuales / eventos fuera de sucursal. Multi-tenant, opc
 
 ## Lo Implementado
 
+### Guia de Usuario en PDF (Feb 2026)
+- **Backend** `routes/user_guide.py` (708 lineas, reportlab platypus):
+  - `GET /api/docs/user-guide.pdf` restringido a `admin` y `superadmin` (403 para vendedor/doctor).
+  - Portada + TOC + 8 secciones: Introduccion, Primer ingreso, Guia Admin (6 subsecciones), Guia Vendedor (4), Guia Doctor (3), Jornadas, Buenas practicas, Soporte.
+  - Header/footer con branding Cortexia, paginacion, tip boxes por color, tablas de modulos, listas estilizadas.
+  - Genera PDF de ~35KB, 21 paginas.
+- **Frontend** `SettingsPage.js`: nueva card "Documentacion" (data-testid=`documentation-card`) visible solo para admin y superadmin. Boton morado "Descargar Guia de Usuario (PDF)" (data-testid=`download-user-guide-btn`) llama a `/api/docs/user-guide.pdf` como blob y dispara download con filename desde `Content-Disposition`. Muestra 6 highlights del contenido y callout "Ideal para onboarding/venta".
+- **Fix menor**: nombre de estilo `Bullet` colisionaba con default de reportlab. Renombrado a `BulletCX`.
+
+## Lo Implementado
+
 ### Auto-block IP + Widget de IPs bloqueadas (Feb 2026)
 Escalada del sistema CSP: cuando una IP individual supera un umbral en la ventana, se bloquea automaticamente en el rate limiter para detener el ataque en tiempo real.
 
