@@ -184,10 +184,9 @@ async def cors_middleware(request: Request, call_next):
     # Aplica solo a paths /api (no bloqueamos el HTML de la SPA para no romper UX de usuarios legitimos
     # que quedaron atrapados por false-positive; ellos veran errores en las API calls y sabran).
     if request.url.path.startswith("/api"):
-        client_ip = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
-        if not client_ip and request.client:
-            client_ip = request.client.host
-        if client_ip:
+        from auth_utils import get_real_ip
+        client_ip = get_real_ip(request)
+        if client_ip and client_ip != "unknown":
             try:
                 from blocked_ips import is_ip_blocked
                 if await is_ip_blocked(client_ip):

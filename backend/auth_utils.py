@@ -16,14 +16,27 @@ def get_jwt_secret() -> str:
     return os.environ["JWT_SECRET"]
 
 def get_real_ip(request: Request) -> str:
-    """Obtiene la IP real del cliente respetando X-Forwarded-For (detras de proxy/ingress).
-    Toma el PRIMER IP de la cadena que es el cliente original.
+    """Obtiene la IP real del cliente respetando la topologia trusted-proxy (SEC-001 fix Feb 2026).
+
+    Orden de prioridad:
+    1. `CF-Connecting-IP` (Cloudflare — cuando la app esta detras de CF; imposible de spoofear).
+    2. **Rightmost** de `X-Forwarded-For` (el hop del proxy trusted mas cercano; los valores a la
+       izquierda son controlables por el cliente y NO se deben usar para blocking/rate-limit).
+    3. `X-Real-IP` (algunos ingress lo setean).
+    4. `request.client.host` (conexion directa).
+
+    IMPORTANTE: nunca uses leftmost XFF. Un anonimo podria falsificarlo y provocar bans
+    dirigidos a IPs de victimas via /api/security/csp-report o saltarse rate limits.
     """
+    cf_ip = request.headers.get("CF-Connecting-IP", "").strip()
+    if cf_ip:
+        return cf_ip
     xff = request.headers.get("X-Forwarded-For", "").strip()
     if xff:
-        first = xff.split(",")[0].strip()
-        if first:
-            return first
+        parts = [p.strip() for p in xff.split(",") if p.strip()]
+        if parts:
+            # rightmost = el ultimo hop trusted; en preview/prod Emergent es la IP real del cliente
+            return parts[-1]
     real_ip = request.headers.get("X-Real-IP", "").strip()
     if real_ip:
         return real_ip

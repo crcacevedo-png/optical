@@ -156,3 +156,4 @@ frontend/node_modules/.cache/default-development/27.pack
 /backend/.env.local
 .env.test
 .env.local
+frontend/node_modules/.cache/default-development/0.pack

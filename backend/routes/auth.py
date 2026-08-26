@@ -95,7 +95,7 @@ async def login(data: UserLogin, response: Response, request: Request):
             # Alerta de seguridad cuando se alcanzan 3 intentos fallidos
             if attempts == 3:
                 app_url = os.environ.get("APP_URL", "https://cortexiaoptical.com")
-                ip = (request.headers.get("X-Forwarded-For", "") or "").split(",")[0].strip() or (request.client.host if request.client else "n/a")
+                ip = get_real_ip(request)
                 html = render_security_alert(
                     name=user.get("name", "Usuario"),
                     event_title="Multiples intentos fallidos de login",
@@ -359,7 +359,7 @@ async def change_password(data: ChangePassword, request: Request, user: dict = D
             event_description="La contrasena de tu cuenta acaba de ser modificada. Si fuiste tu, puedes ignorar este mensaje.",
             event_meta={
                 "Email": user.get("email"),
-                "IP": (request.headers.get("X-Forwarded-For", "") or "").split(",")[0].strip() or (request.client.host if request.client else "n/a"),
+                "IP": get_real_ip(request),
                 "Fecha": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
             },
             app_url=app_url,
@@ -388,7 +388,7 @@ async def forgot_password(data: ForgotPassword, request: Request):
         "expires_at": expires_at,
         "used": False,
         "created_at": datetime.now(timezone.utc),
-        "ip": (request.headers.get("X-Forwarded-For", "") or "").split(",")[0].strip() or (request.client.host if request.client else None),
+        "ip": get_real_ip(request),
     })
     app_url = os.environ.get("APP_URL", "https://cortexiaoptical.com")
     reset_link = f"{app_url.rstrip('/')}/reset-password?token={token}"
@@ -440,7 +440,7 @@ async def reset_password(data: ResetPassword, request: Request):
         event_description="Acabas de restablecer la contrasena de tu cuenta usando el enlace que recibiste por email. Ya puedes ingresar con la nueva contrasena.",
         event_meta={
             "Email": user.get("email"),
-            "IP": (request.headers.get("X-Forwarded-For", "") or "").split(",")[0].strip() or (request.client.host if request.client else "n/a"),
+            "IP": get_real_ip(request),
             "Fecha": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         },
         app_url=app_url,

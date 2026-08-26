@@ -10,7 +10,7 @@ import os
 import secrets
 
 from db import db
-from auth_utils import get_current_user
+from auth_utils import get_current_user, get_real_ip
 from email_service import queue_email, render_reactivation_notice
 from audit import log_audit
 
@@ -221,7 +221,7 @@ async def reactivate_company(company_id: str, request: Request, user: dict = Dep
         "expires_at": expires_at,
         "used": False,
         "created_at": now,
-        "ip": (request.headers.get("X-Forwarded-For", "") or "").split(",")[0].strip() or (request.client.host if request.client else None),
+        "ip": get_real_ip(request),
         "source": "reactivation",
     })
 

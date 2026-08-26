@@ -112,6 +112,27 @@ Modulo nuevo de brigadas visuales / eventos fuera de sucursal. Multi-tenant, opc
 
 ## Lo Implementado
 
+### Security Audit Round 3 — IP Trust + Public Endpoint DoS Hardening (Feb 2026)
+Tercera auditoria. Verdict: `CONDITIONAL PASS - NEEDS ATTENTION`. 0 criticos, 1 alto, 1 medio, 1 bajo. Todos resueltos y verificados E2E.
+
+**SEC-001 (P1 HIGH - RESUELTO)**: IP spoofable via `X-Forwarded-For` leftmost.
+- Bug: `get_real_ip` en `auth_utils.py` tomaba el primer valor de XFF, controlable por el cliente. Un anonimo podia mandar 10 CSP reports con `X-Forwarded-For: <victim-ip>` y auto-banear a la victima 24h (o cualquier IP compartida como oficina/NAT).
+- Fix: `get_real_ip` ahora prioriza (1) `CF-Connecting-IP` de Cloudflare (imposible de spoofear), (2) rightmost de XFF (el hop del proxy trusted mas cercano), (3) `X-Real-IP`, (4) `request.client.host`. Nunca leftmost.
+- Callers actualizados: `server.py` middleware auto-block, `security_reports.py` deteccion de spike + registro de IP en violaciones, `auth.py` (4 usos: brute force, password change alert, forgot password log, reset password alert), `superadmin_retention.py` (reset password token log).
+- Verificado E2E: 10 CSP reports con `X-Forwarded-For: 1.2.3.4, 5.6.7.8` NO banean 1.2.3.4 ni 5.6.7.8. Registran el edge real (`34.160.127.70` en preview).
+
+**SEC-002 (P2 MEDIUM - RESUELTO)**: DoS por PDF generation en endpoint publico sin rate limit.
+- Bug: `/api/docs/public/user-guide?token=...` genera un PDF de 35KB con reportlab (~200-300ms CPU) sin rate limit per-endpoint. Un atacante con un token o rotando XFF podia hacer flooding.
+- Fix 1 (rate limit): `@limiter.limit("10/minute")` en endpoint publico + `@limiter.limit("30/minute")` en endpoint autenticado (ambos keyed por IP via `slowapi`).
+- Fix 2 (cache): cache in-memory por `hash(prospect_name)` con TTL 5min y max 50 entradas (LRU-like eviction). Segundo hit del mismo prospecto es ~2x mas rapido (415ms → 194ms).
+- Env vars: `USER_GUIDE_CACHE_TTL=300`, `USER_GUIDE_CACHE_MAX=50`.
+- Verificado E2E: 15 requests seguidos → 10x 200 + 5x 429 confirmando rate limit.
+
+**SEC-003 (P3 LOW - RESUELTO)**: JWT del share link exponia `user_id` interno y no era revocable.
+- Bug: el payload del JWT incluia `generated_by: <ObjectId>` que se filtraba al decodificar el JWT (base64) por el destinatario del link.
+- Fix: quitado `generated_by`. Agregado `jti: str(uuid4())` unique per token para preparar futura revocacion via denylist. Solo el firmante (server) puede vincular jti → user_id via audit logs.
+- Verificado E2E: JWT decodificado muestra solo `{sub, prospect, iat, exp, jti}` — sin datos sensibles internos.
+
 ### Guia de Usuario en PDF — Personalizacion + Share WhatsApp (Feb 2026)
 - **Portada personalizada**: `GET /api/docs/user-guide.pdf?prospect={nombre}` estampa un banner morado en la portada con "PREPARADA ESPECIALMENTE PARA {nombre}" (max 80 chars, HTML-escaped). Verificado extrayendo el texto del PDF con pypdf.
 - **Share link publico firmado**: `POST /api/docs/share-link` (admin/superadmin) recibe `{prospect_name, expires_hours}` y devuelve un JWT firmado con HS256 (`sub=guide-share`, exp 30d default / 90d max). Retorna `{path, token, expires_at, prospect_name}`. Frontend construye URL absoluto con `window.location.origin`.

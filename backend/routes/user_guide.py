@@ -6,17 +6,22 @@ y compartirla con prospectos comerciales.
 Endpoints:
 - GET /api/docs/user-guide.pdf (admin/superadmin)
 - POST /api/docs/share-link (admin/superadmin) -> genera URL firmada publica
-- GET /api/docs/public/user-guide?token=... (publico, valida JWT)
+- GET /api/docs/public/user-guide?token=... (publico, valida JWT, rate limited)
 """
 import io
 import os
+import time
+import uuid
+import hashlib
+import threading
 import jwt as pyjwt
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone, timedelta
 
 from auth_utils import get_current_user, get_jwt_secret, JWT_ALGORITHM
+from rate_limiter import limiter
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch, cm, mm
@@ -34,6 +39,52 @@ router = APIRouter(prefix="/docs", tags=["Documentacion"])
 SHARE_LINK_DEFAULT_HOURS = int(os.environ.get("USER_GUIDE_SHARE_HOURS", "720"))  # 30d
 SHARE_LINK_MAX_HOURS = int(os.environ.get("USER_GUIDE_SHARE_MAX_HOURS", "2160"))  # 90d
 GUIDE_SHARE_SUB = "guide-share"
+
+# SEC-002 fix (Feb 2026): cache in-memory del PDF por (prospect_name hash) para amortiguar DoS.
+# TTL corto para permitir personalizacion cambiante y no bloatear memoria.
+# Formato: {hash: (pdf_bytes, expires_at_ts)}
+_PDF_CACHE: dict = {}
+_PDF_CACHE_LOCK = threading.Lock()
+PDF_CACHE_TTL_SEC = int(os.environ.get("USER_GUIDE_CACHE_TTL", "300"))  # 5 min
+PDF_CACHE_MAX_ENTRIES = int(os.environ.get("USER_GUIDE_CACHE_MAX", "50"))
+
+
+def _cache_key(prospect_name: str = None) -> str:
+    key = (prospect_name or "").strip()[:80]
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+
+def _cache_get(prospect_name: str = None):
+    now = time.time()
+    key = _cache_key(prospect_name)
+    with _PDF_CACHE_LOCK:
+        entry = _PDF_CACHE.get(key)
+        if entry and entry[1] > now:
+            return entry[0]
+        if entry:  # expirado
+            _PDF_CACHE.pop(key, None)
+    return None
+
+
+def _cache_set(prospect_name: str, pdf_bytes: bytes):
+    now = time.time()
+    key = _cache_key(prospect_name)
+    with _PDF_CACHE_LOCK:
+        # Eviction simple: si supera el maximo, dropea el mas viejo
+        if len(_PDF_CACHE) >= PDF_CACHE_MAX_ENTRIES:
+            oldest = min(_PDF_CACHE.items(), key=lambda kv: kv[1][1])
+            _PDF_CACHE.pop(oldest[0], None)
+        _PDF_CACHE[key] = (pdf_bytes, now + PDF_CACHE_TTL_SEC)
+
+
+def _build_or_cache(prospect_name: str = None) -> bytes:
+    """Devuelve el PDF (desde cache si existe, sino lo genera y cachea)."""
+    cached = _cache_get(prospect_name)
+    if cached is not None:
+        return cached
+    pdf_bytes = _build_pdf(prospect_name=prospect_name)
+    _cache_set(prospect_name, pdf_bytes)
+    return pdf_bytes
 
 # Paleta de colores Cortexia
 BRAND_DARK = colors.HexColor("#1B2A49")
@@ -761,7 +812,9 @@ def _stream_pdf(pdf_bytes: bytes, prospect_name: str = None) -> StreamingRespons
 
 
 @router.get("/user-guide.pdf")
+@limiter.limit("30/minute")
 async def user_guide_pdf(
+    request: Request,
     prospect: str = Query(None, max_length=80),
     user: dict = Depends(get_current_user),
 ):
@@ -769,10 +822,11 @@ async def user_guide_pdf(
 
     Restringido a Admin de optica y Superadmin (uso comercial / onboarding).
     Query param opcional `prospect`: estampa el nombre del prospecto en la portada.
+    Rate limit: 30/min por IP para prevenir DoS por generacion pesada.
     """
     if user.get("role") not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Solo administradores pueden descargar la guia.")
-    pdf_bytes = _build_pdf(prospect_name=prospect)
+    pdf_bytes = _build_or_cache(prospect_name=prospect)
     return _stream_pdf(pdf_bytes, prospect_name=prospect)
 
 
@@ -786,6 +840,8 @@ async def create_share_link(payload: ShareLinkRequest, user: dict = Depends(get_
     """Genera un URL publico firmado para compartir la guia personalizada con un prospecto.
 
     Restringido a admin/superadmin. El JWT contiene el nombre del prospecto y la expiracion.
+    SEC-003 fix (Feb 2026): quitamos user_id del payload (privacy) y agregamos jti unico
+    (deja abierta la puerta a revocacion futura via denylist).
     """
     if user.get("role") not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Solo administradores pueden generar links.")
@@ -796,7 +852,7 @@ async def create_share_link(payload: ShareLinkRequest, user: dict = Depends(get_
         "prospect": payload.prospect_name.strip()[:80],
         "iat": int(now.timestamp()),
         "exp": exp,
-        "generated_by": str(user.get("id") or user.get("_id") or ""),
+        "jti": str(uuid.uuid4()),
     }
     token = pyjwt.encode(token_payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
     public_url_path = f"/api/docs/public/user-guide?token={token}"
@@ -809,11 +865,14 @@ async def create_share_link(payload: ShareLinkRequest, user: dict = Depends(get_
 
 
 @router.get("/public/user-guide")
-async def public_user_guide(token: str = Query(..., min_length=10, max_length=2048)):
+@limiter.limit("10/minute")
+async def public_user_guide(request: Request, token: str = Query(..., min_length=10, max_length=2048)):
     """Endpoint publico (sin auth) que valida un JWT firmado y sirve la guia personalizada.
 
     Diseñado para compartir con prospectos comerciales via WhatsApp/email.
     El token expira segun se configuro en /docs/share-link (default 30d).
+    SEC-002 fix (Feb 2026): rate limit 10/min por IP + cache de PDF por prospect_name (TTL 5min)
+    para prevenir DoS por generacion repetida de PDFs pesados.
     """
     try:
         decoded = pyjwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
@@ -824,7 +883,7 @@ async def public_user_guide(token: str = Query(..., min_length=10, max_length=20
     if decoded.get("sub") != GUIDE_SHARE_SUB:
         raise HTTPException(status_code=403, detail="Enlace invalido.")
     prospect = decoded.get("prospect")
-    pdf_bytes = _build_pdf(prospect_name=prospect)
+    pdf_bytes = _build_or_cache(prospect_name=prospect)
     # inline para preview en el navegador (mejor UX en WhatsApp Web)
     date_str = datetime.now().strftime('%Y%m%d')
     slug = _safe_filename_prospect(prospect)

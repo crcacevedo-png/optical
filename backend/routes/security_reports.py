@@ -23,7 +23,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from db import db
-from auth_utils import get_current_user
+from auth_utils import get_current_user, get_real_ip
 from rate_limiter import limiter
 from email_service import queue_email, render_security_alert
 from routes.notifications import create_notification
@@ -247,7 +247,7 @@ async def csp_report(request: Request):
             "disposition": rep.get("disposition"),
             "sample": (rep.get("script-sample") or rep.get("sample") or "")[:200],
             "user_agent": (request.headers.get("User-Agent") or "")[:500],
-            "ip": (request.headers.get("X-Forwarded-For") or (request.client.host if request.client else "") or "").split(",")[0].strip()[:80],
+            "ip": get_real_ip(request)[:80],
         }
         try:
             await db.csp_violations.insert_one(doc)
