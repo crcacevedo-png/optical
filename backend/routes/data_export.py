@@ -77,6 +77,26 @@ def _build_user_map(users):
     return {str(u["_id"]): u.get("name", "") for u in users}
 
 
+def _fam(flag, rel):
+    """Formatea antecedente familiar: 'Si (parentesco)' / 'No'."""
+    if not flag:
+        return "No"
+    return f"Si ({rel})" if rel else "Si"
+
+
+def _format_refractions(refractions):
+    """Serializa el array de refracciones a un texto legible para Excel."""
+    if not refractions:
+        return ""
+    parts = []
+    for i, r in enumerate(refractions, start=1):
+        od = f"OD {r.get('od_sphere') or '-'}/{r.get('od_cylinder') or '-'}x{r.get('od_axis') or '-'} add {r.get('od_addition') or '-'}"
+        os_ = f"OS {r.get('os_sphere') or '-'}/{r.get('os_cylinder') or '-'}x{r.get('os_axis') or '-'} add {r.get('os_addition') or '-'}"
+        obs = f" ({r.get('observations')})" if r.get("observations") else ""
+        parts.append(f"R{i}: {od} | {os_}{obs}")
+    return " ; ".join(parts)
+
+
 async def _export_company_data(company_id_str: str, company_name: str) -> io.BytesIO:
     """Genera un workbook Excel con todas las colecciones de la empresa."""
     company_id = ObjectId(company_id_str)
@@ -126,35 +146,63 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
     # ─────── Consultas Opticas ───────
     consultations = await db.optical_consultations.find({"company_id": company_id}).to_list(None)
     _write_sheet(wb, "Consultas", [
-        "ID", "Paciente", "Fecha", "Motivo", "Diagnostico", "Tratamiento",
-        "Profesional", "Observaciones", "Creada"
+        "ID", "Paciente", "Fecha", "Tipo", "Motivo", "Anamnesis", "Hallazgos",
+        "Diagnostico", "Tratamiento", "Recomendaciones", "Notas",
+        "Usa Lentes", "Lentes Desde", "Tipo Lentes", "Lensometria OD", "Lensometria OS",
+        "Cirugias Oculares", "Traumatismos", "Enfermedades Oculares",
+        "Diabetes", "Hipertension", "Autoinmune", "Detalle Autoinmune", "Medicamentos", "Alergias",
+        "Fam. Glaucoma", "Fam. Deg. Macular", "Fam. Miopia Alta", "Otros Antec. Familiares",
+        "AV Lejos s/Rx OD", "AV Lejos s/Rx OS", "AV Lejos c/Rx OD", "AV Lejos c/Rx OS",
+        "AV Cerca s/Rx OD", "AV Cerca s/Rx OS", "AV Cerca c/Rx OD", "AV Cerca c/Rx OS",
+        "AV Estenopeico OD", "AV Estenopeico OS", "Metodo AV",
+        "Refracciones", "Profesional", "Creada"
     ], [[c.get("_id"), patient_map.get(str(c.get("patient_id")), ""),
-         c.get("consultation_date"), c.get("chief_complaint"), c.get("diagnosis"),
-         c.get("treatment"), c.get("professional_name"), c.get("observations"),
-         c.get("created_at")] for c in consultations])
+         c.get("consultation_date"), c.get("consultation_type"), c.get("chief_complaint"),
+         c.get("anamnesis"), c.get("findings"), c.get("diagnosis"), c.get("treatment_plan"),
+         c.get("recommendations"), c.get("notes"),
+         c.get("wears_glasses"), c.get("glasses_since"), c.get("glasses_type"),
+         c.get("lensometry_od"), c.get("lensometry_oi"),
+         c.get("ocular_surgeries"), c.get("ocular_trauma"), c.get("ocular_diseases"),
+         c.get("diabetes"), c.get("hypertension"),
+         c.get("autoimmune_disease"), c.get("autoimmune_details"),
+         c.get("current_medications"), c.get("allergies"),
+         _fam(c.get("family_glaucoma"), c.get("family_glaucoma_relationship")),
+         _fam(c.get("family_macular_degeneration"), c.get("family_macular_relationship")),
+         _fam(c.get("family_high_myopia"), c.get("family_high_myopia_relationship")),
+         c.get("family_other_history"),
+         c.get("va_distance_without_rx_od"), c.get("va_distance_without_rx_oi"),
+         c.get("va_distance_with_rx_od"), c.get("va_distance_with_rx_oi"),
+         c.get("va_near_without_rx_od"), c.get("va_near_without_rx_oi"),
+         c.get("va_near_with_rx_od"), c.get("va_near_with_rx_oi"),
+         c.get("va_pinhole_od"), c.get("va_pinhole_oi"), c.get("visual_acuity_method"),
+         _format_refractions(c.get("refractions")),
+         c.get("professional_name"), c.get("created_at")] for c in consultations])
 
     # ─────── Recetas Oftalmicas ───────
     rx_eye = await db.eyeglass_prescriptions.find({"company_id": company_id}).to_list(None)
     _write_sheet(wb, "Recetas_Oftalmicas", [
-        "ID", "Paciente", "Profesional", "OD Esfera", "OD Cilindro", "OD Eje", "OD DP",
-        "OS Esfera", "OS Cilindro", "OS Eje", "OS DP", "Tipo Lente", "Observaciones", "Creada"
+        "ID", "Paciente", "Profesional",
+        "OD Esfera", "OD Cilindro", "OD Eje", "OD Adicion", "OD DP",
+        "OS Esfera", "OS Cilindro", "OS Eje", "OS Adicion", "OS DP",
+        "Tipo Lente", "Armazon", "Observaciones", "Creada"
     ], [[r.get("_id"), patient_map.get(str(r.get("patient_id")), ""),
-         r.get("professional_name"), r.get("od_sphere"), r.get("od_cylinder"),
-         r.get("od_axis"), r.get("od_dp"), r.get("oi_sphere"), r.get("oi_cylinder"),
-         r.get("oi_axis"), r.get("oi_dp"), r.get("lens_type"), r.get("observations"),
+         r.get("professional_name"),
+         r.get("od_sphere"), r.get("od_cylinder"), r.get("od_axis"), r.get("od_addition"), r.get("od_dp"),
+         r.get("oi_sphere"), r.get("oi_cylinder"), r.get("oi_axis"), r.get("oi_addition"), r.get("oi_dp"),
+         r.get("lens_type"), r.get("frame_type"), r.get("observations"),
          r.get("created_at")] for r in rx_eye])
 
     # ─────── Recetas Lentes de Contacto ───────
     rx_cl = await db.contact_lens_prescriptions.find({"company_id": company_id}).to_list(None)
     _write_sheet(wb, "Recetas_Contacto", [
         "ID", "Paciente", "Profesional", "Marca", "Tipo",
-        "OD Esfera", "OD Cilindro", "OD Eje", "OD BC", "OD DIA",
-        "OS Esfera", "OS Cilindro", "OS Eje", "OS BC", "OS DIA",
+        "OD Esfera", "OD Cilindro", "OD Eje", "OD Adicion", "OD BC", "OD DIA",
+        "OS Esfera", "OS Cilindro", "OS Eje", "OS Adicion", "OS BC", "OS DIA",
         "Reemplazo", "Observaciones", "Creada"
     ], [[r.get("_id"), patient_map.get(str(r.get("patient_id")), ""),
          r.get("professional_name"), r.get("brand"), r.get("lens_type"),
-         r.get("od_sphere"), r.get("od_cylinder"), r.get("od_axis"), r.get("od_bc"), r.get("od_dia"),
-         r.get("oi_sphere"), r.get("oi_cylinder"), r.get("oi_axis"), r.get("oi_bc"), r.get("oi_dia"),
+         r.get("od_power"), r.get("od_cylinder"), r.get("od_axis"), r.get("od_addition"), r.get("od_bc"), r.get("od_dia"),
+         r.get("oi_power"), r.get("oi_cylinder"), r.get("oi_axis"), r.get("oi_addition"), r.get("oi_bc"), r.get("oi_dia"),
          r.get("replacement"), r.get("observations"), r.get("created_at")] for r in rx_cl])
 
     # ─────── Recetas Medicas ───────

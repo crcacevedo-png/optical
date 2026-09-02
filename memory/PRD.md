@@ -39,6 +39,13 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - En "II. Historia Clinica > A. Antecedentes Oculares", al marcar el checkbox "Usa lentes" aparece "Lensometria actual" con OD (azul) y OS (verde) como texto libre (graduacion que usa el paciente actualmente).
 - Backend `models.py`: campos `lensometry_od`/`lensometry_oi` en ConsultationCreate y ConsultationUpdate. `routes/consultations.py` los guarda (create), actualiza (all_fields) y devuelve. Se muestran tambien en el detalle de la consulta y en `ConsultationViewDialog`. Verificado (curl + screenshot).
 
+### Correccion de la exportacion de base de datos (Jun 2026)
+- `routes/data_export.py` (Configuracion > Exportacion de Base de Datos > Excel, `GET /api/data-export/full-database`, admin/superadmin):
+  - Consultas: se corrigieron los campos mal mapeados (Tratamiento -> treatment_plan, Notas -> notes) y se completaron columnas: Tipo, Anamnesis, Hallazgos, Recomendaciones, Historia Clinica (usa lentes, lensometria OD/OS, cirugias, traumatismos, enfermedades), Antecedentes sistemicos y familiares, Agudeza Visual (lejos/cerca con y sin Rx, estenopeico, metodo) y Refracciones (serializadas legibles).
+  - Recetas de Contacto: se corrigio la Esfera OD/OS (leia od_sphere en vez de od_power -> salia vacia) y se agrego Adicion OD/OS.
+  - Recetas Oftalmicas: se agrego Adicion OD/OS y Armazon (frame_type).
+  - Verificado descargando el Excel (openpyxl): columnas presentes y datos poblados. Pendiente por decision del usuario: hojas Jornadas, Cuentas por Cobrar/abonos, Cajas, Tickets, Notificaciones y Auditoria (opcion b, no solicitada aun).
+
 
 ### Agenda - Proxima cita al terminar consulta + Recordatorios WhatsApp (Feb 2026)
 - **Backend** `routes/appointments.py`: nuevo `GET /api/appointments/reminders?days_ahead=1` retorna las citas del dia objetivo con `patient_name`, `patient_phone`, `reminder_message` y `whatsapp_url` (link wa.me con mensaje pre-armado URL-encoded). Anade prefijo 502 automatico a telefonos de 8 digitos (Guatemala). Excluye status cancelada/completada/no_asistio. Multi-tenant por `company_id`. Rechaza superadmin (403) y `days_ahead` fuera de [0,30] (400).
