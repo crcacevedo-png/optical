@@ -23,6 +23,9 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 ### Reordenamiento del menu lateral (Jun 2026)
 - `MainLayout.js`: `navItems` reordenado (lista unica filtrada por rol/modulo, mismo orden para todos los roles): Inicio rapido, Dashboard, Agenda, Pacientes, Consultas, Recetas, Punto de Venta, Cuentas por Cobrar, Cotizaciones, Inventario, Jornadas, Finanzas, Proveedores, Reportes, Configuracion. Consultas y Recetas se ubican tras Pacientes (eleccion del usuario). Finanzas/Proveedores solo aparecen si el plan incluye esos modulos, en su posicion (tras Jornadas / antes de Reportes).
 
+### Color OD/OS en tablas de recetas en pantalla (Jun 2026)
+- `PrescriptionsPage.js`: columnas OD (azul, text-blue-700) y OS (verde, text-green-700) en encabezados y celdas de las tablas de anteojos y de lentes de contacto, alineado con formularios y PDF.
+
 
 ### Agenda - Proxima cita al terminar consulta + Recordatorios WhatsApp (Feb 2026)
 - **Backend** `routes/appointments.py`: nuevo `GET /api/appointments/reminders?days_ahead=1` retorna las citas del dia objetivo con `patient_name`, `patient_phone`, `reminder_message` y `whatsapp_url` (link wa.me con mensaje pre-armado URL-encoded). Anade prefijo 502 automatico a telefonos de 8 digitos (Guatemala). Excluye status cancelada/completada/no_asistio. Multi-tenant por `company_id`. Rechaza superadmin (403) y `days_ahead` fuera de [0,30] (400).

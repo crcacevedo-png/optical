@@ -377,8 +377,8 @@ export default function PrescriptionsPage() {
                   <TableRow className="data-table-header">
                     <TableHead>Fecha</TableHead>
                     <TableHead>Paciente</TableHead>
-                    <TableHead>OD</TableHead>
-                    <TableHead>OS</TableHead>
+                    <TableHead className="text-blue-700">OD</TableHead>
+                    <TableHead className="text-green-700">OS</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
@@ -388,8 +388,8 @@ export default function PrescriptionsPage() {
                     <TableRow key={rx._id} className="data-table-row">
                       <TableCell>{rx.created_at?.slice(0, 10)}</TableCell>
                       <TableCell className="font-medium">{rx.patient_name || 'Paciente'}</TableCell>
-                      <TableCell className="text-sm">{rx.od_sphere || '-'} / {rx.od_cylinder || '-'} x {rx.od_axis || '-'}</TableCell>
-                      <TableCell className="text-sm">{rx.oi_sphere || '-'} / {rx.oi_cylinder || '-'} x {rx.oi_axis || '-'}</TableCell>
+                      <TableCell className="text-sm text-blue-700 font-medium">{rx.od_sphere || '-'} / {rx.od_cylinder || '-'} x {rx.od_axis || '-'}</TableCell>
+                      <TableCell className="text-sm text-green-700 font-medium">{rx.oi_sphere || '-'} / {rx.oi_cylinder || '-'} x {rx.oi_axis || '-'}</TableCell>
                       <TableCell>{rx.lens_type || '-'}</TableCell>
                       <TableCell className="text-right space-x-1">
                         <Button size="sm" variant="outline" onClick={() => openWhatsAppFor('eyeglass', rx)} className="border-green-300 text-green-700 hover:bg-green-50" data-testid={`send-rx-eyeglass-wa-${rx._id}`}>
@@ -555,8 +555,8 @@ export default function PrescriptionsPage() {
                   <TableRow className="data-table-header">
                     <TableHead>Fecha</TableHead>
                     <TableHead>Paciente</TableHead>
-                    <TableHead>OD (Esf/Cil/Eje/Add/Diam/CB)</TableHead>
-                    <TableHead>OS (Esf/Cil/Eje/Add/Diam/CB)</TableHead>
+                    <TableHead className="text-blue-700">OD (Esf/Cil/Eje/Add/Diam/CB)</TableHead>
+                    <TableHead className="text-green-700">OS (Esf/Cil/Eje/Add/Diam/CB)</TableHead>
                     <TableHead>Marca</TableHead>
                     <TableHead>Reemplazo</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
@@ -567,8 +567,8 @@ export default function PrescriptionsPage() {
                     <TableRow key={rx._id} className="data-table-row">
                       <TableCell>{rx.created_at?.slice(0, 10)}</TableCell>
                       <TableCell className="font-medium">{rx.patient_name || 'Paciente'}</TableCell>
-                      <TableCell className="text-sm">{rx.od_power || '-'} / {rx.od_cylinder || '-'} x {rx.od_axis || '-'} · Add {rx.od_addition || '-'} · Diam {rx.od_dia || '-'} · CB {rx.od_bc || '-'}</TableCell>
-                      <TableCell className="text-sm">{rx.oi_power || '-'} / {rx.oi_cylinder || '-'} x {rx.oi_axis || '-'} · Add {rx.oi_addition || '-'} · Diam {rx.oi_dia || '-'} · CB {rx.oi_bc || '-'}</TableCell>
+                      <TableCell className="text-sm text-blue-700 font-medium">{rx.od_power || '-'} / {rx.od_cylinder || '-'} x {rx.od_axis || '-'} · Add {rx.od_addition || '-'} · Diam {rx.od_dia || '-'} · CB {rx.od_bc || '-'}</TableCell>
+                      <TableCell className="text-sm text-green-700 font-medium">{rx.oi_power || '-'} / {rx.oi_cylinder || '-'} x {rx.oi_axis || '-'} · Add {rx.oi_addition || '-'} · Diam {rx.oi_dia || '-'} · CB {rx.oi_bc || '-'}</TableCell>
                       <TableCell>{rx.brand || '-'}</TableCell>
                       <TableCell>{rx.replacement || '-'}</TableCell>
                       <TableCell className="text-right space-x-1">
