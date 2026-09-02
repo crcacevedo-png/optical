@@ -59,11 +59,16 @@ export default function JornadaPatientsTab({ jornada, reload }) {
   const linkExisting = async (patient) => {
     setProcessing(true);
     try {
-      await api.post(`/api/jornadas/${jid}/patients`, { ...form, link_to_patient_id: patient._id });
-      toast.success(`${patient.first_name} vinculado a la jornada`);
+      const res = await api.post(`/api/jornadas/${jid}/patients`, { ...form, link_to_patient_id: patient._id });
+      if (res?._offlineQueued || res?.data?._offlineQueued) {
+        toast.success('Guardado en el dispositivo', { description: 'Se vinculara al recuperar la senal.' });
+        setItems(prev => [{ _id: `local-${Date.now()}`, first_name: patient.first_name, last_name: patient.last_name, phone: patient.phone, dpi: patient.dpi, created_at: new Date().toISOString(), _pending: true }, ...prev]);
+      } else {
+        toast.success(`${patient.first_name} vinculado a la jornada`);
+        load(); reload?.();
+      }
       setDialog(false);
       resetForm();
-      load(); reload?.();
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail));
     } finally { setProcessing(false); }
@@ -76,11 +81,21 @@ export default function JornadaPatientsTab({ jornada, reload }) {
     }
     setProcessing(true);
     try {
-      await api.post(`/api/jornadas/${jid}/patients`, form);
-      toast.success('Paciente registrado');
+      const res = await api.post(`/api/jornadas/${jid}/patients`, form);
+      if (res?._offlineQueued || res?.data?._offlineQueued) {
+        toast.success('Guardado en el dispositivo', { description: 'Se sincronizara automaticamente al recuperar la senal.' });
+        setItems(prev => [{
+          _id: `local-${Date.now()}`,
+          first_name: form.first_name, last_name: form.last_name,
+          phone: form.phone, dpi: form.dpi,
+          created_at: new Date().toISOString(), _pending: true,
+        }, ...prev]);
+      } else {
+        toast.success('Paciente registrado');
+        load(); reload?.();
+      }
       setDialog(false);
       resetForm();
-      load(); reload?.();
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail));
     } finally { setProcessing(false); }
@@ -127,6 +142,11 @@ export default function JornadaPatientsTab({ jornada, reload }) {
                     {p.is_first_capture_here && (
                       <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">
                         <Star className="w-2.5 h-2.5 mr-0.5" /> Nuevo
+                      </Badge>
+                    )}
+                    {p._pending && (
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`jpat-pending-${p._id}`}>
+                        Pendiente de sincronizar
                       </Badge>
                     )}
                   </div>

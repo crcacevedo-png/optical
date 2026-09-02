@@ -46,6 +46,17 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
   - Recetas Oftalmicas: se agrego Adicion OD/OS y Armazon (frame_type).
   - Verificado descargando el Excel (openpyxl): columnas presentes y datos poblados. Pendiente por decision del usuario: hojas Jornadas, Cuentas por Cobrar/abonos, Cajas, Tickets, Notificaciones y Auditoria (opcion b, no solicitada aun).
 
+### Modo offline global (captura sin internet) (Jun 2026)
+- Objetivo: en jornadas/lugares sin senal, poder seguir CAPTURANDO datos; se guardan cifrados en el dispositivo y se sincronizan solos al volver la senal. Sin PIN, sin PWA (decision del usuario).
+- Piezas nuevas:
+  - `lib/offlineQueue.js`: cola en IndexedDB cifrada con AES-GCM usando una clave NO exportable guardada en IndexedDB (ni el JS lee sus bytes). Cada item se purga apenas se sincroniza.
+  - `context/OfflineContext.js`: estado {online, pending, failed, syncing}; motor de sincronizacion FIFO (reintenta al volver online, evento `online` + polling 30s si hay pendientes); marca fallidos si el servidor rechaza (4xx).
+  - `components/OfflineIndicator.js`: pastilla en el header — "Sin conexion · N sin sincronizar" / "Sincronizando… N" / "N por sincronizar" (+ boton Sincronizar) / "N con error"; toasts al perder/recuperar conexion y "Todo sincronizado".
+  - `context/AuthContext.js`: interceptor de respuesta de axios encola peticiones mutantes (POST/PUT/PATCH/DELETE) cuando hay error de red y devuelve respuesta sintetica `{_offlineQueued:true}` (status 202) para que la UI continue. Denylist: /auth/, /data-export/, /search, .pdf, blobs, FormData. IMPORTANTE: el guard `!isAuthRoute` se mantiene en la logica de refresh 401 (sin el, /auth/refresh entra en bucle infinito y la app queda en "Cargando...").
+  - `pages/JornadaPatientsTab.js`: al encolar offline muestra "Guardado en el dispositivo", agrega fila optimista con badge "Pendiente de sincronizar" y NO hace GET.
+- Verificado E2E (Playwright offline real): registro offline -> badge/indicador -> reconecta -> auto-sync -> el paciente queda persistido en el backend (curl confirmado).
+- Limitaciones honestas: la LECTURA de listas/datos existentes necesita conexion (no hay cache de lectura sin PWA); si cierran/recargan la app sin senal, no abre; algunos flujos que devuelven documento inmediato (ticket de venta) se completan tras sincronizar; la deteccion de duplicados no corre offline.
+
 
 ### Agenda - Proxima cita al terminar consulta + Recordatorios WhatsApp (Feb 2026)
 - **Backend** `routes/appointments.py`: nuevo `GET /api/appointments/reminders?days_ahead=1` retorna las citas del dia objetivo con `patient_name`, `patient_phone`, `reminder_message` y `whatsapp_url` (link wa.me con mensaje pre-armado URL-encoded). Anade prefijo 502 automatico a telefonos de 8 digitos (Guatemala). Excluye status cancelada/completada/no_asistio. Multi-tenant por `company_id`. Rechaza superadmin (403) y `days_ahead` fuera de [0,30] (400).

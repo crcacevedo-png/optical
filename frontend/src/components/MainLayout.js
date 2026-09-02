@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { GlobalSearch } from './GlobalSearch';
 import { NotificationBell } from './NotificationBell';
+import { OfflineIndicator } from './OfflineIndicator';
 import { ChangeMyPasswordDialog } from './ChangeMyPasswordDialog';
 import { ReactivationFeedbackDialog } from './retention/ReactivationFeedbackDialog';
 import { Button } from '../components/ui/button';
@@ -259,6 +260,7 @@ export default function MainLayout() {
       <main className="flex-1 lg:p-8 p-4 pt-[85px] lg:pt-8 min-h-screen">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-end items-center gap-3 mb-4">
+            <OfflineIndicator />
             <NotificationBell />
             <GlobalSearch />
           </div>

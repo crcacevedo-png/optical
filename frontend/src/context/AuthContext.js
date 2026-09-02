@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { enqueue as enqueueRequest } from '../lib/offlineQueue';
 
 // In production (custom domain), use relative URL (same-origin).
 // In preview/dev, use the env variable.
@@ -57,18 +58,78 @@ const processQueue = (error) => {
   failedQueue = [];
 };
 
+// ---- Cola offline: decide que peticiones se guardan si no hay conexion ----
+const _QUEUE_DENYLIST = [/\/auth\//, /\/data-export\//, /\/search/, /receipt\.pdf/, /\.pdf/, /manifesto/, /\/refresh/];
+function _isQueueable(config) {
+  const method = (config.method || 'get').toLowerCase();
+  if (!['post', 'put', 'patch', 'delete'].includes(method)) return false;
+  if (config.skipOfflineQueue) return false;
+  if (config.responseType === 'blob') return false;
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) return false;
+  const url = config.url || '';
+  if (_QUEUE_DENYLIST.some((rx) => rx.test(url))) return false;
+  return true;
+}
+function _parseData(d) {
+  if (d == null) return undefined;
+  if (typeof d === 'string') { try { return JSON.parse(d); } catch { return d; } }
+  return d;
+}
+function _labelFor(config) {
+  const url = config.url || '';
+  const m = (config.method || '').toUpperCase();
+  if (/\/jornadas\/.*\/patients/.test(url)) return 'Registro de paciente (jornada)';
+  if (/\/jornadas\/.*\/consultations/.test(url)) return 'Consulta de jornada';
+  if (/\/jornadas\/.*\/sales/.test(url)) return 'Venta de jornada';
+  if (/\/prescriptions\/eyeglass/.test(url)) return 'Receta de anteojos';
+  if (/\/prescriptions\/contact/.test(url)) return 'Receta de lentes de contacto';
+  if (/\/consultations/.test(url)) return 'Consulta';
+  if (/\/patients/.test(url)) return 'Paciente';
+  if (/\/sales/.test(url)) return 'Venta';
+  if (/\/appointments/.test(url)) return 'Cita';
+  return `${m} ${url}`;
+}
+
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    try { window.dispatchEvent(new Event('cortexia:online')); } catch { /* noop */ }
+    return response;
+  },
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest = error.config || {};
     const isAuthRoute = originalRequest.url?.includes('/auth/');
-    
-    // Never intercept auth routes or network errors (no response)
-    if (isAuthRoute || !error.response) {
+
+    // Sin respuesta = error de red (offline o servidor inalcanzable)
+    if (!error.response) {
+      if (!isAuthRoute && _isQueueable(originalRequest)) {
+        try {
+          await enqueueRequest({
+            method: (originalRequest.method || 'post').toLowerCase(),
+            url: originalRequest.url,
+            data: _parseData(originalRequest.data),
+            createdAt: Date.now(),
+            label: _labelFor(originalRequest),
+          });
+          try { window.dispatchEvent(new Event('cortexia:offline')); } catch { /* noop */ }
+          // Respuesta sintetica para que la UI continue con normalidad.
+          return Promise.resolve({
+            data: { _offlineQueued: true },
+            status: 202,
+            statusText: 'Queued Offline',
+            headers: {},
+            config: originalRequest,
+            _offlineQueued: true,
+          });
+        } catch (e) {
+          try { window.dispatchEvent(new Event('cortexia:offline')); } catch { /* noop */ }
+          return Promise.reject(error);
+        }
+      }
+      try { window.dispatchEvent(new Event('cortexia:offline')); } catch { /* noop */ }
       return Promise.reject(error);
     }
-    
-    if (error.response?.status === 401 && !originalRequest._retry) {
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRoute) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });

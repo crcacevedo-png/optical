@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { OfflineProvider } from './context/OfflineContext';
 import { Toaster } from './components/ui/sonner';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './components/MainLayout';
@@ -41,6 +42,7 @@ import './App.css';
 function App() {
   return (
     <AuthProvider>
+      <OfflineProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -91,6 +93,7 @@ function App() {
         </Routes>
       </BrowserRouter>
       <Toaster position="top-right" richColors />
+      </OfflineProvider>
     </AuthProvider>
   );
 }
