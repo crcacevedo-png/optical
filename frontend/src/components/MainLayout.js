@@ -59,17 +59,17 @@ export default function MainLayout() {
     // Inicio rapido primero (solo admin)
     ...(isAdmin ? [{ path: '/onboarding', icon: Rocket, label: 'Inicio rapido' }] : []),
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', key: 'dashboard' },
+    { path: '/agenda', icon: Calendar, label: 'Agenda', key: 'agenda' },
     { path: '/patients', icon: Users, label: 'Pacientes', key: 'patients' },
     { path: '/consultations', icon: Eye, label: 'Consultas', key: 'consultations' },
-    { path: '/agenda', icon: Calendar, label: 'Agenda', key: 'agenda' },
     { path: '/prescriptions', icon: FileText, label: 'Recetas', key: 'prescriptions' },
-    { path: '/quotations', icon: ClipboardList, label: 'Cotizaciones', key: 'quotations' },
-    ...(hasModule('inventario') ? [{ path: '/inventory', icon: Package, label: 'Inventario', key: 'inventory' }] : []),
     ...(hasModule('ventas') ? [{ path: '/sales', icon: ShoppingCart, label: 'Punto de Venta', key: 'sales' }] : []),
     ...(hasModule('ventas') ? [{ path: '/receivables', icon: HandCoins, label: 'Cuentas por Cobrar', key: 'receivables' }] : []),
+    { path: '/quotations', icon: ClipboardList, label: 'Cotizaciones', key: 'quotations' },
+    ...(hasModule('inventario') ? [{ path: '/inventory', icon: Package, label: 'Inventario', key: 'inventory' }] : []),
     ...(hasModule('jornadas') ? [{ path: '/jornadas', icon: Tent, label: 'Jornadas', key: 'jornadas' }] : []),
-    ...(hasModule('proveedores') ? [{ path: '/suppliers', icon: Truck, label: 'Proveedores', key: 'suppliers' }] : []),
     ...(hasModule('finanzas') ? [{ path: '/finance', icon: DollarSign, label: 'Finanzas', key: 'finance' }] : []),
+    ...(hasModule('proveedores') ? [{ path: '/suppliers', icon: Truck, label: 'Proveedores', key: 'suppliers' }] : []),
     ...(isAdmin ? [
       { path: '/reports', icon: BarChart3, label: 'Reportes' },
       {
