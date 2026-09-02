@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from bson import ObjectId
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date, timedelta
+from urllib.parse import quote
 from typing import Optional
 import io
 from reportlab.pdfgen import canvas
@@ -324,6 +325,94 @@ async def list_contact_lens_prescriptions(user: dict = Depends(get_current_user)
             rx["patient_phone"] = p.get("phone", "") or ""
             rx["patient_whatsapp"] = p.get("whatsapp", "") or ""
     return [serialize_doc(rx) for rx in prescriptions]
+
+# Dias de uso por tipo de reemplazo (base para calcular vencimiento).
+# "Diario" = por caja (~30 dias). El resto segun su ciclo.
+REPLACEMENT_DAYS = {
+    "diario": 30,
+    "quincenal": 15,
+    "mensual": 30,
+    "trimestral": 90,
+    "anual": 365,
+}
+
+@router.get("/contact/replacement-reminders")
+async def contact_replacement_reminders(
+    user: dict = Depends(get_current_user),
+    days_ahead: int = 5,
+):
+    """Lentes de contacto proximos a vencer (o vencidos) segun el tipo de
+    reemplazo, contando desde la fecha de la receta. Devuelve un mensaje
+    pre-armado para compartir por WhatsApp Web (envio manual)."""
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    if days_ahead < 0 or days_ahead > 60:
+        raise HTTPException(status_code=400, detail="days_ahead debe estar entre 0 y 60")
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1}) or {}
+    company_name = company.get("name") or "Cortexia Optical"
+    rxs = await db.contact_lens_prescriptions.find(
+        {"company_id": ObjectId(user["company_id"]), "replacement": {"$nin": [None, ""]}}
+    ).sort("created_at", -1).to_list(3000)
+    # Dedup por paciente: se conserva solo la receta mas reciente (la primera por sort desc).
+    seen: set = set()
+    latest: list = []
+    for rx in rxs:
+        key = str(rx.get("patient_id") or rx.get("_id"))
+        if key in seen:
+            continue
+        seen.add(key)
+        latest.append(rx)
+    pids = [rx["patient_id"] for rx in latest if rx.get("patient_id")]
+    pmap: dict = {}
+    if pids:
+        docs = await db.patients.find(
+            {"_id": {"$in": pids}}, {"first_name": 1, "last_name": 1, "phone": 1, "whatsapp": 1}
+        ).to_list(len(pids))
+        pmap = {str(d["_id"]): d for d in docs}
+    today = date.today()
+    out: list = []
+    for rx in latest:
+        interval = REPLACEMENT_DAYS.get((rx.get("replacement") or "").strip().lower())
+        if not interval:
+            continue
+        try:
+            start = date.fromisoformat((rx.get("created_at") or "")[:10])
+        except ValueError:
+            continue
+        due = start + timedelta(days=interval)
+        days_remaining = (due - today).days
+        if days_remaining > days_ahead:
+            continue  # aun no entra en la ventana de aviso
+        p = pmap.get(str(rx.get("patient_id"))) or {}
+        first = p.get("first_name", "") or ""
+        name = f"{first} {p.get('last_name','')}".strip() or "Paciente"
+        phone = (p.get("whatsapp") or p.get("phone") or "").strip()
+        digits = "".join(ch for ch in phone if ch.isdigit())
+        if digits and len(digits) == 8:
+            digits = "502" + digits
+        overdue = days_remaining < 0
+        when = f"vencieron el {due.isoformat()}" if overdue else f"vencen el {due.isoformat()}"
+        message = (
+            f"Hola {first}, en {company_name} le recordamos que sus lentes de contacto "
+            f"({rx.get('replacement')}) {when}. Le recomendamos reponerlos a tiempo para "
+            f"cuidar su salud visual. Con gusto le ayudamos a renovarlos. Gracias!"
+        )
+        out.append({
+            "_id": str(rx["_id"]),
+            "patient_id": str(rx.get("patient_id")) if rx.get("patient_id") else None,
+            "patient_name": name,
+            "patient_phone": phone,
+            "brand": rx.get("brand") or "",
+            "replacement": rx.get("replacement") or "",
+            "created_at": (rx.get("created_at") or "")[:10],
+            "due_date": due.isoformat(),
+            "days_remaining": days_remaining,
+            "status": "vencida" if overdue else "por_vencer",
+            "whatsapp_url": (f"https://wa.me/{digits}?text={quote(message)}") if digits else None,
+            "reminder_message": message,
+        })
+    out.sort(key=lambda x: x["due_date"])
+    return {"count": len(out), "days_ahead": days_ahead, "items": out}
 
 @router.post("/contact")
 async def create_contact_lens_prescription(data: ContactLensPrescriptionCreate, user: dict = Depends(get_current_user)):

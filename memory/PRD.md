@@ -26,6 +26,10 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 ### Color OD/OS en tablas de recetas en pantalla (Jun 2026)
 - `PrescriptionsPage.js`: columnas OD (azul, text-blue-700) y OS (verde, text-green-700) en encabezados y celdas de las tablas de anteojos y de lentes de contacto, alineado con formularios y PDF.
 
+### Recordatorio de reposicion de lentes de contacto (Jun 2026)
+- Backend `GET /api/prescriptions/contact/replacement-reminders?days_ahead=5`: calcula el vencimiento desde la fecha de la receta segun el tipo de reemplazo (Diario=30, Quincenal=15, Mensual=30, Trimestral=90, Anual=365 dias). Deduplica por paciente (receta mas reciente), incluye vencidas + por vencer dentro de la ventana, y arma mensaje + enlace wa.me (con prefijo 502 si aplica). Envio manual (semi-automatico).
+- Frontend `AgendaPage.js`: boton "Reposicion de lentes" con contador y modal que lista pacientes (vencidas en rojo, por vencer en cian) con boton "Enviar" por WhatsApp.
+
 
 ### Agenda - Proxima cita al terminar consulta + Recordatorios WhatsApp (Feb 2026)
 - **Backend** `routes/appointments.py`: nuevo `GET /api/appointments/reminders?days_ahead=1` retorna las citas del dia objetivo con `patient_name`, `patient_phone`, `reminder_message` y `whatsapp_url` (link wa.me con mensaje pre-armado URL-encoded). Anade prefijo 502 automatico a telefonos de 8 digitos (Guatemala). Excluye status cancelada/completada/no_asistio. Multi-tenant por `company_id`. Rechaza superadmin (403) y `days_ahead` fuera de [0,30] (400).

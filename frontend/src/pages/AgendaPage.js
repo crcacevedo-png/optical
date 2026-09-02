@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { BranchFilter } from '../components/BranchFilter';
 import {
   Plus, CalendarIcon, ChevronLeft, ChevronRight,
-  Check, X, MoreHorizontal, Clock, MessageCircle, Phone
+  Check, X, MoreHorizontal, Clock, MessageCircle, Phone, CircleDot, AlertTriangle
 } from 'lucide-react';
 import {
   format, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths,
@@ -102,6 +102,17 @@ export default function AgendaPage() {
     } catch (err) { /* silent */ }
   }, []);
   useEffect(() => { fetchReminders(); }, [fetchReminders]);
+
+  // Recordatorios de reposicion de lentes de contacto via WhatsApp
+  const [replReminders, setReplReminders] = useState({ count: 0, items: [] });
+  const [replOpen, setReplOpen] = useState(false);
+  const fetchReplReminders = useCallback(async () => {
+    try {
+      const { data } = await api.get('/api/prescriptions/contact/replacement-reminders', { params: { days_ahead: 5 } });
+      setReplReminders(data);
+    } catch (err) { /* silent */ }
+  }, []);
+  useEffect(() => { fetchReplReminders(); }, [fetchReplReminders]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -373,6 +384,20 @@ export default function AgendaPage() {
               </span>
             )}
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => setReplOpen(true)}
+            className="border-cyan-200 text-cyan-700 hover:bg-cyan-50"
+            data-testid="repl-reminders-open-btn"
+          >
+            <CircleDot className="w-4 h-4 mr-2" />
+            Reposicion de lentes
+            {replReminders.count > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-cyan-600 text-white text-[10px] font-bold">
+                {replReminders.count}
+              </span>
+            )}
+          </Button>
           <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogTrigger asChild>
             <Button className="bg-pine-900 hover:bg-pine-700" data-testid="add-appointment-btn">
@@ -514,6 +539,62 @@ export default function AgendaPage() {
             )}
             <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-100">
               Al hacer click en &quot;Enviar&quot; se abre WhatsApp Web con el mensaje pre-armado. Confirma y envia desde WhatsApp.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Recordatorios de reposicion de lentes de contacto */}
+      <Dialog open={replOpen} onOpenChange={setReplOpen}>
+        <DialogContent className="sm:max-w-lg" data-testid="repl-reminders-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-heading">Reposicion de lentes de contacto</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-xs text-slate-500">
+              Lentes por vencer (proximos 5 dias) o vencidos — {replReminders.count || 0} paciente(s)
+            </p>
+            {(replReminders.items || []).length === 0 ? (
+              <div className="py-6 text-center text-sm text-slate-400 italic">No hay reposiciones pendientes</div>
+            ) : (
+              <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto -mx-2">
+                {(replReminders.items || []).map((r) => {
+                  const overdue = r.status === 'vencida';
+                  return (
+                    <div key={r._id} className="flex items-center gap-3 py-2.5 px-2" data-testid={`repl-reminder-${r._id}`}>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${overdue ? 'bg-red-100' : 'bg-cyan-100'}`}>
+                        {overdue ? <AlertTriangle className="w-4 h-4 text-red-600" /> : <CircleDot className="w-4 h-4 text-cyan-700" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-slate-800 text-sm truncate">{r.patient_name}</p>
+                        <p className="text-xs text-slate-500 truncate">
+                          {r.replacement}{r.brand ? ` · ${r.brand}` : ''} · {r.patient_phone || 'sin telefono'}
+                        </p>
+                        <p className={`text-[11px] font-medium ${overdue ? 'text-red-600' : 'text-cyan-700'}`}>
+                          {overdue
+                            ? `Vencio el ${r.due_date} (hace ${Math.abs(r.days_remaining)} dias)`
+                            : (r.days_remaining === 0 ? `Vence hoy (${r.due_date})` : `Vence en ${r.days_remaining} dias (${r.due_date})`)}
+                        </p>
+                      </div>
+                      {r.whatsapp_url ? (
+                        <a
+                          href={r.whatsapp_url}
+                          target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20b859] text-white text-xs font-medium px-3 py-1.5 rounded-md flex-shrink-0"
+                          data-testid={`repl-reminder-wa-${r._id}`}
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" /> Enviar
+                        </a>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 italic flex-shrink-0">sin WhatsApp</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-100">
+              El vencimiento se calcula desde la fecha de la receta segun el tipo de reemplazo. Al hacer click en &quot;Enviar&quot; se abre WhatsApp con el mensaje pre-armado; confirma y envia desde WhatsApp.
             </p>
           </div>
         </DialogContent>
