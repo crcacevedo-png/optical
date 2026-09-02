@@ -50,6 +50,7 @@ export function ConsultationViewDialog({
                       <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Antecedentes Oculares</p>
                       <div className="text-sm space-y-0.5">
                         {consultation.wears_glasses && <p><span className="text-slate-500">Usa lentes:</span> Si{consultation.glasses_since ? `, desde ${consultation.glasses_since}` : ''}{consultation.glasses_type ? ` (${consultation.glasses_type})` : ''}</p>}
+                        {consultation.wears_glasses && (consultation.lensometry_od || consultation.lensometry_oi) && <p><span className="text-slate-500">Lensometria:</span> <span className="text-blue-700 font-medium">OD {consultation.lensometry_od || '-'}</span> · <span className="text-green-700 font-medium">OS {consultation.lensometry_oi || '-'}</span></p>}
                         {consultation.ocular_surgeries && <p><span className="text-slate-500">Cirugias:</span> {consultation.ocular_surgeries}</p>}
                         {consultation.ocular_trauma && <p><span className="text-slate-500">Traumatismos:</span> {consultation.ocular_trauma}</p>}
                         {consultation.ocular_diseases && <p><span className="text-slate-500">Enfermedades:</span> {consultation.ocular_diseases}</p>}

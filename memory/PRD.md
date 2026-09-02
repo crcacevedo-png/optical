@@ -35,6 +35,10 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Backend `models.py`: clase `Refraction` + campo `refractions: Optional[List[Refraction]]` en ConsultationCreate y ConsultationUpdate. `routes/consultations.py` guarda/actualiza/devuelve `refractions`.
 - Autorellenado: desde el detalle de la consulta, botones "Receta Anteojos" y "Receta Lentes de Contacto" abren el dialogo prellenado con refractions[0]. Con mas de una refraccion, `EyeglassRxDialog`/`ContactRxDialog` muestran botones "Refraccion N" (opcion B del usuario) para elegir cual cargar. Mapeo os_*->oi_* y esfera->power (contacto). Campos no aplicables (DP en anteojos; Diametro y Curva Base en contacto) quedan en blanco. Verificado E2E (iteration_4, 100%).
 
+### Lensometria actual al usar lentes (Jun 2026)
+- En "II. Historia Clinica > A. Antecedentes Oculares", al marcar el checkbox "Usa lentes" aparece "Lensometria actual" con OD (azul) y OS (verde) como texto libre (graduacion que usa el paciente actualmente).
+- Backend `models.py`: campos `lensometry_od`/`lensometry_oi` en ConsultationCreate y ConsultationUpdate. `routes/consultations.py` los guarda (create), actualiza (all_fields) y devuelve. Se muestran tambien en el detalle de la consulta y en `ConsultationViewDialog`. Verificado (curl + screenshot).
+
 
 ### Agenda - Proxima cita al terminar consulta + Recordatorios WhatsApp (Feb 2026)
 - **Backend** `routes/appointments.py`: nuevo `GET /api/appointments/reminders?days_ahead=1` retorna las citas del dia objetivo con `patient_name`, `patient_phone`, `reminder_message` y `whatsapp_url` (link wa.me con mensaje pre-armado URL-encoded). Anade prefijo 502 automatico a telefonos de 8 digitos (Guatemala). Excluye status cancelada/completada/no_asistio. Multi-tenant por `company_id`. Rechaza superadmin (403) y `days_ahead` fuera de [0,30] (400).

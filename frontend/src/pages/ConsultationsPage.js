@@ -48,6 +48,7 @@ export default function ConsultationsPage() {
   // Form state
   const defaultClinical = {
     wears_glasses: false, glasses_since: '', glasses_type: '',
+    lensometry_od: '', lensometry_oi: '',
     ocular_surgeries: '', ocular_trauma: '', ocular_diseases: '',
     diabetes: false, hypertension: false, autoimmune_disease: false, autoimmune_details: '',
     current_medications: '', allergies: '',
@@ -147,7 +148,7 @@ export default function ConsultationsPage() {
       notes: c.notes || '',
       refractions: c.refractions || [],
       wears_glasses: c.wears_glasses || false, glasses_since: c.glasses_since || '',
-      glasses_type: c.glasses_type || '', ocular_surgeries: c.ocular_surgeries || '',
+      glasses_type: c.glasses_type || '', lensometry_od: c.lensometry_od || '', lensometry_oi: c.lensometry_oi || '', ocular_surgeries: c.ocular_surgeries || '',
       ocular_trauma: c.ocular_trauma || '', ocular_diseases: c.ocular_diseases || '',
       diabetes: c.diabetes || false, hypertension: c.hypertension || false,
       autoimmune_disease: c.autoimmune_disease || false, autoimmune_details: c.autoimmune_details || '',
@@ -512,6 +513,19 @@ export default function ConsultationsPage() {
                           onChange={(e) => setForm(f => ({ ...f, glasses_since: e.target.value }))} className="h-8 text-sm" />
                         <Input placeholder="Tipo de lentes" value={form.glasses_type}
                           onChange={(e) => setForm(f => ({ ...f, glasses_type: e.target.value }))} className="h-8 text-sm" />
+                        <div className="pt-1 space-y-1.5">
+                          <Label className="text-xs text-slate-500">Lensometria actual</Label>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-blue-700 w-7">OD</span>
+                            <Input placeholder="Graduacion actual OD" value={form.lensometry_od}
+                              onChange={(e) => setForm(f => ({ ...f, lensometry_od: e.target.value }))} className="h-8 text-sm" data-testid="form-lensometry-od" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-green-700 w-7">OS</span>
+                            <Input placeholder="Graduacion actual OS" value={form.lensometry_oi}
+                              onChange={(e) => setForm(f => ({ ...f, lensometry_oi: e.target.value }))} className="h-8 text-sm" data-testid="form-lensometry-os" />
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -869,6 +883,7 @@ export default function ConsultationsPage() {
                       <p className="text-xs font-semibold text-pine-700 uppercase tracking-wide mb-2">A. Antecedentes Oculares</p>
                       <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
                         {c.wears_glasses && <div><span className="text-slate-500">Usa lentes:</span> <span className="font-medium">Si{c.glasses_since ? `, desde ${c.glasses_since}` : ''}{c.glasses_type ? ` (${c.glasses_type})` : ''}</span></div>}
+                        {c.wears_glasses && (c.lensometry_od || c.lensometry_oi) && <div><span className="text-slate-500">Lensometria:</span> <span className="text-blue-700 font-medium">OD {c.lensometry_od || '-'}</span> · <span className="text-green-700 font-medium">OS {c.lensometry_oi || '-'}</span></div>}
                         {c.ocular_surgeries && <div><span className="text-slate-500">Cirugias:</span> <span className="font-medium">{c.ocular_surgeries}</span></div>}
                         {c.ocular_trauma && <div><span className="text-slate-500">Traumatismos:</span> <span className="font-medium">{c.ocular_trauma}</span></div>}
                         {c.ocular_diseases && <div><span className="text-slate-500">Enfermedades:</span> <span className="font-medium">{c.ocular_diseases}</span></div>}

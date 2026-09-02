@@ -73,6 +73,8 @@ async def create_consultation(data: ConsultationCreate, user: dict = Depends(get
         "wears_glasses": data.wears_glasses,
         "glasses_since": data.glasses_since or "",
         "glasses_type": data.glasses_type or "",
+        "lensometry_od": data.lensometry_od or "",
+        "lensometry_oi": data.lensometry_oi or "",
         "ocular_surgeries": data.ocular_surgeries or "",
         "ocular_trauma": data.ocular_trauma or "",
         "ocular_diseases": data.ocular_diseases or "",
@@ -155,7 +157,7 @@ async def update_consultation(consultation_id: str, data: ConsultationUpdate, us
     all_fields = [
         "consultation_type", "chief_complaint", "anamnesis", "findings", "diagnosis",
         "treatment_plan", "recommendations", "notes",
-        "wears_glasses", "glasses_since", "glasses_type", "ocular_surgeries", "ocular_trauma", "ocular_diseases",
+        "wears_glasses", "glasses_since", "glasses_type", "lensometry_od", "lensometry_oi", "ocular_surgeries", "ocular_trauma", "ocular_diseases",
         "diabetes", "hypertension", "autoimmune_disease", "autoimmune_details", "current_medications", "allergies",
         "family_glaucoma", "family_glaucoma_relationship", "family_macular_degeneration", "family_macular_relationship",
         "family_high_myopia", "family_high_myopia_relationship", "family_other_history",

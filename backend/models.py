@@ -283,6 +283,8 @@ class ConsultationCreate(BaseModel):
     wears_glasses: Optional[bool] = None
     glasses_since: Optional[str] = None
     glasses_type: Optional[str] = None
+    lensometry_od: Optional[str] = None
+    lensometry_oi: Optional[str] = None
     ocular_surgeries: Optional[str] = None
     ocular_trauma: Optional[str] = None
     ocular_diseases: Optional[str] = None
@@ -324,6 +326,8 @@ class ConsultationUpdate(BaseModel):
     wears_glasses: Optional[bool] = None
     glasses_since: Optional[str] = None
     glasses_type: Optional[str] = None
+    lensometry_od: Optional[str] = None
+    lensometry_oi: Optional[str] = None
     ocular_surgeries: Optional[str] = None
     ocular_trauma: Optional[str] = None
     ocular_diseases: Optional[str] = None
