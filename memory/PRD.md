@@ -56,6 +56,8 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
   - `pages/JornadaPatientsTab.js`: al encolar offline muestra "Guardado en el dispositivo", agrega fila optimista con badge "Pendiente de sincronizar" y NO hace GET.
 - Verificado E2E (Playwright offline real): registro offline -> badge/indicador -> reconecta -> auto-sync -> el paciente queda persistido en el backend (curl confirmado).
 - Limitaciones honestas: la LECTURA de listas/datos existentes necesita conexion (no hay cache de lectura sin PWA); si cierran/recargan la app sin senal, no abre; algunos flujos que devuelven documento inmediato (ticket de venta) se completan tras sincronizar; la deteccion de duplicados no corre offline.
+- Capacidad: sin limite fijo en la app; lo limita la cuota del navegador (medido ~977 MB en el entorno). Paciente ~289 B, venta ~431 B en texto; caben cientos de miles de registros. 100 expedientes = ~0.03 MB.
+- Aviso de seguridad (`OfflineIndicator.js`): al cruzar cada bloque de pendientes (umbral 50, urgente 150) muestra un toast recordando buscar senal ("Tienes N registros sin sincronizar...") y la pastilla del indicador se pone ROJA con "· busca senal". Umbrales WARN_THRESHOLD=50 / URGENT_THRESHOLD=150. Verificado sembrando 52 pendientes cifrados (toast + pastilla roja) y limpiando la cola.
 
 
 ### Agenda - Proxima cita al terminar consulta + Recordatorios WhatsApp (Feb 2026)
