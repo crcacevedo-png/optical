@@ -461,11 +461,11 @@ export default function PrescriptionsPage() {
                           <Input type="number" step="0.25" value={contactForm.od_addition} onChange={(e) => setContactForm({...contactForm, od_addition: e.target.value})} placeholder="+1.50" className="h-9" />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs">DIA</Label>
+                          <Label className="text-xs">Diametro</Label>
                           <Input type="number" step="0.1" value={contactForm.od_dia} onChange={(e) => setContactForm({...contactForm, od_dia: e.target.value})} placeholder="14.2" className="h-9" data-testid="od-dia" />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs">B.C.</Label>
+                          <Label className="text-xs">Curva Base</Label>
                           <Input type="number" step="0.1" value={contactForm.od_bc} onChange={(e) => setContactForm({...contactForm, od_bc: e.target.value})} placeholder="8.6" className="h-9" data-testid="od-bc" />
                         </div>
                       </div>
@@ -492,11 +492,11 @@ export default function PrescriptionsPage() {
                           <Input type="number" step="0.25" value={contactForm.oi_addition} onChange={(e) => setContactForm({...contactForm, oi_addition: e.target.value})} placeholder="+1.50" className="h-9" />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs">DIA</Label>
+                          <Label className="text-xs">Diametro</Label>
                           <Input type="number" step="0.1" value={contactForm.oi_dia} onChange={(e) => setContactForm({...contactForm, oi_dia: e.target.value})} placeholder="14.2" className="h-9" data-testid="oi-dia" />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs">B.C.</Label>
+                          <Label className="text-xs">Curva Base</Label>
                           <Input type="number" step="0.1" value={contactForm.oi_bc} onChange={(e) => setContactForm({...contactForm, oi_bc: e.target.value})} placeholder="8.6" className="h-9" data-testid="oi-bc" />
                         </div>
                       </div>

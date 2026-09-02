@@ -154,8 +154,8 @@ export function EyeglassRxDialog({ open, onOpenChange, form, setForm, onSubmit, 
 // Contact Lens Rx Dialog
 // ═══════════════════════════════════════════════════════════════════
 const CONTACT_FIELDS = [
-  { k: 'power', l: 'Poder' }, { k: 'bc', l: 'CB' }, { k: 'dia', l: 'DIA' },
-  { k: 'cylinder', l: 'Cilindro' }, { k: 'axis', l: 'Eje' }, { k: 'addition', l: 'Adicion' },
+  { k: 'power', l: 'Esfera' }, { k: 'cylinder', l: 'Cilindro' }, { k: 'axis', l: 'Eje' },
+  { k: 'addition', l: 'Adicion' }, { k: 'dia', l: 'Diametro' }, { k: 'bc', l: 'Curva Base' },
 ];
 
 export function ContactRxDialog({ open, onOpenChange, form, setForm, onSubmit }) {
