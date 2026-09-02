@@ -11,11 +11,11 @@ import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
 import { BranchFilter } from '../components/BranchFilter';
 import {
-  Plus, Search, Eye, Pencil, Stethoscope, FileText, Pill,
+  Plus, Trash2, Search, Eye, Pencil, Stethoscope, FileText, Pill,
   Clock, User, CalendarIcon, ChevronRight, Save, ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { EyeglassRxDialog, MedicalRxDialog } from '../components/patients/PatientDialogs';
+import { EyeglassRxDialog, ContactRxDialog, MedicalRxDialog } from '../components/patients/PatientDialogs';
 import { NextAppointmentDialog } from '../components/appointments/NextAppointmentDialog';
 
 const CONSULTATION_TYPES = [
@@ -67,6 +67,7 @@ export default function ConsultationsPage() {
     consultation_time: new Date().toTimeString().slice(0, 5),
     consultation_type: 'general', chief_complaint: '', anamnesis: '',
     findings: '', diagnosis: '', treatment_plan: '', recommendations: '', notes: '',
+    refractions: [],
     ...defaultClinical
   });
   const [patientSearch, setPatientSearch] = useState('');
@@ -78,6 +79,11 @@ export default function ConsultationsPage() {
     oi_sphere: '', oi_cylinder: '', oi_axis: '', oi_addition: '', oi_dp: '',
     lens_type: '', frame_type: '', observations: ''
   });
+
+  // Contact lens Rx from consultation
+  const emptyContactForm = { od_power: '', od_bc: '', od_dia: '', od_cylinder: '', od_axis: '', od_addition: '', oi_power: '', oi_bc: '', oi_dia: '', oi_cylinder: '', oi_axis: '', oi_addition: '', brand: '', lens_type: '', replacement: '', observations: '' };
+  const [showContactRx, setShowContactRx] = useState(false);
+  const [contactForm, setContactForm] = useState(emptyContactForm);
 
   // Medical Rx from consultation
   const [showMedicalRx, setShowMedicalRx] = useState(false);
@@ -111,6 +117,7 @@ export default function ConsultationsPage() {
       consultation_time: new Date().toTimeString().slice(0, 5),
       consultation_type: 'general', chief_complaint: '', anamnesis: '',
       findings: '', diagnosis: '', treatment_plan: '', recommendations: '', notes: '',
+      refractions: [],
       ...defaultClinical
     });
     setPatientSearch('');
@@ -138,6 +145,7 @@ export default function ConsultationsPage() {
       findings: c.findings || '', diagnosis: c.diagnosis || '',
       treatment_plan: c.treatment_plan || '', recommendations: c.recommendations || '',
       notes: c.notes || '',
+      refractions: c.refractions || [],
       wears_glasses: c.wears_glasses || false, glasses_since: c.glasses_since || '',
       glasses_type: c.glasses_type || '', ocular_surgeries: c.ocular_surgeries || '',
       ocular_trauma: c.ocular_trauma || '', ocular_diseases: c.ocular_diseases || '',
@@ -176,7 +184,8 @@ export default function ConsultationsPage() {
           chief_complaint: form.chief_complaint, anamnesis: form.anamnesis,
           findings: form.findings, diagnosis: form.diagnosis,
           treatment_plan: form.treatment_plan, recommendations: form.recommendations,
-          notes: form.notes
+          notes: form.notes,
+          refractions: form.refractions
         });
         toast.success('Consulta actualizada');
         openDetail(selectedConsultation._id);
@@ -225,6 +234,47 @@ export default function ConsultationsPage() {
       toast.error(formatApiErrorDetail(err?.response?.data?.detail));
     }
   };
+
+  const refractionToEyeglass = (r) => ({
+    od_sphere: r?.od_sphere || '', od_cylinder: r?.od_cylinder || '', od_axis: r?.od_axis || '', od_addition: r?.od_addition || '', od_dp: '',
+    oi_sphere: r?.os_sphere || '', oi_cylinder: r?.os_cylinder || '', oi_axis: r?.os_axis || '', oi_addition: r?.os_addition || '', oi_dp: '',
+    lens_type: '', frame_type: '', observations: '',
+  });
+  const refractionToContact = (r) => ({
+    od_power: r?.od_sphere || '', od_cylinder: r?.od_cylinder || '', od_axis: r?.od_axis || '', od_addition: r?.od_addition || '', od_dia: '', od_bc: '',
+    oi_power: r?.os_sphere || '', oi_cylinder: r?.os_cylinder || '', oi_axis: r?.os_axis || '', oi_addition: r?.os_addition || '', oi_dia: '', oi_bc: '',
+    brand: '', lens_type: '', replacement: '', observations: '',
+  });
+  const openEyeglassRxFromConsultation = () => {
+    const refs = selectedConsultation?.refractions || [];
+    setEyeglassForm(refractionToEyeglass(refs[0]));
+    setShowEyeglassRx(true);
+  };
+  const openContactRxFromConsultation = () => {
+    const refs = selectedConsultation?.refractions || [];
+    setContactForm(refractionToContact(refs[0]));
+    setShowContactRx(true);
+  };
+  const handleCreateContactRx = async () => {
+    if (!selectedConsultation) return;
+    try {
+      await api.post('/api/prescriptions/contact', {
+        patient_id: selectedConsultation.patient_id,
+        consultation_id: selectedConsultation._id,
+        professional_name: selectedConsultation.professional_name || user?.name,
+        ...contactForm
+      });
+      toast.success('Receta de lentes de contacto creada');
+      setShowContactRx(false);
+      setContactForm(emptyContactForm);
+      openDetail(selectedConsultation._id);
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err?.response?.data?.detail));
+    }
+  };
+  const addRefraction = () => setForm(f => ({ ...f, refractions: [...(f.refractions || []), { od_sphere: '', od_cylinder: '', od_axis: '', od_addition: '', os_sphere: '', os_cylinder: '', os_axis: '', os_addition: '', observations: '' }] }));
+  const updateRefraction = (idx, field, value) => setForm(f => { const arr = [...(f.refractions || [])]; arr[idx] = { ...arr[idx], [field]: value }; return { ...f, refractions: arr }; });
+  const removeRefraction = (idx) => setForm(f => ({ ...f, refractions: (f.refractions || []).filter((_, i) => i !== idx) }));
 
   const handleCreateMedicalRx = async () => {
     if (!selectedConsultation) return;
@@ -638,6 +688,45 @@ export default function ConsultationsPage() {
                   onChange={(e) => setForm(f => ({ ...f, findings: e.target.value }))}
                   placeholder="Resultados del examen visual, agudeza visual, biomicroscopia..." data-testid="form-findings" />
               </div>
+              <div className="space-y-2 border-t border-slate-100 pt-4">
+                <div className="flex items-center justify-between">
+                  <Label>Refraccion Actual</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addRefraction} data-testid="add-refraction-btn">
+                    <Plus className="w-3.5 h-3.5 mr-1" /> Agregar refraccion
+                  </Button>
+                </div>
+                {(form.refractions || []).length === 0 && (
+                  <p className="text-xs text-slate-400 italic">Sin refracciones. Agrega una para registrar la graduacion del paciente.</p>
+                )}
+                {(form.refractions || []).map((r, idx) => (
+                  <div key={idx} className="border border-slate-200 rounded-lg p-3 space-y-2" data-testid={`refraction-${idx}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-500">Refraccion {idx + 1}</span>
+                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-red-600 hover:bg-red-50" onClick={() => removeRefraction(idx)} data-testid={`remove-refraction-${idx}`}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-5 gap-2 text-[10px] uppercase text-slate-400">
+                      <span></span><span>Esfera</span><span>Cilindro</span><span>Eje</span><span>Adicion</span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-2 items-center">
+                      <span className="text-xs font-bold text-blue-700">OD</span>
+                      <Input className="h-8 text-sm" value={r.od_sphere} onChange={(e) => updateRefraction(idx, 'od_sphere', e.target.value)} data-testid={`refraction-${idx}-od-sphere`} />
+                      <Input className="h-8 text-sm" value={r.od_cylinder} onChange={(e) => updateRefraction(idx, 'od_cylinder', e.target.value)} />
+                      <Input className="h-8 text-sm" value={r.od_axis} onChange={(e) => updateRefraction(idx, 'od_axis', e.target.value)} />
+                      <Input className="h-8 text-sm" value={r.od_addition} onChange={(e) => updateRefraction(idx, 'od_addition', e.target.value)} />
+                    </div>
+                    <div className="grid grid-cols-5 gap-2 items-center">
+                      <span className="text-xs font-bold text-green-700">OS</span>
+                      <Input className="h-8 text-sm" value={r.os_sphere} onChange={(e) => updateRefraction(idx, 'os_sphere', e.target.value)} data-testid={`refraction-${idx}-os-sphere`} />
+                      <Input className="h-8 text-sm" value={r.os_cylinder} onChange={(e) => updateRefraction(idx, 'os_cylinder', e.target.value)} />
+                      <Input className="h-8 text-sm" value={r.os_axis} onChange={(e) => updateRefraction(idx, 'os_axis', e.target.value)} />
+                      <Input className="h-8 text-sm" value={r.os_addition} onChange={(e) => updateRefraction(idx, 'os_addition', e.target.value)} />
+                    </div>
+                    <Textarea value={r.observations} rows={1} onChange={(e) => updateRefraction(idx, 'observations', e.target.value)} placeholder="Observaciones de esta refraccion..." data-testid={`refraction-${idx}-observations`} />
+                  </div>
+                ))}
+              </div>
               <div className="space-y-2">
                 <Label>Diagnostico / Impresion Clinica</Label>
                 <Textarea value={form.diagnosis} rows={2}
@@ -699,11 +788,11 @@ export default function ConsultationsPage() {
             <Button variant="outline" size="sm" onClick={() => openEditConsultation(c)} data-testid="detail-edit-btn">
               <Pencil className="w-4 h-4 mr-1" /> Editar
             </Button>
-            <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => {
-              setEyeglassForm({ od_sphere: '', od_cylinder: '', od_axis: '', od_addition: '', od_dp: '', oi_sphere: '', oi_cylinder: '', oi_axis: '', oi_addition: '', oi_dp: '', lens_type: '', frame_type: '', observations: '' });
-              setShowEyeglassRx(true);
-            }} data-testid="gen-eyeglass-rx-btn">
+            <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={openEyeglassRxFromConsultation} data-testid="gen-eyeglass-rx-btn">
               <FileText className="w-4 h-4 mr-1" /> Receta Anteojos
+            </Button>
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700" onClick={openContactRxFromConsultation} data-testid="gen-contact-rx-btn">
+              <Eye className="w-4 h-4 mr-1" /> Receta Lentes de Contacto
             </Button>
             <Button size="sm" className="bg-purple-600 hover:bg-purple-700" onClick={() => {
               setMedicalForm({ diagnosis: c.diagnosis || '', medications: [{ name: '', dosage: '', frequency: '', duration: '' }], instructions: '' });
@@ -856,6 +945,21 @@ export default function ConsultationsPage() {
               <CardContent className="space-y-4">
                 {c.anamnesis && <Section title="Historia / Anamnesis" text={c.anamnesis} />}
                 {c.findings && <Section title="Hallazgos" text={c.findings} />}
+                {Array.isArray(c.refractions) && c.refractions.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Refraccion Actual</p>
+                    <div className="space-y-2">
+                      {c.refractions.map((r, i) => (
+                        <div key={i} className="border border-slate-200 rounded-lg p-2 text-sm">
+                          <p className="text-[11px] text-slate-400 mb-1">Refraccion {i + 1}</p>
+                          <p className="text-blue-700"><span className="font-bold">OD</span> · Esf {r.od_sphere || '-'} · Cil {r.od_cylinder || '-'} · Eje {r.od_axis || '-'} · Add {r.od_addition || '-'}</p>
+                          <p className="text-green-700"><span className="font-bold">OS</span> · Esf {r.os_sphere || '-'} · Cil {r.os_cylinder || '-'} · Eje {r.os_axis || '-'} · Add {r.os_addition || '-'}</p>
+                          {r.observations && <p className="text-slate-500 text-xs mt-1">Obs: {r.observations}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {c.diagnosis && <Section title="Diagnostico / Impresion Clinica" text={c.diagnosis} highlight />}
                 {c.treatment_plan && <Section title="Plan / Tratamiento" text={c.treatment_plan} />}
                 {c.recommendations && <Section title="Recomendaciones" text={c.recommendations} />}
@@ -889,6 +993,15 @@ export default function ConsultationsPage() {
         setForm={setEyeglassForm}
         onSubmit={handleCreateEyeglassRx}
         testIdPrefix=""
+        refractions={selectedConsultation?.refractions || []}
+      />
+      <ContactRxDialog
+        open={showContactRx}
+        onOpenChange={setShowContactRx}
+        form={contactForm}
+        setForm={setContactForm}
+        onSubmit={handleCreateContactRx}
+        refractions={selectedConsultation?.refractions || []}
       />
       <MedicalRxDialog
         open={showMedicalRx}

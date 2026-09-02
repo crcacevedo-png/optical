@@ -44,7 +44,7 @@ async def list_consultations(
             prof = await db.users.find_one({"_id": ObjectId(c["professional_user_id"])}, {"name": 1})
             if prof:
                 c["professional_name"] = prof["name"]
-    return consultations
+    return [serialize_doc(c) for c in consultations]
 
 @router.post("")
 async def create_consultation(data: ConsultationCreate, user: dict = Depends(get_current_user)):
@@ -100,6 +100,7 @@ async def create_consultation(data: ConsultationCreate, user: dict = Depends(get
         "va_pinhole_od": data.va_pinhole_od or "",
         "va_pinhole_oi": data.va_pinhole_oi or "",
         "visual_acuity_method": data.visual_acuity_method or "",
+        "refractions": [r.model_dump() for r in (data.refractions or [])],
         "created_by": ObjectId(user["_id"]),
         "created_at": now.isoformat(),
         "updated_at": now.isoformat()
@@ -142,7 +143,7 @@ async def get_consultation(consultation_id: str, user: dict = Depends(get_curren
         serialize_doc(rx)
     c["medical_prescriptions"] = medical_rx
     
-    return c
+    return serialize_doc(c)
 
 @router.put("/{consultation_id}")
 async def update_consultation(consultation_id: str, data: ConsultationUpdate, user: dict = Depends(get_current_user)):
@@ -167,6 +168,8 @@ async def update_consultation(consultation_id: str, data: ConsultationUpdate, us
         if val is not None:
             update_data[field] = val
     
+    if data.refractions is not None:
+        update_data["refractions"] = [r.model_dump() for r in data.refractions]
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.optical_consultations.update_one({"_id": ObjectId(consultation_id)}, {"$set": update_data})
     return {"message": "Consulta actualizada"}

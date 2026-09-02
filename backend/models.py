@@ -256,6 +256,17 @@ class QuotationCreate(BaseModel):
 class QuotationStatusUpdate(BaseModel):
     status: str
 
+class Refraction(BaseModel):
+    od_sphere: Optional[str] = None
+    od_cylinder: Optional[str] = None
+    od_axis: Optional[str] = None
+    od_addition: Optional[str] = None
+    os_sphere: Optional[str] = None
+    os_cylinder: Optional[str] = None
+    os_axis: Optional[str] = None
+    os_addition: Optional[str] = None
+    observations: Optional[str] = None
+
 class ConsultationCreate(BaseModel):
     patient_id: str
     appointment_id: Optional[str] = None
@@ -299,6 +310,7 @@ class ConsultationCreate(BaseModel):
     va_pinhole_od: Optional[str] = None
     va_pinhole_oi: Optional[str] = None
     visual_acuity_method: Optional[str] = None
+    refractions: Optional[List[Refraction]] = None
 
 class ConsultationUpdate(BaseModel):
     consultation_type: Optional[str] = None
@@ -339,6 +351,7 @@ class ConsultationUpdate(BaseModel):
     va_pinhole_od: Optional[str] = None
     va_pinhole_oi: Optional[str] = None
     visual_acuity_method: Optional[str] = None
+    refractions: Optional[List[Refraction]] = None
 
 class SupplierCreate(BaseModel):
     name: str

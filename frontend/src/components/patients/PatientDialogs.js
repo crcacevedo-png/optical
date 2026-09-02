@@ -91,7 +91,7 @@ export function PatientFormFields({ form, setForm, testIdPrefix = 'patient-', re
 // ═══════════════════════════════════════════════════════════════════
 // Eyeglass Rx Dialog
 // ═══════════════════════════════════════════════════════════════════
-export function EyeglassRxDialog({ open, onOpenChange, form, setForm, onSubmit, testIdPrefix = 'p-' }) {
+export function EyeglassRxDialog({ open, onOpenChange, form, setForm, onSubmit, testIdPrefix = 'p-', refractions = [] }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -99,6 +99,21 @@ export function EyeglassRxDialog({ open, onOpenChange, form, setForm, onSubmit, 
           <DialogTitle className="flex items-center gap-2"><Glasses className="w-5 h-5 text-blue-600" /> Receta de Anteojos</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          {Array.isArray(refractions) && refractions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 border border-slate-200 p-2">
+              <span className="text-xs text-slate-500">Autorellenar desde refraccion:</span>
+              {refractions.map((r, i) => (
+                <Button key={i} type="button" size="sm" variant="outline" className="h-7 text-xs"
+                  onClick={() => setForm(p => ({ ...p,
+                    od_sphere: r.od_sphere || '', od_cylinder: r.od_cylinder || '', od_axis: r.od_axis || '', od_addition: r.od_addition || '',
+                    oi_sphere: r.os_sphere || '', oi_cylinder: r.os_cylinder || '', oi_axis: r.os_axis || '', oi_addition: r.os_addition || '',
+                  }))}
+                  data-testid={`${testIdPrefix}load-refraction-${i}`}>
+                  Refraccion {i + 1}
+                </Button>
+              ))}
+            </div>
+          )}
           <div className="space-y-3">
             {[
               { side: 'od', title: 'OJO DERECHO (OD)', bg: 'bg-blue-50', txt: 'text-blue-700' },
@@ -158,7 +173,7 @@ const CONTACT_FIELDS = [
   { k: 'addition', l: 'Adicion' }, { k: 'dia', l: 'Diametro' }, { k: 'bc', l: 'Curva Base' },
 ];
 
-export function ContactRxDialog({ open, onOpenChange, form, setForm, onSubmit }) {
+export function ContactRxDialog({ open, onOpenChange, form, setForm, onSubmit, refractions = [] }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -166,6 +181,21 @@ export function ContactRxDialog({ open, onOpenChange, form, setForm, onSubmit })
           <DialogTitle className="flex items-center gap-2"><Eye className="w-5 h-5 text-teal-600" /> Receta de Lentes de Contacto</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          {Array.isArray(refractions) && refractions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 border border-slate-200 p-2">
+              <span className="text-xs text-slate-500">Autorellenar desde refraccion:</span>
+              {refractions.map((r, i) => (
+                <Button key={i} type="button" size="sm" variant="outline" className="h-7 text-xs"
+                  onClick={() => setForm(p => ({ ...p,
+                    od_power: r.od_sphere || '', od_cylinder: r.od_cylinder || '', od_axis: r.od_axis || '', od_addition: r.od_addition || '',
+                    oi_power: r.os_sphere || '', oi_cylinder: r.os_cylinder || '', oi_axis: r.os_axis || '', oi_addition: r.os_addition || '',
+                  }))}
+                  data-testid={`load-contact-refraction-${i}`}>
+                  Refraccion {i + 1}
+                </Button>
+              ))}
+            </div>
+          )}
           <div className="space-y-3">
             {[
               { side: 'od', title: 'OJO DERECHO (OD)', bg: 'bg-blue-50', txt: 'text-blue-700' },

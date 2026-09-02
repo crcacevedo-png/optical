@@ -30,6 +30,11 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Backend `GET /api/prescriptions/contact/replacement-reminders?days_ahead=5`: calcula el vencimiento desde la fecha de la receta segun el tipo de reemplazo (Diario=30, Quincenal=15, Mensual=30, Trimestral=90, Anual=365 dias). Deduplica por paciente (receta mas reciente), incluye vencidas + por vencer dentro de la ventana, y arma mensaje + enlace wa.me (con prefijo 502 si aplica). Envio manual (semi-automatico).
 - Frontend `AgendaPage.js`: boton "Reposicion de lentes" con contador y modal que lista pacientes (vencidas en rojo, por vencer en cian) con boton "Enviar" por WhatsApp.
 
+### Refraccion Actual en consultas + autorellenado de recetas (Jun 2026)
+- Formulario de Consulta (`ConsultationsPage.js`): tras "Hallazgos" se agrego el area "Refraccion Actual" repetible (Agregar/Quitar). Cada refraccion tiene OD (azul) y OS (verde) con esfera/cilindro/eje/adicion + Observaciones. Se guarda como array `refractions` en la consulta.
+- Backend `models.py`: clase `Refraction` + campo `refractions: Optional[List[Refraction]]` en ConsultationCreate y ConsultationUpdate. `routes/consultations.py` guarda/actualiza/devuelve `refractions`.
+- Autorellenado: desde el detalle de la consulta, botones "Receta Anteojos" y "Receta Lentes de Contacto" abren el dialogo prellenado con refractions[0]. Con mas de una refraccion, `EyeglassRxDialog`/`ContactRxDialog` muestran botones "Refraccion N" (opcion B del usuario) para elegir cual cargar. Mapeo os_*->oi_* y esfera->power (contacto). Campos no aplicables (DP en anteojos; Diametro y Curva Base en contacto) quedan en blanco. Verificado E2E (iteration_4, 100%).
+
 
 ### Agenda - Proxima cita al terminar consulta + Recordatorios WhatsApp (Feb 2026)
 - **Backend** `routes/appointments.py`: nuevo `GET /api/appointments/reminders?days_ahead=1` retorna las citas del dia objetivo con `patient_name`, `patient_phone`, `reminder_message` y `whatsapp_url` (link wa.me con mensaje pre-armado URL-encoded). Anade prefijo 502 automatico a telefonos de 8 digitos (Guatemala). Excluye status cancelada/completada/no_asistio. Multi-tenant por `company_id`. Rechaza superadmin (403) y `days_ahead` fuera de [0,30] (400).
