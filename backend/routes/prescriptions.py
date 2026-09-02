@@ -264,14 +264,18 @@ async def get_eyeglass_prescription_pdf(rx_id: str, user: dict = Depends(get_cur
         c.drawString(xp[i], y, hdr)
     y -= 0.28*inch
     c.setFont(font, 9)
+    c.setFillColor(colors.HexColor("#1D4ED8"))
     c.drawString(xp[0], y, "OD")
+    c.setFillColor(colors.black)
     c.drawString(xp[1], y, str(rx.get("od_sphere") or "-"))
     c.drawString(xp[2], y, str(rx.get("od_cylinder") or "-"))
     c.drawString(xp[3], y, (str(rx.get("od_axis")) + "\u00b0") if rx.get("od_axis") else "-")
     c.drawString(xp[4], y, str(rx.get("od_addition") or "-"))
     c.drawString(xp[5], y, str(rx.get("od_dp") or "-"))
     y -= 0.28*inch
+    c.setFillColor(colors.HexColor("#15803D"))
     c.drawString(xp[0], y, "OS")
+    c.setFillColor(colors.black)
     c.drawString(xp[1], y, str(rx.get("oi_sphere") or "-"))
     c.drawString(xp[2], y, str(rx.get("oi_cylinder") or "-"))
     c.drawString(xp[3], y, (str(rx.get("oi_axis")) + "\u00b0") if rx.get("oi_axis") else "-")
@@ -364,13 +368,15 @@ async def get_contact_lens_prescription_pdf(rx_id: str, user: dict = Depends(get
     c.rect(0.3*inch, y - 0.65*inch, w - 0.6*inch, 0.85*inch, fill=True, stroke=False)
     c.setFillColor(colors.black)
     c.setFont(f"{font}-Bold" if font != "Courier" else font, 7)
-    headers = ["", "ESF", "CIL", "EJE", "ADD", "DIA", "B.C."]
+    headers = ["", "ESF", "CIL", "EJE", "ADD", "DIA", "C.B."]
     xp = [0.4*inch, 1*inch, 1.6*inch, 2.2*inch, 2.8*inch, 3.5*inch, 4.2*inch]
     for i, hdr in enumerate(headers):
         c.drawString(xp[i], y, hdr)
     y -= 0.28*inch
     c.setFont(font, 8)
+    c.setFillColor(colors.HexColor("#1D4ED8"))
     c.drawString(xp[0], y, "OD")
+    c.setFillColor(colors.black)
     c.drawString(xp[1], y, str(rx.get("od_power") or "-"))
     c.drawString(xp[2], y, str(rx.get("od_cylinder") or "-"))
     c.drawString(xp[3], y, str(rx.get("od_axis") or "-"))
@@ -378,7 +384,9 @@ async def get_contact_lens_prescription_pdf(rx_id: str, user: dict = Depends(get
     c.drawString(xp[5], y, str(rx.get("od_dia") or "-"))
     c.drawString(xp[6], y, str(rx.get("od_bc") or "-"))
     y -= 0.28*inch
+    c.setFillColor(colors.HexColor("#15803D"))
     c.drawString(xp[0], y, "OS")
+    c.setFillColor(colors.black)
     c.drawString(xp[1], y, str(rx.get("oi_power") or "-"))
     c.drawString(xp[2], y, str(rx.get("oi_cylinder") or "-"))
     c.drawString(xp[3], y, str(rx.get("oi_axis") or "-"))

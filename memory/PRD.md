@@ -15,6 +15,11 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Las claves internas de campo en MongoDB (`oi_sphere`, `va_*_oi`, `side:'oi'`, data-testids) se conservan intactas: sin migracion de datos.
 - Fix colateral (linter ObjectId): endpoints de listado en `prescriptions.py`, `jornada_ops.py`, `support_tickets.py` ahora serializan explicitamente con `serialize_doc` en el patron reconocido (bucle o comprension en el return).
 
+### Recetas lentes de contacto: orden completo + color OD/OS en PDF (Jun 2026)
+- Tabla resumen de lentes de contacto muestra ahora los 6 valores en orden esfera/cilindro/eje/adicion/diametro/curva base (antes solo Esf/Cil/Eje).
+- Mensaje de WhatsApp de lentes de contacto reordenado al mismo formato completo (antes Poder/BC/DIA incompleto).
+- PDF de recetas (`prescriptions.py`): etiqueta OD en azul (#1D4ED8) y OS en verde (#15803D) en anteojos y lentes de contacto; header de contacto "B.C." -> "C.B.". Orden de columnas de contacto ya era ESF/CIL/EJE/ADD/DIA/CB.
+
 
 ### Agenda - Proxima cita al terminar consulta + Recordatorios WhatsApp (Feb 2026)
 - **Backend** `routes/appointments.py`: nuevo `GET /api/appointments/reminders?days_ahead=1` retorna las citas del dia objetivo con `patient_name`, `patient_phone`, `reminder_message` y `whatsapp_url` (link wa.me con mensaje pre-armado URL-encoded). Anade prefijo 502 automatico a telefonos de 8 digitos (Guatemala). Excluye status cancelada/completada/no_asistio. Multi-tenant por `company_id`. Rechaza superadmin (403) y `days_ahead` fuera de [0,30] (400).

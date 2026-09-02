@@ -31,8 +31,8 @@ const buildWhatsAppMessage = (type, rx) => {
     return `Hola ${name}, adjunto tu receta de anteojos del ${date}:\n\n  OD (derecho): ${od}\n  OS (izquierdo): ${oi}${add}${lens}\n\nGracias por confiar en ${OPTICA_NAME}.`;
   }
   if (type === 'contact') {
-    const od = `Poder ${rx.od_power ?? '-'} · BC ${rx.od_bc ?? '-'} · DIA ${rx.od_dia ?? '-'}`;
-    const oi = `Poder ${rx.oi_power ?? '-'} · BC ${rx.oi_bc ?? '-'} · DIA ${rx.oi_dia ?? '-'}`;
+    const od = `Esf ${rx.od_power ?? '-'} · Cil ${rx.od_cylinder ?? '-'} · Eje ${rx.od_axis ?? '-'} · Add ${rx.od_addition ?? '-'} · Diam ${rx.od_dia ?? '-'} · CB ${rx.od_bc ?? '-'}`;
+    const oi = `Esf ${rx.oi_power ?? '-'} · Cil ${rx.oi_cylinder ?? '-'} · Eje ${rx.oi_axis ?? '-'} · Add ${rx.oi_addition ?? '-'} · Diam ${rx.oi_dia ?? '-'} · CB ${rx.oi_bc ?? '-'}`;
     const brand = rx.brand ? `\nMarca: ${rx.brand}` : '';
     const repl = rx.replacement ? `\nReemplazo: ${rx.replacement}` : '';
     return `Hola ${name}, adjunto tu receta de lentes de contacto del ${date}:\n\n  OD: ${od}\n  OS: ${oi}${brand}${repl}\n\nGracias por confiar en ${OPTICA_NAME}.`;
@@ -555,8 +555,8 @@ export default function PrescriptionsPage() {
                   <TableRow className="data-table-header">
                     <TableHead>Fecha</TableHead>
                     <TableHead>Paciente</TableHead>
-                    <TableHead>OD (Esf/Cil/Eje)</TableHead>
-                    <TableHead>OS (Esf/Cil/Eje)</TableHead>
+                    <TableHead>OD (Esf/Cil/Eje/Add/Diam/CB)</TableHead>
+                    <TableHead>OS (Esf/Cil/Eje/Add/Diam/CB)</TableHead>
                     <TableHead>Marca</TableHead>
                     <TableHead>Reemplazo</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
@@ -567,8 +567,8 @@ export default function PrescriptionsPage() {
                     <TableRow key={rx._id} className="data-table-row">
                       <TableCell>{rx.created_at?.slice(0, 10)}</TableCell>
                       <TableCell className="font-medium">{rx.patient_name || 'Paciente'}</TableCell>
-                      <TableCell className="text-sm">{rx.od_power || '-'} / {rx.od_cylinder || '-'} x {rx.od_axis || '-'}</TableCell>
-                      <TableCell className="text-sm">{rx.oi_power || '-'} / {rx.oi_cylinder || '-'} x {rx.oi_axis || '-'}</TableCell>
+                      <TableCell className="text-sm">{rx.od_power || '-'} / {rx.od_cylinder || '-'} x {rx.od_axis || '-'} · Add {rx.od_addition || '-'} · Diam {rx.od_dia || '-'} · CB {rx.od_bc || '-'}</TableCell>
+                      <TableCell className="text-sm">{rx.oi_power || '-'} / {rx.oi_cylinder || '-'} x {rx.oi_axis || '-'} · Add {rx.oi_addition || '-'} · Diam {rx.oi_dia || '-'} · CB {rx.oi_bc || '-'}</TableCell>
                       <TableCell>{rx.brand || '-'}</TableCell>
                       <TableCell>{rx.replacement || '-'}</TableCell>
                       <TableCell className="text-right space-x-1">
