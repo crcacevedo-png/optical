@@ -137,7 +137,7 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
     rx_eye = await db.eyeglass_prescriptions.find({"company_id": company_id}).to_list(None)
     _write_sheet(wb, "Recetas_Oftalmicas", [
         "ID", "Paciente", "Profesional", "OD Esfera", "OD Cilindro", "OD Eje", "OD DP",
-        "OI Esfera", "OI Cilindro", "OI Eje", "OI DP", "Tipo Lente", "Observaciones", "Creada"
+        "OS Esfera", "OS Cilindro", "OS Eje", "OS DP", "Tipo Lente", "Observaciones", "Creada"
     ], [[r.get("_id"), patient_map.get(str(r.get("patient_id")), ""),
          r.get("professional_name"), r.get("od_sphere"), r.get("od_cylinder"),
          r.get("od_axis"), r.get("od_dp"), r.get("oi_sphere"), r.get("oi_cylinder"),
@@ -149,7 +149,7 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
     _write_sheet(wb, "Recetas_Contacto", [
         "ID", "Paciente", "Profesional", "Marca", "Tipo",
         "OD Esfera", "OD Cilindro", "OD Eje", "OD BC", "OD DIA",
-        "OI Esfera", "OI Cilindro", "OI Eje", "OI BC", "OI DIA",
+        "OS Esfera", "OS Cilindro", "OS Eje", "OS BC", "OS DIA",
         "Reemplazo", "Observaciones", "Creada"
     ], [[r.get("_id"), patient_map.get(str(r.get("patient_id")), ""),
          r.get("professional_name"), r.get("brand"), r.get("lens_type"),

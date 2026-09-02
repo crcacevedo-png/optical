@@ -205,11 +205,12 @@ async def list_eyeglass_prescriptions(user: dict = Depends(get_current_user), pa
         ).to_list(len(patient_ids))
         patient_map = {str(p["_id"]): p for p in patients}
         for rx in prescriptions:
+            serialize_doc(rx)
             p = patient_map.get(rx.get("patient_id")) or {}
             rx["patient_name"] = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
             rx["patient_phone"] = p.get("phone", "") or ""
             rx["patient_whatsapp"] = p.get("whatsapp", "") or ""
-    return prescriptions
+    return [serialize_doc(rx) for rx in prescriptions]
 
 @router.post("/eyeglass")
 async def create_eyeglass_prescription(data: EyeglassPrescriptionCreate, user: dict = Depends(get_current_user)):
@@ -270,7 +271,7 @@ async def get_eyeglass_prescription_pdf(rx_id: str, user: dict = Depends(get_cur
     c.drawString(xp[4], y, str(rx.get("od_addition") or "-"))
     c.drawString(xp[5], y, str(rx.get("od_dp") or "-"))
     y -= 0.28*inch
-    c.drawString(xp[0], y, "OI")
+    c.drawString(xp[0], y, "OS")
     c.drawString(xp[1], y, str(rx.get("oi_sphere") or "-"))
     c.drawString(xp[2], y, str(rx.get("oi_cylinder") or "-"))
     c.drawString(xp[3], y, (str(rx.get("oi_axis")) + "\u00b0") if rx.get("oi_axis") else "-")
@@ -313,11 +314,12 @@ async def list_contact_lens_prescriptions(user: dict = Depends(get_current_user)
         ).to_list(len(patient_ids))
         patient_map = {str(p["_id"]): p for p in patients}
         for rx in prescriptions:
+            serialize_doc(rx)
             p = patient_map.get(rx.get("patient_id")) or {}
             rx["patient_name"] = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
             rx["patient_phone"] = p.get("phone", "") or ""
             rx["patient_whatsapp"] = p.get("whatsapp", "") or ""
-    return prescriptions
+    return [serialize_doc(rx) for rx in prescriptions]
 
 @router.post("/contact")
 async def create_contact_lens_prescription(data: ContactLensPrescriptionCreate, user: dict = Depends(get_current_user)):
@@ -376,7 +378,7 @@ async def get_contact_lens_prescription_pdf(rx_id: str, user: dict = Depends(get
     c.drawString(xp[5], y, str(rx.get("od_dia") or "-"))
     c.drawString(xp[6], y, str(rx.get("od_bc") or "-"))
     y -= 0.28*inch
-    c.drawString(xp[0], y, "OI")
+    c.drawString(xp[0], y, "OS")
     c.drawString(xp[1], y, str(rx.get("oi_power") or "-"))
     c.drawString(xp[2], y, str(rx.get("oi_cylinder") or "-"))
     c.drawString(xp[3], y, str(rx.get("oi_axis") or "-"))
@@ -426,11 +428,12 @@ async def list_medical_prescriptions(user: dict = Depends(get_current_user), pat
         ).to_list(len(patient_ids))
         patient_map = {str(p["_id"]): p for p in patients}
         for rx in prescriptions:
+            serialize_doc(rx)
             p = patient_map.get(rx.get("patient_id")) or {}
             rx["patient_name"] = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
             rx["patient_phone"] = p.get("phone", "") or ""
             rx["patient_whatsapp"] = p.get("whatsapp", "") or ""
-    return prescriptions
+    return [serialize_doc(rx) for rx in prescriptions]
 
 @router.post("/medical")
 async def create_medical_prescription(data: MedicalPrescriptionCreate, user: dict = Depends(get_current_user)):

@@ -26,16 +26,16 @@ const buildWhatsAppMessage = (type, rx) => {
   if (type === 'eyeglass') {
     const od = fmtEye(rx.od_sphere, rx.od_cylinder, rx.od_axis);
     const oi = fmtEye(rx.oi_sphere, rx.oi_cylinder, rx.oi_axis);
-    const add = rx.od_addition || rx.oi_addition ? `\n  ADD OD: ${rx.od_addition || '-'} · OI: ${rx.oi_addition || '-'}` : '';
+    const add = rx.od_addition || rx.oi_addition ? `\n  ADD OD: ${rx.od_addition || '-'} · OS: ${rx.oi_addition || '-'}` : '';
     const lens = rx.lens_type ? `\nTipo de lente: ${rx.lens_type}` : '';
-    return `Hola ${name}, adjunto tu receta de anteojos del ${date}:\n\n  OD (derecho): ${od}\n  OI (izquierdo): ${oi}${add}${lens}\n\nGracias por confiar en ${OPTICA_NAME}.`;
+    return `Hola ${name}, adjunto tu receta de anteojos del ${date}:\n\n  OD (derecho): ${od}\n  OS (izquierdo): ${oi}${add}${lens}\n\nGracias por confiar en ${OPTICA_NAME}.`;
   }
   if (type === 'contact') {
     const od = `Poder ${rx.od_power ?? '-'} · BC ${rx.od_bc ?? '-'} · DIA ${rx.od_dia ?? '-'}`;
     const oi = `Poder ${rx.oi_power ?? '-'} · BC ${rx.oi_bc ?? '-'} · DIA ${rx.oi_dia ?? '-'}`;
     const brand = rx.brand ? `\nMarca: ${rx.brand}` : '';
     const repl = rx.replacement ? `\nReemplazo: ${rx.replacement}` : '';
-    return `Hola ${name}, adjunto tu receta de lentes de contacto del ${date}:\n\n  OD: ${od}\n  OI: ${oi}${brand}${repl}\n\nGracias por confiar en ${OPTICA_NAME}.`;
+    return `Hola ${name}, adjunto tu receta de lentes de contacto del ${date}:\n\n  OD: ${od}\n  OS: ${oi}${brand}${repl}\n\nGracias por confiar en ${OPTICA_NAME}.`;
   }
   if (type === 'medical') {
     const meds = (rx.medications || [])
@@ -313,9 +313,9 @@ export default function PrescriptionsPage() {
                       </div>
                     </div>
 
-                    {/* OI - Ojo Izquierdo */}
+                    {/* OS - Ojo Izquierdo */}
                     <div className="p-4 rounded-lg bg-green-50 border border-green-200">
-                      <h3 className="font-semibold text-green-900 mb-3">Ojo Izquierdo (OI)</h3>
+                      <h3 className="font-semibold text-green-900 mb-3">Ojo Izquierdo (OS)</h3>
                       <div className="grid grid-cols-5 gap-3">
                         <div className="space-y-1">
                           <Label className="text-xs">Esfera</Label>
@@ -378,7 +378,7 @@ export default function PrescriptionsPage() {
                     <TableHead>Fecha</TableHead>
                     <TableHead>Paciente</TableHead>
                     <TableHead>OD</TableHead>
-                    <TableHead>OI</TableHead>
+                    <TableHead>OS</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
@@ -471,9 +471,9 @@ export default function PrescriptionsPage() {
                       </div>
                     </div>
 
-                    {/* OI - Ojo Izquierdo */}
+                    {/* OS - Ojo Izquierdo */}
                     <div className="p-4 rounded-lg bg-green-50 border border-green-200">
-                      <h3 className="font-semibold text-green-900 mb-3">Ojo Izquierdo (OI)</h3>
+                      <h3 className="font-semibold text-green-900 mb-3">Ojo Izquierdo (OS)</h3>
                       <div className="grid grid-cols-6 gap-3">
                         <div className="space-y-1">
                           <Label className="text-xs">Esfera</Label>
@@ -556,7 +556,7 @@ export default function PrescriptionsPage() {
                     <TableHead>Fecha</TableHead>
                     <TableHead>Paciente</TableHead>
                     <TableHead>OD (Esf/Cil/Eje)</TableHead>
-                    <TableHead>OI (Esf/Cil/Eje)</TableHead>
+                    <TableHead>OS (Esf/Cil/Eje)</TableHead>
                     <TableHead>Marca</TableHead>
                     <TableHead>Reemplazo</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>

@@ -9,6 +9,13 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Nomenclatura ocular OD/OS (Jun 2026)
+- Estandarizada la etiqueta del ojo izquierdo a **OS** (Oculus Sinister) en TODO lo visible; OD (ojo derecho) sin cambios. Ya no se usa "OI".
+- Cambios de etiqueta (no de datos): formularios de recetas y consultas, tablas/listados, headings "Ojo Izquierdo (OS)", PDFs de recetas (`prescriptions.py`), exportaciones Excel/CSV (`data_export.py`), mensajes de WhatsApp (`PrescriptionsPage.js`), guia PDF (`user_guide.py`), y POS de jornada (`JornadaPOSTab.js`).
+- Las claves internas de campo en MongoDB (`oi_sphere`, `va_*_oi`, `side:'oi'`, data-testids) se conservan intactas: sin migracion de datos.
+- Fix colateral (linter ObjectId): endpoints de listado en `prescriptions.py`, `jornada_ops.py`, `support_tickets.py` ahora serializan explicitamente con `serialize_doc` en el patron reconocido (bucle o comprension en el return).
+
+
 ### Agenda - Proxima cita al terminar consulta + Recordatorios WhatsApp (Feb 2026)
 - **Backend** `routes/appointments.py`: nuevo `GET /api/appointments/reminders?days_ahead=1` retorna las citas del dia objetivo con `patient_name`, `patient_phone`, `reminder_message` y `whatsapp_url` (link wa.me con mensaje pre-armado URL-encoded). Anade prefijo 502 automatico a telefonos de 8 digitos (Guatemala). Excluye status cancelada/completada/no_asistio. Multi-tenant por `company_id`. Rechaza superadmin (403) y `days_ahead` fuera de [0,30] (400).
 - **Frontend** `ConsultationsPage.js`: al guardar consulta NUEVA (no edicion), abre modal "Agendar proxima cita" con fecha default a +6 meses, botones rapidos (1 semana / 1 mes / 3 meses / 6 meses / 1 ano) y POST a `/api/appointments` con patient_id + professional_id de la consulta. Opcion "Ahora no" para saltar.

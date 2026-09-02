@@ -605,7 +605,7 @@ def _doctor_section(story, styles):
     story.append(_bullets([
         "<b>Motivo</b>: lo que trae al paciente (dolor, borroso, control anual).",
         "<b>Anamnesis</b>: historia clinica breve, medicamentos, alergias.",
-        "<b>Refraccion</b>: OD/OI esfera, cilindro, eje, adicion, DP, altura.",
+        "<b>Refraccion</b>: OD/OS esfera, cilindro, eje, adicion, DP, altura.",
         "<b>Examenes fisicos</b>: presion intraocular, fondo de ojo, motilidad, campimetria.",
         "<b>Diagnostico</b> con CIE-10 (autocompleta al escribir).",
         "<b>Plan terapeutico</b>: receta, controles, referencias.",

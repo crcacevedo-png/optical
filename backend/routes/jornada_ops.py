@@ -186,8 +186,8 @@ async def get_cash_state(jid: str, user: dict = Depends(get_current_user)):
     )
     if not reg:
         return {"register": None, "totals": None}
+    serialize_doc(reg)
     totals = await _compute_jornada_cash_totals(joid, reg)
-    _svc(reg)
     return {"register": reg, "totals": totals}
 
 
@@ -469,7 +469,7 @@ async def list_jornada_inventory(
     items = await db.jornada_stock.find(q).sort("product_name", 1).to_list(2000)
     total_value = 0.0
     for it in items:
-        _svc(it)
+        serialize_doc(it)
         total_value += float(it.get("current_qty") or 0) * float(it.get("unit_price") or 0)
     return {"items": items, "total_units": sum(int(i.get("current_qty") or 0) for i in items), "total_value": round(total_value, 2)}
 
@@ -718,7 +718,7 @@ async def list_jornada_sales(
         docs = await db.patients.find({"_id": {"$in": pids}}, {"first_name": 1, "last_name": 1}).to_list(len(pids))
         pmap = {str(p["_id"]): f"{p.get('first_name','')} {p.get('last_name','')}".strip() for p in docs}
     for s in sales:
-        _svc(s)
+        serialize_doc(s)
         for p in (s.get("payments") or []):
             if isinstance(p.get("created_by"), ObjectId):
                 p["created_by"] = str(p["created_by"])
@@ -775,7 +775,7 @@ async def find_duplicates(
         "company_id": company_oid, "is_deleted": {"$ne": True}, "$or": or_clauses,
     }, {"first_name": 1, "last_name": 1, "phone": 1, "dpi": 1, "jornada_ids": 1}).limit(10).to_list(10)
     for m in matches:
-        _svc(m)
+        serialize_doc(m)
     return {"matches": matches}
 
 
@@ -866,7 +866,7 @@ async def list_jornada_patients(
         "email": 1, "jornada_id_first": 1, "jornada_ids": 1, "created_at": 1,
     }).sort("_id", -1).limit(limit).to_list(limit)
     for p in patients:
-        _svc(p)
+        serialize_doc(p)
         p["is_first_capture_here"] = str(p.get("jornada_id_first") or "") == str(joid)
     return {"items": patients, "count": len(patients)}
 

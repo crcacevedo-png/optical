@@ -194,7 +194,7 @@ export function ConsultationFormDialog({
                   <tr className="border-b">
                     <th className="text-left py-1 pr-2 text-xs font-semibold text-slate-500 uppercase">Medicion</th>
                     <th className="text-center py-1 px-1 text-xs font-semibold text-blue-700 uppercase">OD</th>
-                    <th className="text-center py-1 px-1 text-xs font-semibold text-green-700 uppercase">OI</th>
+                    <th className="text-center py-1 px-1 text-xs font-semibold text-green-700 uppercase">OS</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -389,7 +389,7 @@ export default function JornadaPOSTab({ jornada, reload }) {
                 <Input value={consultForm.vision_od} onChange={(e) => setConsultForm({ ...consultForm, vision_od: e.target.value })} placeholder="20/20" data-testid="jpos-consult-od" />
               </div>
               <div className="space-y-1.5">
-                <Label>Vision OI</Label>
+                <Label>Vision OS</Label>
                 <Input value={consultForm.vision_oi} onChange={(e) => setConsultForm({ ...consultForm, vision_oi: e.target.value })} placeholder="20/40" data-testid="jpos-consult-oi" />
               </div>
             </div>
@@ -424,7 +424,7 @@ export default function JornadaPOSTab({ jornada, reload }) {
             </div>
             {['od', 'oi'].map((eye) => (
               <div key={eye} className="grid grid-cols-5 gap-2 items-center">
-                <Label className="text-xs font-semibold uppercase">{eye}</Label>
+                <Label className="text-xs font-semibold uppercase">{eye === 'oi' ? 'OS' : eye}</Label>
                 <Input type="number" step="0.25" value={rxForm[`${eye}_sphere`]} onChange={(e) => setRxForm({ ...rxForm, [`${eye}_sphere`]: e.target.value })} className="text-center text-xs h-8" data-testid={`jpos-rx-${eye}-sphere`} />
                 <Input type="number" step="0.25" value={rxForm[`${eye}_cylinder`]} onChange={(e) => setRxForm({ ...rxForm, [`${eye}_cylinder`]: e.target.value })} className="text-center text-xs h-8" />
                 <Input type="number" step="1" value={rxForm[`${eye}_axis`]} onChange={(e) => setRxForm({ ...rxForm, [`${eye}_axis`]: e.target.value })} className="text-center text-xs h-8" />

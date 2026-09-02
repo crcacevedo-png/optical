@@ -180,6 +180,7 @@ async def list_tickets(
 
     tickets = await db.support_tickets.find(query).sort("_id", -1).limit(min(limit, 500)).to_list(min(limit, 500))
     for t in tickets:
+        serialize_doc(t)
         _serialize_ticket(t)
         # Contadores utiles en el listing
         msgs = t.get("messages", []) or []
@@ -203,6 +204,7 @@ async def get_ticket(ticket_id: str, user: dict = Depends(get_current_user)):
     # Ownership: creador o superadmin
     if user["role"] != "superadmin" and str(ticket.get("created_by")) != user["_id"]:
         raise HTTPException(status_code=403, detail="Acceso denegado")
+    serialize_doc(ticket)
     _serialize_ticket(ticket)
     ticket["unread"] = _compute_unread(ticket, user)
     return ticket

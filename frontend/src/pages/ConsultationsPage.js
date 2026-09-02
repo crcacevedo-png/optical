@@ -580,7 +580,7 @@ export default function ConsultationsPage() {
                     <tr className="border-b">
                       <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500 uppercase w-1/2">Agudeza Visual</th>
                       <th className="text-center py-2 px-2 text-xs font-semibold text-blue-700 uppercase w-1/4">OD</th>
-                      <th className="text-center py-2 px-2 text-xs font-semibold text-green-700 uppercase w-1/4">OI</th>
+                      <th className="text-center py-2 px-2 text-xs font-semibold text-green-700 uppercase w-1/4">OS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -827,7 +827,7 @@ export default function ConsultationsPage() {
                       <tr className="border-b">
                         <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500 uppercase">Medicion</th>
                         <th className="text-center py-2 px-4 text-xs font-semibold text-blue-700 uppercase">OD</th>
-                        <th className="text-center py-2 px-4 text-xs font-semibold text-green-700 uppercase">OI</th>
+                        <th className="text-center py-2 px-4 text-xs font-semibold text-green-700 uppercase">OS</th>
                       </tr>
                     </thead>
                     <tbody>

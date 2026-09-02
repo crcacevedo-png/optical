@@ -560,7 +560,7 @@ export default function PatientsPage() {
                               <div className="text-center">{rx.od_addition || '-'}</div>
                               <div className="text-center">{rx.od_dp || '-'}</div>
                               
-                              <div className="font-medium">OI</div>
+                              <div className="font-medium">OS</div>
                               <div className="text-center">{rx.oi_sphere || '-'}</div>
                               <div className="text-center">{rx.oi_cylinder || '-'}</div>
                               <div className="text-center">{rx.oi_axis || '-'}</div>

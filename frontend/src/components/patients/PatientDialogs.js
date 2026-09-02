@@ -102,7 +102,7 @@ export function EyeglassRxDialog({ open, onOpenChange, form, setForm, onSubmit, 
           <div className="space-y-3">
             {[
               { side: 'od', title: 'OJO DERECHO (OD)', bg: 'bg-blue-50', txt: 'text-blue-700' },
-              { side: 'oi', title: 'OJO IZQUIERDO (OI)', bg: 'bg-green-50', txt: 'text-green-700' },
+              { side: 'oi', title: 'OJO IZQUIERDO (OS)', bg: 'bg-green-50', txt: 'text-green-700' },
             ].map(({ side, title, bg, txt }) => (
               <div key={side} className={`p-3 ${bg} rounded-lg`}>
                 <p className={`text-xs font-bold ${txt} mb-2`}>{title}</p>
@@ -169,7 +169,7 @@ export function ContactRxDialog({ open, onOpenChange, form, setForm, onSubmit })
           <div className="space-y-3">
             {[
               { side: 'od', title: 'OJO DERECHO (OD)', bg: 'bg-blue-50', txt: 'text-blue-700' },
-              { side: 'oi', title: 'OJO IZQUIERDO (OI)', bg: 'bg-green-50', txt: 'text-green-700' },
+              { side: 'oi', title: 'OJO IZQUIERDO (OS)', bg: 'bg-green-50', txt: 'text-green-700' },
             ].map(({ side, title, bg, txt }) => (
               <div key={side} className={`p-3 ${bg} rounded-lg`}>
                 <p className={`text-xs font-bold ${txt} mb-2`}>{title}</p>
