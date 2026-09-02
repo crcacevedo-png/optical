@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from pydantic import BaseModel
 import io
+import asyncio
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -98,7 +99,7 @@ async def get_current_register(
     if not reg:
         return {"register": None}
     _serialize(reg)
-    return {"register": reg}
+    return {"register": serialize_doc(reg)}
 
 
 @router.get("/current/preview")
@@ -155,7 +156,7 @@ async def get_current_preview(
         "sales_in_window": totals["sales_in_window"],
         "is_preview": True,
     })
-    return reg
+    return serialize_doc(reg)
 
 
 @router.post("/open")
@@ -323,7 +324,7 @@ async def close_register(data: CloseCashRegister, request: Request, user: dict =
 
     reg.update(update)
     _serialize(reg)
-    return {"message": "Caja cerrada", "register": reg}
+    return {"message": "Caja cerrada", "register": serialize_doc(reg)}
 
 
 @router.get("")
@@ -351,7 +352,7 @@ async def list_registers(
     for r in regs:
         _serialize(r)
         r["branch_name"] = branches_map.get(str(r.get("branch_id")), "")
-    return regs
+    return [serialize_doc(r) for r in regs]
 
 
 async def _build_report(user: dict, date_from: Optional[str], date_to: Optional[str], branch_id: Optional[str]) -> dict:
@@ -474,6 +475,22 @@ async def cash_register_report_pdf(
         b = await db.branches.find_one({"_id": ObjectId(branch_id)}, {"name": 1})
         branch_name = (b or {}).get("name")
 
+    pdf_bytes = await asyncio.to_thread(
+        _render_cash_report_pdf, data, company_name, branch_name, date_from, date_to
+    )
+
+    await log_audit("CASH_REGISTER_REPORT_PDF", actor_id=user["_id"], actor_email=user.get("email"),
+                    metadata={"date_from": date_from, "date_to": date_to, "count": data["count"]})
+
+    filename = f"reporte_cierres_{date_from or 'todo'}_{date_to or 'hoy'}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes), media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+def _render_cash_report_pdf(data: dict, company_name: str, branch_name: Optional[str],
+                            date_from: Optional[str], date_to: Optional[str]) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=letter,
@@ -564,16 +581,7 @@ async def cash_register_report_pdf(
         story.append(tbl)
 
     doc.build(story)
-    buf.seek(0)
-
-    await log_audit("CASH_REGISTER_REPORT_PDF", actor_id=user["_id"], actor_email=user.get("email"),
-                    metadata={"date_from": date_from, "date_to": date_to, "count": data["count"]})
-
-    filename = f"reporte_cierres_{date_from or 'todo'}_{date_to or 'hoy'}.pdf"
-    return StreamingResponse(
-        buf, media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-    )
+    return buf.getvalue()
 
 
 @router.get("/{register_id}")
@@ -600,4 +608,4 @@ async def get_register(register_id: str, user: dict = Depends(get_current_user))
                 pass
         for s in reg["sales_in_window"]:
             s["patient_name"] = pmap.get(s.get("patient_id"), "Consumidor final")
-    return reg
+    return serialize_doc(reg)

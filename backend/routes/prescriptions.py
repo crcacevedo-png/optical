@@ -5,6 +5,7 @@ from datetime import datetime, timezone, date, timedelta
 from urllib.parse import quote
 from typing import Optional
 import io
+import asyncio
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from reportlab.lib import colors
@@ -231,13 +232,7 @@ async def create_eyeglass_prescription(data: EyeglassPrescriptionCreate, user: d
     result = await db.eyeglass_prescriptions.insert_one(rx_doc)
     return {"_id": str(result.inserted_id), "message": "Receta creada"}
 
-@router.get("/eyeglass/{rx_id}/pdf")
-async def get_eyeglass_prescription_pdf(rx_id: str, user: dict = Depends(get_current_user)):
-    rx = await db.eyeglass_prescriptions.find_one({"_id": ObjectId(rx_id)})
-    if not rx or str(rx["company_id"]) != user["company_id"]:
-        raise HTTPException(status_code=404, detail="Receta no encontrada")
-    patient = await db.patients.find_one({"_id": rx["patient_id"]})
-    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
+def _render_eyeglass_pdf(rx: dict, patient: Optional[dict], company: Optional[dict]) -> bytes:
     style = get_rx_style(company, "optica")
     logo_path = get_logo_path(company)
     font = style["font"]
@@ -296,8 +291,18 @@ async def get_eyeglass_prescription_pdf(rx_id: str, user: dict = Depends(get_cur
         c.drawString(1.6*inch, y, rx["observations"][:60])
     draw_rx_footer(c, w, style, rx.get("professional_name", ""))
     c.save()
-    buffer.seek(0)
-    return StreamingResponse(buffer, media_type="application/pdf",
+    return buffer.getvalue()
+
+
+@router.get("/eyeglass/{rx_id}/pdf")
+async def get_eyeglass_prescription_pdf(rx_id: str, user: dict = Depends(get_current_user)):
+    rx = await db.eyeglass_prescriptions.find_one({"_id": ObjectId(rx_id)})
+    if not rx or str(rx["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Receta no encontrada")
+    patient = await db.patients.find_one({"_id": rx["patient_id"]})
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
+    pdf_bytes = await asyncio.to_thread(_render_eyeglass_pdf, rx, patient, company)
+    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
                            headers={"Content-Disposition": f"attachment; filename=receta_anteojos_{rx_id}.pdf"})
 
 # ==================== CONTACT LENS ====================
@@ -433,13 +438,7 @@ async def create_contact_lens_prescription(data: ContactLensPrescriptionCreate, 
     result = await db.contact_lens_prescriptions.insert_one(rx_doc)
     return {"_id": str(result.inserted_id), "message": "Receta de lentes de contacto creada"}
 
-@router.get("/contact/{rx_id}/pdf")
-async def get_contact_lens_prescription_pdf(rx_id: str, user: dict = Depends(get_current_user)):
-    rx = await db.contact_lens_prescriptions.find_one({"_id": ObjectId(rx_id)})
-    if not rx or str(rx["company_id"]) != user["company_id"]:
-        raise HTTPException(status_code=404, detail="Receta no encontrada")
-    patient = await db.patients.find_one({"_id": rx["patient_id"]})
-    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
+def _render_contact_pdf(rx: dict, patient: Optional[dict], company: Optional[dict]) -> bytes:
     style = get_rx_style(company, "optica")
     logo_path = get_logo_path(company)
     font = style["font"]
@@ -502,8 +501,18 @@ async def get_contact_lens_prescription_pdf(rx_id: str, user: dict = Depends(get
         c.drawString(0.9*inch, y, rx["observations"][:55])
     draw_rx_footer(c, w, style, rx.get("professional_name", ""))
     c.save()
-    buffer.seek(0)
-    return StreamingResponse(buffer, media_type="application/pdf",
+    return buffer.getvalue()
+
+
+@router.get("/contact/{rx_id}/pdf")
+async def get_contact_lens_prescription_pdf(rx_id: str, user: dict = Depends(get_current_user)):
+    rx = await db.contact_lens_prescriptions.find_one({"_id": ObjectId(rx_id)})
+    if not rx or str(rx["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Receta no encontrada")
+    patient = await db.patients.find_one({"_id": rx["patient_id"]})
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
+    pdf_bytes = await asyncio.to_thread(_render_contact_pdf, rx, patient, company)
+    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
                            headers={"Content-Disposition": f"attachment; filename=receta_contacto_{rx_id}.pdf"})
 
 # ==================== MEDICAL ====================
@@ -546,13 +555,7 @@ async def create_medical_prescription(data: MedicalPrescriptionCreate, user: dic
     result = await db.medical_prescriptions.insert_one(rx_doc)
     return {"_id": str(result.inserted_id), "message": "Receta medica creada"}
 
-@router.get("/medical/{rx_id}/pdf")
-async def get_medical_prescription_pdf(rx_id: str, user: dict = Depends(get_current_user)):
-    rx = await db.medical_prescriptions.find_one({"_id": ObjectId(rx_id)})
-    if not rx or str(rx["company_id"]) != user["company_id"]:
-        raise HTTPException(status_code=404, detail="Receta no encontrada")
-    patient = await db.patients.find_one({"_id": rx["patient_id"]})
-    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
+def _render_medical_pdf(rx: dict, patient: Optional[dict], company: Optional[dict]) -> bytes:
     style = get_rx_style(company, "medica")
     logo_path = get_logo_path(company)
     font = style["font"]
@@ -600,6 +603,16 @@ async def get_medical_prescription_pdf(rx_id: str, user: dict = Depends(get_curr
         c.drawString(0.5*inch, y, rx["instructions"][:70])
     draw_rx_footer(c, w, style, rx.get("professional_name", ""))
     c.save()
-    buffer.seek(0)
-    return StreamingResponse(buffer, media_type="application/pdf",
+    return buffer.getvalue()
+
+
+@router.get("/medical/{rx_id}/pdf")
+async def get_medical_prescription_pdf(rx_id: str, user: dict = Depends(get_current_user)):
+    rx = await db.medical_prescriptions.find_one({"_id": ObjectId(rx_id)})
+    if not rx or str(rx["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Receta no encontrada")
+    patient = await db.patients.find_one({"_id": rx["patient_id"]})
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
+    pdf_bytes = await asyncio.to_thread(_render_medical_pdf, rx, patient, company)
+    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
                            headers={"Content-Disposition": f"attachment; filename=receta_medica_{rx_id}.pdf"})

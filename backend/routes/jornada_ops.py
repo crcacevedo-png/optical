@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Literal
 from pydantic import BaseModel, Field
 import re
+import asyncio
 
 from db import db, serialize_doc
 from auth_utils import get_current_user
@@ -188,7 +189,7 @@ async def get_cash_state(jid: str, user: dict = Depends(get_current_user)):
         return {"register": None, "totals": None}
     serialize_doc(reg)
     totals = await _compute_jornada_cash_totals(joid, reg)
-    return {"register": reg, "totals": totals}
+    return {"register": serialize_doc(reg), "totals": totals}
 
 
 @router.post("/{jid}/cash/movements")
@@ -471,7 +472,7 @@ async def list_jornada_inventory(
     for it in items:
         serialize_doc(it)
         total_value += float(it.get("current_qty") or 0) * float(it.get("unit_price") or 0)
-    return {"items": items, "total_units": sum(int(i.get("current_qty") or 0) for i in items), "total_value": round(total_value, 2)}
+    return {"items": [serialize_doc(it) for it in items], "total_units": sum(int(i.get("current_qty") or 0) for i in items), "total_value": round(total_value, 2)}
 
 
 @router.post("/{jid}/inventory/adjust")
@@ -725,7 +726,7 @@ async def list_jornada_sales(
         pid = s.get("patient_id")
         s["patient_name"] = pmap.get(pid, s.get("patient_name_override") or "Consumidor final") if pid else (s.get("patient_name_override") or "Consumidor final")
     total_sold = sum(float(s.get("total") or 0) for s in sales)
-    return {"items": sales, "count": len(sales), "total_sold": round(total_sold, 2)}
+    return {"items": [serialize_doc(s) for s in sales], "count": len(sales), "total_sold": round(total_sold, 2)}
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -776,7 +777,7 @@ async def find_duplicates(
     }, {"first_name": 1, "last_name": 1, "phone": 1, "dpi": 1, "jornada_ids": 1}).limit(10).to_list(10)
     for m in matches:
         serialize_doc(m)
-    return {"matches": matches}
+    return {"matches": [serialize_doc(m) for m in matches]}
 
 
 @router.post("/{jid}/patients")
@@ -868,7 +869,7 @@ async def list_jornada_patients(
     for p in patients:
         serialize_doc(p)
         p["is_first_capture_here"] = str(p.get("jornada_id_first") or "") == str(joid)
-    return {"items": patients, "count": len(patients)}
+    return {"items": [serialize_doc(p) for p in patients], "count": len(patients)}
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -983,9 +984,6 @@ async def sale_receipt_pdf(
 ):
     """Ticket PDF 80mm para impresora termica o compartir por WhatsApp."""
     from fastapi.responses import StreamingResponse
-    from reportlab.lib import colors
-    from reportlab.lib.units import mm
-    from reportlab.pdfgen import canvas
     import io as _io
 
     j = await _get_jornada_active_or_400(jid, user["company_id"], {"activa", "en_cierre", "cerrada"})
@@ -1008,6 +1006,19 @@ async def sale_receipt_pdf(
             patient_name = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
     elif sale.get("patient_name_override"):
         patient_name = sale["patient_name_override"]
+
+    pdf_bytes = await asyncio.to_thread(_render_receipt_pdf, sale, company, j, patient_name)
+    return StreamingResponse(
+        _io.BytesIO(pdf_bytes), media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename=ticket_{sale_id}.pdf"},
+    )
+
+
+def _render_receipt_pdf(sale: dict, company: dict, j: dict, patient_name: str) -> bytes:
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+    import io as _io
 
     width = 80 * mm
     lines_items = len(sale.get("items") or [])
@@ -1103,8 +1114,4 @@ async def sale_receipt_pdf(
 
     c.showPage()
     c.save()
-    buf.seek(0)
-    return StreamingResponse(
-        buf, media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename=ticket_{sale_id}.pdf"},
-    )
+    return buf.getvalue()

@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone
 import io
+import asyncio
 
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import LETTER
@@ -205,7 +206,7 @@ def generate_security_manifesto_pdf() -> io.BytesIO:
 @router.get("/manifesto.pdf")
 async def download_security_manifesto():
     """Endpoint publico para descargar el manifiesto de seguridad en PDF."""
-    buffer = generate_security_manifesto_pdf()
+    buffer = await asyncio.to_thread(generate_security_manifesto_pdf)
     return StreamingResponse(
         buffer,
         media_type="application/pdf",

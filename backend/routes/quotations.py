@@ -4,6 +4,7 @@ from bson import ObjectId
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import io
+import asyncio
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
@@ -131,7 +132,7 @@ async def list_quotations(
             {"$set": {"status": "vencida"}},
         )
 
-    return quotations
+    return [serialize_doc(q) for q in quotations]
 
 @router.post("")
 async def create_quotation(data: QuotationCreate, user: dict = Depends(get_current_user)):
@@ -181,7 +182,7 @@ async def get_quotation(quotation_id: str, user: dict = Depends(get_current_user
             q["patient_phone"] = patient.get("phone", "")
             q["patient_email"] = patient.get("email", "")
             q["patient_whatsapp"] = patient.get("whatsapp", "")
-    return q
+    return serialize_doc(q)
 
 @router.put("/{quotation_id}/status")
 async def update_quotation_status(quotation_id: str, data: QuotationStatusUpdate, user: dict = Depends(get_current_user)):
@@ -255,7 +256,12 @@ async def convert_quotation_to_sale(quotation_id: str, payment_method: str = "ef
     return {"_id": str(sale_result.inserted_id), "message": "Cotizacion convertida a venta exitosamente"}
 
 async def _build_quotation_pdf_bytes(q: dict, patient: Optional[dict], company: Optional[dict]) -> bytes:
-    """Construye el PDF de una cotizacion y retorna los bytes. Reusable entre GET /pdf y send-email."""
+    """Construye el PDF de una cotizacion y retorna los bytes. La generacion
+    (CPU-bound reportlab) corre en un hilo para no bloquear el event loop."""
+    return await asyncio.to_thread(_render_quotation_pdf, q, patient, company)
+
+
+def _render_quotation_pdf(q: dict, patient: Optional[dict], company: Optional[dict]) -> bytes:
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter

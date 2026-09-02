@@ -34,16 +34,23 @@ async def list_consultations(
         query["consultation_date"] = {"$gte": date_from}
     
     consultations = await db.optical_consultations.find(query).sort("created_at", -1).limit(limit).to_list(limit)
+    # Batch fetch de pacientes y profesionales (elimina N+1)
+    patient_ids = {c["patient_id"] for c in consultations if c.get("patient_id")}
+    prof_ids = {c["professional_user_id"] for c in consultations if c.get("professional_user_id")}
+    patient_map = {}
+    if patient_ids:
+        docs = await db.patients.find({"_id": {"$in": list(patient_ids)}}, {"first_name": 1, "last_name": 1}).to_list(len(patient_ids))
+        patient_map = {str(p["_id"]): f"{p.get('first_name','')} {p.get('last_name','')}".strip() for p in docs}
+    prof_map = {}
+    if prof_ids:
+        docs = await db.users.find({"_id": {"$in": list(prof_ids)}}, {"name": 1}).to_list(len(prof_ids))
+        prof_map = {str(u["_id"]): u.get("name", "") for u in docs}
     for c in consultations:
         serialize_doc(c)
         if c.get("patient_id"):
-            patient = await db.patients.find_one({"_id": ObjectId(c["patient_id"])}, {"first_name": 1, "last_name": 1})
-            if patient:
-                c["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
+            c["patient_name"] = patient_map.get(c["patient_id"], "")
         if c.get("professional_user_id"):
-            prof = await db.users.find_one({"_id": ObjectId(c["professional_user_id"])}, {"name": 1})
-            if prof:
-                c["professional_name"] = prof["name"]
+            c["professional_name"] = prof_map.get(c["professional_user_id"], "")
     return [serialize_doc(c) for c in consultations]
 
 @router.post("")

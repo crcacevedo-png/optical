@@ -9,6 +9,14 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Optimizacion de rendimiento y capacidad (Jun 2026)
+Respuesta a la pregunta del usuario sobre capacidad (cuantas opticas / usuarios simultaneos al 100%). Se corrigieron los 2 cuellos de botella detectados en el analisis:
+- **N+1 en Consultas** (`routes/consultations.py::list_consultations`): antes hacia 1 `find_one` de paciente + 1 de profesional POR consulta dentro de un bucle (1+2N queries). Ahora usa batch `$in` -> 3 queries constantes.
+- **Generacion de PDF/Excel bloqueante (CPU-bound)**: reportlab/openpyxl corrian sincronamente en el event loop ASGI, bloqueando a TODOS los usuarios ~200-400ms por documento. Se extrajo la parte de armado a funciones sync y se envolvio en `asyncio.to_thread(...)` en 10 endpoints: recetas anteojos/contacto/medica (`prescriptions.py`), cotizacion (`quotations.py`, `_build_quotation_pdf_bytes` ahora delega a `_render_quotation_pdf` en hilo), reporte de cierres de caja (`cash_register.py`), reporte jornada PDF + XLSX (`jornada_consignment.py`), ticket de venta de jornada (`jornada_ops.py`), guia de usuario (`user_guide.py`), manifiesto de seguridad (`security.py`) y exportacion completa de BD Excel (`data_export.py`, ahora hace todos los fetch async primero y arma el workbook en un hilo).
+- Sin cambios funcionales: los PDFs/Excel salen identicos. Verificado por curl E2E que los 10 endpoints devuelven salida valida (%PDF / PK) y que `list_consultations` sigue poblando `patient_name`/`professional_name`.
+- Capacidad estimada con la infraestructura actual (1 pod + pool Mongo max 200 + Redis Upstash): cientos de opticas registradas y ~150-250 usuarios concurrentes activos con carga fluida. Para >500 opticas o mayor concurrencia se activa la Fase 2 (uvicorn --workers, HPA multi-pod, cola Celery/RQ para PDFs/emails) documentada en la seccion de Escalabilidad.
+
+
 ### Nomenclatura ocular OD/OS (Jun 2026)
 - Estandarizada la etiqueta del ojo izquierdo a **OS** (Oculus Sinister) en TODO lo visible; OD (ojo derecho) sin cambios. Ya no se usa "OI".
 - Cambios de etiqueta (no de datos): formularios de recetas y consultas, tablas/listados, headings "Ojo Izquierdo (OS)", PDFs de recetas (`prescriptions.py`), exportaciones Excel/CSV (`data_export.py`), mensajes de WhatsApp (`PrescriptionsPage.js`), guia PDF (`user_guide.py`), y POS de jornada (`JornadaPOSTab.js`).

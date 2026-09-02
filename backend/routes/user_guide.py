@@ -14,6 +14,7 @@ import time
 import uuid
 import hashlib
 import threading
+import asyncio
 import jwt as pyjwt
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -826,7 +827,7 @@ async def user_guide_pdf(
     """
     if user.get("role") not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Solo administradores pueden descargar la guia.")
-    pdf_bytes = _build_or_cache(prospect_name=prospect)
+    pdf_bytes = await asyncio.to_thread(_build_or_cache, prospect)
     return _stream_pdf(pdf_bytes, prospect_name=prospect)
 
 
@@ -883,7 +884,7 @@ async def public_user_guide(request: Request, token: str = Query(..., min_length
     if decoded.get("sub") != GUIDE_SHARE_SUB:
         raise HTTPException(status_code=403, detail="Enlace invalido.")
     prospect = decoded.get("prospect")
-    pdf_bytes = _build_or_cache(prospect_name=prospect)
+    pdf_bytes = await asyncio.to_thread(_build_or_cache, prospect)
     # inline para preview en el navegador (mejor UX en WhatsApp Web)
     date_str = datetime.now().strftime('%Y%m%d')
     slug = _safe_filename_prospect(prospect)

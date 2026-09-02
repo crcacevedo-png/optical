@@ -4,6 +4,7 @@ from fastapi.responses import StreamingResponse
 from bson import ObjectId
 from datetime import datetime, timezone
 import io
+import asyncio
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -97,32 +98,46 @@ def _format_refractions(refractions):
     return " ; ".join(parts)
 
 
-async def _export_company_data(company_id_str: str, company_name: str) -> io.BytesIO:
-    """Genera un workbook Excel con todas las colecciones de la empresa."""
-    company_id = ObjectId(company_id_str)
+def _build_workbook_bytes(company_name: str, data: dict) -> io.BytesIO:
+    """Arma el workbook Excel (CPU-bound). Corre en un hilo via asyncio.to_thread
+    para no bloquear el event loop del servidor."""
+    branches = data["branches"]
+    users = data["users"]
+    patients = data["patients"]
+    appointments = data["appointments"]
+    consultations = data["consultations"]
+    rx_eye = data["rx_eye"]
+    rx_cl = data["rx_cl"]
+    rx_med = data["rx_med"]
+    products = data["products"]
+    stock = data["stock"]
+    movements = data["movements"]
+    sales = data["sales"]
+    quotes = data["quotes"]
+    suppliers = data["suppliers"]
+    finance = data["finance"]
+    branch_map = data["branch_map"]
+    user_map = data["user_map"]
+    patient_map = data["patient_map"]
+    product_map = data["product_map"]
+
     wb = Workbook()
     # Remove default sheet
     wb.remove(wb.active)
 
     # ─────── Sucursales ───────
-    branches = await db.branches.find({"company_id": company_id}).to_list(None)
-    branch_map = _build_branch_map(branches)
     _write_sheet(wb, "Sucursales", [
         "ID", "Nombre", "Direccion", "Telefono", "Email", "Activa", "Creada"
     ], [[b.get("_id"), b.get("name"), b.get("address"), b.get("phone"),
          b.get("email"), b.get("is_active", True), b.get("created_at")] for b in branches])
 
     # ─────── Usuarios ───────
-    users = await db.users.find({"company_id": company_id}, {"password_hash": 0}).to_list(None)
-    user_map = _build_user_map(users)
     _write_sheet(wb, "Usuarios", [
         "ID", "Nombre", "Email", "Rol", "Sucursal", "Activo", "Creado"
     ], [[u.get("_id"), u.get("name"), u.get("email"), u.get("role"),
          branch_map.get(str(u.get("branch_id")), ""), u.get("is_active", True), u.get("created_at")] for u in users])
 
     # ─────── Pacientes ───────
-    patients = await db.patients.find({"company_id": company_id, "is_deleted": {"$ne": True}}).to_list(None)
-    patient_map = _build_patient_map(patients)
     _write_sheet(wb, "Pacientes", [
         "ID", "Nombre", "Apellido", "DPI", "Fecha Nac", "Genero",
         "Telefono", "WhatsApp", "Email", "Direccion", "Ciudad", "Pais",
@@ -134,7 +149,6 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
          p.get("created_at")] for p in patients])
 
     # ─────── Citas ───────
-    appointments = await db.appointments.find({"company_id": company_id}).to_list(None)
     _write_sheet(wb, "Citas", [
         "ID", "Paciente", "Sucursal", "Fecha", "Hora", "Duracion",
         "Tipo", "Estado", "Profesional", "Notas", "Creada"
@@ -144,7 +158,6 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
          a.get("notes"), a.get("created_at")] for a in appointments])
 
     # ─────── Consultas Opticas ───────
-    consultations = await db.optical_consultations.find({"company_id": company_id}).to_list(None)
     _write_sheet(wb, "Consultas", [
         "ID", "Paciente", "Fecha", "Tipo", "Motivo", "Anamnesis", "Hallazgos",
         "Diagnostico", "Tratamiento", "Recomendaciones", "Notas",
@@ -179,7 +192,6 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
          c.get("professional_name"), c.get("created_at")] for c in consultations])
 
     # ─────── Recetas Oftalmicas ───────
-    rx_eye = await db.eyeglass_prescriptions.find({"company_id": company_id}).to_list(None)
     _write_sheet(wb, "Recetas_Oftalmicas", [
         "ID", "Paciente", "Profesional",
         "OD Esfera", "OD Cilindro", "OD Eje", "OD Adicion", "OD DP",
@@ -193,7 +205,6 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
          r.get("created_at")] for r in rx_eye])
 
     # ─────── Recetas Lentes de Contacto ───────
-    rx_cl = await db.contact_lens_prescriptions.find({"company_id": company_id}).to_list(None)
     _write_sheet(wb, "Recetas_Contacto", [
         "ID", "Paciente", "Profesional", "Marca", "Tipo",
         "OD Esfera", "OD Cilindro", "OD Eje", "OD Adicion", "OD BC", "OD DIA",
@@ -206,7 +217,6 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
          r.get("replacement"), r.get("observations"), r.get("created_at")] for r in rx_cl])
 
     # ─────── Recetas Medicas ───────
-    rx_med = await db.medical_prescriptions.find({"company_id": company_id}).to_list(None)
     _write_sheet(wb, "Recetas_Medicas", [
         "ID", "Paciente", "Profesional", "Medicamentos", "Indicaciones", "Observaciones", "Creada"
     ], [[r.get("_id"), patient_map.get(str(r.get("patient_id")), ""),
@@ -214,8 +224,6 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
          r.get("instructions"), r.get("observations"), r.get("created_at")] for r in rx_med])
 
     # ─────── Productos / Inventario ───────
-    products = await db.products.find({"company_id": company_id}).to_list(None)
-    product_map = _build_product_map(products)
     _write_sheet(wb, "Productos", [
         "ID", "Nombre", "SKU", "Categoria", "Marca", "Precio Costo",
         "Precio Venta", "Stock Minimo", "Activo", "Creado"
@@ -224,7 +232,6 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
          p.get("min_stock"), p.get("is_active", True), p.get("created_at")] for p in products])
 
     # ─────── Stock por sucursal ───────
-    stock = await db.stock.find({"company_id": company_id}).to_list(None)
     _write_sheet(wb, "Stock", [
         "ID", "Producto", "Sucursal", "Cantidad", "Actualizado"
     ], [[s.get("_id"), product_map.get(str(s.get("product_id")), ""),
@@ -232,7 +239,6 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
          s.get("updated_at") or s.get("created_at")] for s in stock])
 
     # ─────── Movimientos de Inventario ───────
-    movements = await db.inventory_movements.find({"company_id": company_id}).sort("created_at", -1).to_list(2000)
     _write_sheet(wb, "Movimientos_Inventario", [
         "ID", "Producto", "Sucursal", "Tipo", "Cantidad", "Motivo", "Usuario", "Fecha"
     ], [[m.get("_id"), product_map.get(str(m.get("product_id")), ""),
@@ -241,7 +247,6 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
          m.get("created_at")] for m in movements])
 
     # ─────── Ventas ───────
-    sales = await db.sales.find({"company_id": company_id}).sort("created_at", -1).to_list(None)
     _write_sheet(wb, "Ventas", [
         "ID", "Numero", "Paciente", "Sucursal", "Vendedor", "Subtotal",
         "Descuento", "Impuesto", "Total", "Pagado", "Saldo", "Metodo Pago",
@@ -255,7 +260,6 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
          s.get("status"), str(s.get("items", [])), s.get("created_at")] for s in sales])
 
     # ─────── Cotizaciones ───────
-    quotes = await db.quotations.find({"company_id": company_id}).to_list(None)
     _write_sheet(wb, "Cotizaciones", [
         "ID", "Numero", "Paciente", "Sucursal", "Total", "Estado",
         "Valida hasta", "Items (JSON)", "Fecha"
@@ -266,7 +270,6 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
          str(q.get("items", [])), q.get("created_at")] for q in quotes])
 
     # ─────── Proveedores ───────
-    suppliers = await db.suppliers.find({"company_id": company_id}).to_list(None)
     _write_sheet(wb, "Proveedores", [
         "ID", "Nombre", "Contacto", "Telefono", "Email", "Direccion",
         "NIT", "Notas", "Activo", "Creado"
@@ -275,7 +278,6 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
          s.get("is_active", True), s.get("created_at")] for s in suppliers])
 
     # ─────── Finanzas ───────
-    finance = await db.finance_entries.find({"company_id": company_id}).to_list(None)
     _write_sheet(wb, "Finanzas", [
         "ID", "Tipo", "Categoria", "Descripcion", "Monto", "Metodo Pago",
         "Sucursal", "Fecha", "Creada"
@@ -335,6 +337,40 @@ async def _export_company_data(company_id_str: str, company_name: str) -> io.Byt
     wb.save(buffer)
     buffer.seek(0)
     return buffer
+
+
+async def _export_company_data(company_id_str: str, company_name: str) -> io.BytesIO:
+    """Obtiene todas las colecciones de la empresa (async) y arma el Excel en un hilo."""
+    company_id = ObjectId(company_id_str)
+
+    branches = await db.branches.find({"company_id": company_id}).to_list(None)
+    users = await db.users.find({"company_id": company_id}, {"password_hash": 0}).to_list(None)
+    patients = await db.patients.find({"company_id": company_id, "is_deleted": {"$ne": True}}).to_list(None)
+    appointments = await db.appointments.find({"company_id": company_id}).to_list(None)
+    consultations = await db.optical_consultations.find({"company_id": company_id}).to_list(None)
+    rx_eye = await db.eyeglass_prescriptions.find({"company_id": company_id}).to_list(None)
+    rx_cl = await db.contact_lens_prescriptions.find({"company_id": company_id}).to_list(None)
+    rx_med = await db.medical_prescriptions.find({"company_id": company_id}).to_list(None)
+    products = await db.products.find({"company_id": company_id}).to_list(None)
+    stock = await db.stock.find({"company_id": company_id}).to_list(None)
+    movements = await db.inventory_movements.find({"company_id": company_id}).sort("created_at", -1).to_list(2000)
+    sales = await db.sales.find({"company_id": company_id}).sort("created_at", -1).to_list(None)
+    quotes = await db.quotations.find({"company_id": company_id}).to_list(None)
+    suppliers = await db.suppliers.find({"company_id": company_id}).to_list(None)
+    finance = await db.finance_entries.find({"company_id": company_id}).to_list(None)
+
+    data = {
+        "branches": branches, "users": users, "patients": patients,
+        "appointments": appointments, "consultations": consultations,
+        "rx_eye": rx_eye, "rx_cl": rx_cl, "rx_med": rx_med,
+        "products": products, "stock": stock, "movements": movements,
+        "sales": sales, "quotes": quotes, "suppliers": suppliers, "finance": finance,
+        "branch_map": _build_branch_map(branches),
+        "user_map": _build_user_map(users),
+        "patient_map": _build_patient_map(patients),
+        "product_map": _build_product_map(products),
+    }
+    return await asyncio.to_thread(_build_workbook_bytes, company_name, data)
 
 
 @router.get("/full-database")

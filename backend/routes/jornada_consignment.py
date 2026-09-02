@@ -22,6 +22,7 @@ import io
 import re
 import json
 import hashlib
+import asyncio
 
 import openpyxl
 
@@ -393,7 +394,7 @@ async def list_excel_uploads(jid: str, user: dict = Depends(get_current_user)):
                 r[k] = str(r[k])
         r["stock_ids"] = [str(x) for x in (r.get("stock_ids") or [])]
         r["product_ids"] = [str(x) for x in (r.get("product_ids") or [])]
-    return {"items": rows}
+    return {"items": [serialize_doc(r) for r in rows]}
 
 
 @router.post("/{jid}/excel/{upload_id}/revert")
@@ -679,7 +680,14 @@ async def _build_report_data(company_id: ObjectId, j: dict) -> dict:
 async def get_report_pdf(jid: str, user: dict = Depends(get_current_user)):
     j = await _get_jornada_or_404(jid, user["company_id"])
     data = await _build_report_data(ObjectId(user["company_id"]), j)
-    # Generar PDF
+    pdf_bytes = await asyncio.to_thread(_render_jornada_report_pdf, data)
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes), media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=jornada_{jid}.pdf"},
+    )
+
+
+def _render_jornada_report_pdf(data: dict) -> bytes:
     from reportlab.lib.pagesizes import letter
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -795,11 +803,7 @@ async def get_report_pdf(jid: str, user: dict = Depends(get_current_user)):
         elems.append(_fmt_table(rows))
 
     doc.build(elems)
-    buf.seek(0)
-    return StreamingResponse(
-        buf, media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=jornada_{jid}.pdf"},
-    )
+    return buf.getvalue()
 
 
 def _fmt_table(data: list):
@@ -824,6 +828,14 @@ def _fmt_table(data: list):
 async def get_report_xlsx(jid: str, user: dict = Depends(get_current_user)):
     j = await _get_jornada_or_404(jid, user["company_id"])
     data = await _build_report_data(ObjectId(user["company_id"]), j)
+    xlsx_bytes = await asyncio.to_thread(_render_jornada_report_xlsx, data)
+    return StreamingResponse(
+        io.BytesIO(xlsx_bytes), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=jornada_{jid}.xlsx"},
+    )
+
+
+def _render_jornada_report_xlsx(data: dict) -> bytes:
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Resumen"
@@ -882,7 +894,4 @@ async def get_report_xlsx(jid: str, user: dict = Depends(get_current_user)):
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    return StreamingResponse(
-        buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=jornada_{jid}.xlsx"},
-    )
+    return buf.getvalue()
