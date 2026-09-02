@@ -234,7 +234,7 @@ async def reactivate_company(company_id: str, request: Request, user: dict = Dep
         company_name=company.get("name", "tu optica"),
         reset_link=reset_link,
     )
-    queue_email(
+    await queue_email(
         admin["email"],
         f"[Cortexia] Tu optica {company.get('name', 'ha sido reactivada')} fue reactivada",
         html,

@@ -470,6 +470,10 @@ async def startup():
     await db.sales.create_index([("company_id", 1), ("jornada_id", 1), ("_id", -1)])
     await db.patients.create_index([("company_id", 1), ("jornada_ids", 1)])
 
+    # --- Email queue (cola durable de correos con reintentos) ---
+    await db.email_queue.create_index([("status", 1), ("next_attempt_at", 1)])
+    await db.email_queue.create_index("completed_at", expireAfterSeconds=604800, name="email_queue_ttl")  # purga enviados/fallidos a los 7d
+
     logger.info("MongoDB indexes verified/created OK")
 
     # ═══════════════════════════════════════════════════════════════════
@@ -692,6 +696,17 @@ async def startup():
         logger.info("Activation task loop started (deadline=30d, checks every 12h)")
     except Exception as e:
         logger.error(f"Activation task init error: {e}")
+
+    # ═══════════════════════════════════════════════════════════════════
+    # Worker de la cola durable de correos (reintentos + backoff)
+    # ═══════════════════════════════════════════════════════════════════
+    try:
+        import asyncio as _asyncio
+        from email_service import email_worker_loop
+        _asyncio.create_task(email_worker_loop())
+        logger.info("Email worker loop scheduled")
+    except Exception as e:
+        logger.error(f"Email worker init error: {e}")
 
 @app.on_event("shutdown")
 async def shutdown():

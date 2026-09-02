@@ -83,7 +83,7 @@ async def _process_welcome_tips(now: datetime, app_url: str):
                 company_name=company.get("name", "tu optica"),
                 login_link=app_url,
             )
-            queue_email(
+            await queue_email(
                 admin["email"],
                 f"[Cortexia] 5 tips para empezar con {company.get('name', 'tu optica')}",
                 html,
@@ -135,7 +135,7 @@ async def _process_reminders(now: datetime, app_url: str):
                     days_remaining=remaining,
                     login_link=app_url,
                 )
-                queue_email(
+                await queue_email(
                     admin["email"],
                     f"[Cortexia] Recordatorio: activa tu optica ({remaining} dia{'s' if remaining != 1 else ''} restante{'s' if remaining != 1 else ''})",
                     html,
@@ -209,7 +209,7 @@ async def _process_deactivations(now: datetime):
                     admin_name=admin.get("name", "Administrador"),
                     company_name=company.get("name", "tu optica"),
                 )
-                queue_email(
+                await queue_email(
                     admin["email"],
                     "[Cortexia] Tu optica fue desactivada por inactividad",
                     html,

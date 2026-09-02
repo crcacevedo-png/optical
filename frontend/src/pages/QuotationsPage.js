@@ -154,7 +154,7 @@ export default function QuotationsPage() {
     try {
       setSendingEmail(true);
       await api.post(`/api/quotations/${quotation._id}/send-email`);
-      toast.success(`Cotizacion enviada a ${quotation.patient_email}`);
+      toast.success(`Cotizacion en camino a ${quotation.patient_email} (envio en segundo plano)`);
       loadData();
     } catch (err) {
       toast.error(formatApiErrorDetail(err?.response?.data?.detail));

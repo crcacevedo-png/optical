@@ -149,7 +149,7 @@ async def create_ticket(data: TicketCreate, user: dict = Depends(get_current_use
             company_name=company_name,
         )
         subject_line = f"[Cortexia · {data.priority.upper()}] {data.subject[:80]}"
-        queue_email(SUPPORT_EMAIL, subject_line, html, tag="support-ticket")
+        await queue_email(SUPPORT_EMAIL, subject_line, html, tag="support-ticket")
     except Exception:
         pass
 
@@ -189,7 +189,7 @@ async def list_tickets(
         t["last_message_by_role"] = msgs[-1]["author_role"] if msgs else None
         t["attachment_count"] = len(t.get("attachments", []) or [])
         t["unread"] = _compute_unread(t, user)
-    return tickets
+    return [serialize_doc(t) for t in tickets]
 
 
 @router.get("/{ticket_id}")
@@ -207,7 +207,7 @@ async def get_ticket(ticket_id: str, user: dict = Depends(get_current_user)):
     serialize_doc(ticket)
     _serialize_ticket(ticket)
     ticket["unread"] = _compute_unread(ticket, user)
-    return ticket
+    return serialize_doc(ticket)
 
 
 @router.post("/{ticket_id}/read")

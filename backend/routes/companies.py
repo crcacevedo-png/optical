@@ -122,7 +122,7 @@ async def list_companies(
             c["days_since_last_login"] = None
         c["days_since_created"] = _days_since(c.get("created_at"))
 
-    return companies
+    return [serialize_doc(c) for c in companies]
 
 @router.post("")
 async def create_company(data: CompanyCreate, user: dict = Depends(get_current_user)):
@@ -161,7 +161,7 @@ async def create_company(data: CompanyCreate, user: dict = Depends(get_current_u
         admin_password=data.admin_password,
         login_link=app_url,
     )
-    queue_email(
+    await queue_email(
         data.admin_email.lower(),
         f"Bienvenido a Cortexia Optical - {data.name}",
         welcome_html,

@@ -372,7 +372,7 @@ async def get_quotation_pdf(quotation_id: str, user: dict = Depends(get_current_
 @router.post("/{quotation_id}/send-email")
 async def send_quotation_email(quotation_id: str, user: dict = Depends(get_current_user)):
     """Envia el PDF de la cotizacion al paciente via Resend."""
-    from email_service import send_email, render_quotation_email
+    from email_service import queue_email, render_quotation_email
 
     q = await db.quotations.find_one({"_id": ObjectId(quotation_id)})
     if not q or str(q["company_id"]) != user["company_id"]:
@@ -399,7 +399,7 @@ async def send_quotation_email(quotation_id: str, user: dict = Depends(get_curre
         expiry_date=q.get("expiry_date", ""),
         notes=q.get("notes"),
     )
-    ok = await send_email(
+    await queue_email(
         patient["email"],
         f"Cotizacion {quotation_number} - {company_name}",
         html,
@@ -410,10 +410,8 @@ async def send_quotation_email(quotation_id: str, user: dict = Depends(get_curre
             "content_type": "application/pdf",
         }],
     )
-    if not ok:
-        raise HTTPException(status_code=502, detail="No se pudo enviar el email. Revisa el log del servidor.")
 
-    # Registrar el envio en la cotizacion
+    # Registrar el envio (encolado) en la cotizacion
     await db.quotations.update_one(
         {"_id": q["_id"]},
         {"$push": {"emails_sent": {
@@ -421,8 +419,9 @@ async def send_quotation_email(quotation_id: str, user: dict = Depends(get_curre
             "sent_at": datetime.now(timezone.utc).isoformat(),
             "sent_by": ObjectId(user["_id"]),
             "sent_by_name": user.get("name", ""),
+            "status": "encolado",
         }}}
     )
 
-    return {"message": "Cotizacion enviada", "to": patient["email"]}
+    return {"message": "Cotizacion encolada para envio", "to": patient["email"]}
 

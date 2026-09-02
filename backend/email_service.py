@@ -4,10 +4,14 @@ para maxima compatibilidad con clientes de email.
 """
 import os
 import asyncio
+import base64
 import logging
 import html
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 import resend
+from pymongo import ReturnDocument
+from db import db
 
 logger = logging.getLogger(__name__)
 
@@ -74,13 +78,141 @@ async def send_email(to: str, subject: str, html: str, *, tag: Optional[str] = N
         return False
 
 
-def queue_email(to: str, subject: str, html: str, *, tag: Optional[str] = None) -> None:
-    """Encola un email en background sin bloquear la respuesta HTTP.
-    Fire-and-forget: errores se loggean pero NO se propagan al request.
-    Uso: reemplazar `await send_email(...)` por `queue_email(...)` en flujos
-    donde el usuario no necesita saber si el email se envio (welcome, alertas).
+# ─────────────────────────── COLA DURABLE DE EMAILS ───────────────────────────
+# Los emails se persisten en la coleccion `email_queue` y un worker interno los
+# envia con reintentos + backoff exponencial. Sobrevive reinicios del pod, da
+# visibilidad (la coleccion es inspeccionable) y no bloquea la respuesta HTTP.
+EMAIL_MAX_ATTEMPTS = int(os.environ.get("EMAIL_MAX_ATTEMPTS", "5"))
+EMAIL_WORKER_INTERVAL = int(os.environ.get("EMAIL_WORKER_INTERVAL", "5"))          # segundos entre polls
+EMAIL_STALE_SENDING_SEC = int(os.environ.get("EMAIL_STALE_SENDING_SEC", "300"))    # reclamar "sending" colgados
+EMAIL_BATCH = int(os.environ.get("EMAIL_WORKER_BATCH", "20"))
+
+# Mantiene referencias fuertes de tareas fallback para evitar GC prematuro.
+_BG_TASKS: set = set()
+
+
+def _encode_attachments(attachments):
+    """Convierte el content (bytes) de cada adjunto a base64 str para guardar en Mongo."""
+    if not attachments:
+        return None
+    out = []
+    for att in attachments:
+        content = att.get("content")
+        if isinstance(content, (bytes, bytearray)):
+            content = base64.b64encode(content).decode("ascii")
+        out.append({
+            "filename": att["filename"],
+            "content": content,
+            **({"content_type": att["content_type"]} if att.get("content_type") else {}),
+        })
+    return out
+
+
+async def queue_email(to: str, subject: str, html: str, *, tag: Optional[str] = None,
+                      attachments: Optional[list] = None) -> None:
+    """Encola un email de forma DURABLE (lo persiste en `email_queue`).
+
+    La respuesta HTTP no espera el envio real; el worker interno lo procesa con
+    reintentos. Best-effort: si el insert en Mongo falla, hace fallback a un
+    envio directo en background (con referencia fuerte para no ser GC'd).
     """
-    asyncio.create_task(send_email(to, subject, html, tag=tag))
+    now_iso = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "to": to,
+        "subject": subject,
+        "html": html,
+        "tag": tag,
+        "attachments": _encode_attachments(attachments),
+        "status": "pending",
+        "attempts": 0,
+        "max_attempts": EMAIL_MAX_ATTEMPTS,
+        "next_attempt_at": now_iso,
+        "last_error": None,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+    try:
+        await db.email_queue.insert_one(doc)
+    except Exception as e:
+        logger.error(f"No se pudo encolar email a {to}: {e}. Fallback a envio directo.")
+        _t = asyncio.create_task(send_email(to, subject, html, tag=tag, attachments=attachments))
+        _BG_TASKS.add(_t)
+        _t.add_done_callback(_BG_TASKS.discard)
+
+
+async def _process_email_queue_once() -> int:
+    """Procesa hasta EMAIL_BATCH emails pendientes cuyo next_attempt_at ya vencio.
+    Reclama cada doc de forma atomica (pending -> sending) para ser multi-pod safe.
+    Retorna cuantos emails intento enviar."""
+    processed = 0
+    for _ in range(EMAIL_BATCH):
+        now_iso = datetime.now(timezone.utc).isoformat()
+        doc = await db.email_queue.find_one_and_update(
+            {"status": "pending", "next_attempt_at": {"$lte": now_iso}},
+            {"$set": {"status": "sending", "updated_at": now_iso}},
+            sort=[("next_attempt_at", 1)],
+            return_document=ReturnDocument.AFTER,
+        )
+        if not doc:
+            break
+        processed += 1
+        ok = await send_email(
+            doc["to"], doc["subject"], doc["html"],
+            tag=doc.get("tag"), attachments=doc.get("attachments"),
+        )
+        done = datetime.now(timezone.utc)
+        if ok:
+            await db.email_queue.update_one(
+                {"_id": doc["_id"]},
+                {"$set": {"status": "sent", "completed_at": done, "updated_at": done.isoformat()}},
+            )
+        else:
+            attempts = int(doc.get("attempts", 0)) + 1
+            if attempts >= int(doc.get("max_attempts", EMAIL_MAX_ATTEMPTS)):
+                await db.email_queue.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {"status": "failed", "attempts": attempts,
+                              "completed_at": done, "updated_at": done.isoformat(),
+                              "last_error": "max_attempts alcanzado"}},
+                )
+                logger.error(f"Email a {doc.get('to')} FALLIDO tras {attempts} intentos.")
+            else:
+                backoff = min(30 * (2 ** (attempts - 1)), 1800)  # 30s,60s,120s,...max 30min
+                nxt = (done + timedelta(seconds=backoff)).isoformat()
+                await db.email_queue.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {"status": "pending", "attempts": attempts,
+                              "next_attempt_at": nxt, "updated_at": done.isoformat(),
+                              "last_error": "envio fallido (reintentara)"}},
+                )
+    return processed
+
+
+async def _recover_stale_sending():
+    """Devuelve a 'pending' los emails que quedaron en 'sending' (pod muerto a mitad del envio)."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(seconds=EMAIL_STALE_SENDING_SEC)).isoformat()
+    try:
+        await db.email_queue.update_many(
+            {"status": "sending", "updated_at": {"$lt": cutoff}},
+            {"$set": {"status": "pending"}},
+        )
+    except Exception as e:
+        logger.error(f"Error recuperando emails colgados: {e}")
+
+
+async def email_worker_loop():
+    """Loop interno que drena la cola de emails. Se arranca en el startup del server
+    (mismo patron que activation_task_loop). Corre en el mismo pod, sin proceso worker aparte."""
+    logger.info(f"Email worker loop started (interval={EMAIL_WORKER_INTERVAL}s, max_attempts={EMAIL_MAX_ATTEMPTS})")
+    while True:
+        try:
+            await _recover_stale_sending()
+            n = await _process_email_queue_once()
+            if n >= EMAIL_BATCH:
+                continue  # habia mucho trabajo: sigue drenando sin dormir
+        except Exception as e:
+            logger.error(f"Email worker error: {e}")
+        await asyncio.sleep(EMAIL_WORKER_INTERVAL)
 
 
 # ─────────────────────────────────── TEMPLATES ───────────────────────────────────

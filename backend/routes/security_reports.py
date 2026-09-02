@@ -169,7 +169,7 @@ async def _check_and_alert_spike():
                 event_meta=event_meta,
                 app_url=app_url,
             )
-            queue_email(
+            await queue_email(
                 alerts_to,
                 f"[Cortexia][SECURITY] Pico CSP: {recent_count} violaciones en {SPIKE_WINDOW_MIN} min",
                 html,

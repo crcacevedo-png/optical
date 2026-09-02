@@ -9,6 +9,16 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Cola durable de correos (background queue) (Jun 2026)
+Antes los correos se enviaban con `asyncio.create_task` (fire-and-forget): rapido pero fragil — si el pod se reiniciaba se perdian, sin reintentos y con riesgo de GC de la tarea. Se reemplazo por una cola durable respaldada en MongoDB, sin proceso worker aparte (compatible con el despliegue de 1 pod de Emergent).
+- **`email_service.py`**: `queue_email(...)` ahora es `async` y PERSISTE cada correo en `db.email_queue` (status=pending) en vez de lanzar una tarea suelta. Soporta `attachments` (se guardan en base64 en el doc). Nuevas piezas: `_process_email_queue_once` (reclama docs de forma atomica pending->sending con `find_one_and_update`, envia via `send_email` en hilo, marca sent o reintenta con backoff 30s->30min hasta `EMAIL_MAX_ATTEMPTS=5`, luego failed), `_recover_stale_sending` (devuelve a pending los "sending" colgados > `EMAIL_STALE_SENDING_SEC=300s`), y `email_worker_loop` (poll cada `EMAIL_WORKER_INTERVAL=5s`, drena rapido si hay backlog).
+- **`server.py`**: arranca `email_worker_loop()` en el startup (junto a `activation_task_loop`). Indices nuevos: `email_queue (status, next_attempt_at)` + TTL 7d en `completed_at` (purga enviados/fallidos; los pending/reintentando NO expiran). `completed_at` se guarda como `datetime` (BSON date) para que el TTL funcione.
+- **Call sites actualizados a `await queue_email(...)`** (la funcion es async): `auth.py` (4), `activation_task.py` (3), `companies.py`, `superadmin_retention.py`, `support_tickets.py`, `security_reports.py`. Todos estaban ya en funciones async.
+- **Cotizaciones (opcion a del usuario)**: `quotations.py::send_quotation_email` ahora ENCOLA el correo con el PDF adjunto y responde al instante (`"Cotizacion encolada para envio"`, ya no espera a Resend ni devuelve 502). El PDF se genera en hilo antes de encolar. Frontend `QuotationsPage.js`: toast "Cotizacion en camino ... (envio en segundo plano)".
+- Config env: `EMAIL_MAX_ATTEMPTS`, `EMAIL_WORKER_INTERVAL`, `EMAIL_STALE_SENDING_SEC`, `EMAIL_WORKER_BATCH`.
+- Verificado por curl + inspeccion directa de Mongo: (1) forgot-password encola -> worker envia (status=sent, id Resend real); (2) cotizacion encola con adjunto PDF (base64) -> enviado; (3) recipiente invalido -> status vuelve a pending, attempts=1, next_attempt_at +30s, last_error seteado (backoff OK). Sin warnings de "coroutine never awaited". `send_email` (envio directo con confirmacion) se conserva intacto.
+
+
 ### Optimizacion de rendimiento y capacidad (Jun 2026)
 Respuesta a la pregunta del usuario sobre capacidad (cuantas opticas / usuarios simultaneos al 100%). Se corrigieron los 2 cuellos de botella detectados en el analisis:
 - **N+1 en Consultas** (`routes/consultations.py::list_consultations`): antes hacia 1 `find_one` de paciente + 1 de profesional POR consulta dentro de un bucle (1+2N queries). Ahora usa batch `$in` -> 3 queries constantes.

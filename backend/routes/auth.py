@@ -108,7 +108,7 @@ async def login(data: UserLogin, response: Response, request: Request):
                     },
                     app_url=app_url,
                 )
-                queue_email(email, "[Cortexia] Intentos fallidos de inicio de sesion", html, tag="security_alert")
+                await queue_email(email, "[Cortexia] Intentos fallidos de inicio de sesion", html, tag="security_alert")
             raise HTTPException(status_code=401, detail="Credenciales invalidas")
     except HTTPException:
         raise
@@ -364,7 +364,7 @@ async def change_password(data: ChangePassword, request: Request, user: dict = D
             },
             app_url=app_url,
         )
-        queue_email(user["email"], "[Cortexia] Tu contrasena fue cambiada", html, tag="security_alert")
+        await queue_email(user["email"], "[Cortexia] Tu contrasena fue cambiada", html, tag="security_alert")
     return {"message": "Contraseña actualizada correctamente"}
 
 
@@ -393,7 +393,7 @@ async def forgot_password(data: ForgotPassword, request: Request):
     app_url = os.environ.get("APP_URL", "https://cortexiaoptical.com")
     reset_link = f"{app_url.rstrip('/')}/reset-password?token={token}"
     html = render_password_reset(name=user.get("name", "Usuario"), reset_link=reset_link)
-    queue_email(email, "[Cortexia] Restablece tu contrasena", html, tag="password_reset")
+    await queue_email(email, "[Cortexia] Restablece tu contrasena", html, tag="password_reset")
     await log_audit("PASSWORD_RESET_REQUESTED", actor_id=str(user["_id"]), actor_email=email,
                     actor_role=user.get("role"), request=request)
     return neutral_response
@@ -445,7 +445,7 @@ async def reset_password(data: ResetPassword, request: Request):
         },
         app_url=app_url,
     )
-    queue_email(user["email"], "[Cortexia] Contrasena restablecida", html, tag="security_alert")
+    await queue_email(user["email"], "[Cortexia] Contrasena restablecida", html, tag="security_alert")
     return {"message": "Contrasena restablecida correctamente. Ya puedes iniciar sesion."}
 
 @router.post("/refresh")
