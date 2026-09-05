@@ -26,12 +26,16 @@ _LOOP = asyncio.new_event_loop()
 
 def run_async(coro):
     return _LOOP.run_until_complete(coro)
-SUPERADMIN_EMAIL = "superadmin@cortexia.com"
-SUPERADMIN_PASSWORD = "Montecristo2026"
-ADMIN_EMAIL = "admin@cortexia.gt"
-ADMIN_PASSWORD = "DemoAdmin2026!"
-VENDEDOR_EMAIL = "vendedor@cortexia.gt"
-VENDEDOR_PASSWORD = "DemoUser2026!"
+# Credenciales leidas SOLO de env vars (via _credentials.py). Sin secretos hardcodeados.
+from _credentials import (  # noqa: E402
+    SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD,
+    ADMIN_EMAIL, ADMIN_PASSWORD,
+    VENDEDOR_EMAIL, VENDEDOR_PASSWORD,
+    require,
+)
+SUPERADMIN_PASSWORD = require("SUPERADMIN_PASSWORD", SUPERADMIN_PASSWORD)
+ADMIN_PASSWORD = require("ADMIN_PASSWORD", ADMIN_PASSWORD)
+VENDEDOR_PASSWORD = require("VENDEDOR_PASSWORD", VENDEDOR_PASSWORD)
 
 
 def _login(session, email, password):

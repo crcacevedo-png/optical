@@ -33,7 +33,7 @@ export default function ReceivablesPage() {
       const { data: d } = await api.get('/api/sales/receivables', { params });
       setData(d || { items: [], total_pending: 0, count: 0 });
     } catch (err) {
-      // silent
+      console.error('No se pudieron cargar las cuentas por cobrar:', err);
     } finally {
       setLoading(false);
     }

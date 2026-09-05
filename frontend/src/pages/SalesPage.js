@@ -608,7 +608,7 @@ export default function SalesPage() {
             try {
               const { data } = await api.get(`/api/sales/${detailSale._id}`);
               setDetailSale(data);
-            } catch {} // eslint-disable-line no-empty
+            } catch (e) { console.error('No se pudo refrescar el detalle de la venta:', e); }
           }
           fetchData();
         }}

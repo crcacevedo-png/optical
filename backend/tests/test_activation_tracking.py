@@ -16,10 +16,14 @@ import pytest
 import requests
 
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
-SUPERADMIN_EMAIL = "superadmin@cortexia.com"
-SUPERADMIN_PASSWORD = "Montecristo2026"
-DEMO_ADMIN_EMAIL = "admin@cortexia.gt"
-DEMO_ADMIN_PASSWORD = "DemoAdmin2026!"
+# Credenciales leidas SOLO de env vars (via _credentials.py). Sin secretos hardcodeados.
+from _credentials import (  # noqa: E402
+    SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD,
+    ADMIN_EMAIL as DEMO_ADMIN_EMAIL, ADMIN_PASSWORD as DEMO_ADMIN_PASSWORD,
+    require,
+)
+SUPERADMIN_PASSWORD = require("SUPERADMIN_PASSWORD", SUPERADMIN_PASSWORD)
+DEMO_ADMIN_PASSWORD = require("DEMO_ADMIN_PASSWORD", DEMO_ADMIN_PASSWORD)
 
 
 def _login(session, email, password):
@@ -111,7 +115,7 @@ class TestFirstLoginNotification:
     def test_create_company_and_first_login(self, superadmin_session):
         unique = uuid.uuid4().hex[:8]
         admin_email = f"test_activation_{unique}@example.com"
-        admin_password = "TestActivation2026!"
+        admin_password = f"Tst{uuid.uuid4().hex[:12]}Aa1!"  # aleatorio, no hardcodeado
         company_name = f"TEST_ActivationOptica_{unique}"
 
         payload = {

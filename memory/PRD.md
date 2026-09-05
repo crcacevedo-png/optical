@@ -9,6 +9,13 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Revision de calidad de codigo — correcciones aplicadas (Jun 2026)
+Se recibio un reporte automatico de calidad. Se aplicaron SOLO las correcciones reales y de bajo riesgo (la app esta en produccion, no se refactoriza codigo que funciona por metricas de estilo):
+- **Secretos hardcodeados en tests (REAL, corregido)**: `tests/test_sessions.py`, `test_retention_dashboard.py` y `test_activation_tracking.py` hardcodeaban passwords de las cuentas seed. Ahora importan de `tests/_credentials.py` (lee SOLO de env vars, con `require()` que falla claro si faltan). La password del test que crea empresa temporal ahora es aleatoria (`uuid`).
+- **Catch vacios (mejorado)**: se agrego `console.error` con contexto en los `catch {}` silenciosos senalados (`SupportTicketsPage`, `SalesPage`, `ReceivablesPage`, `OnboardingPage`) manteniendo el comportamiento best-effort.
+- **NO aplicado (con justificacion)**: (a) `is` vs `==` (F632) = FALSA ALARMA, eran `is True/False/None` que es Python correcto (0 violaciones reales). (b) Refactor de `login()`/`get_current_user()` por complejidad = alto riesgo de romper el auth de todos los tenants en produccion; es metrica de estilo, no bug. (c) 74 deps faltantes de hooks React = agregar deps a ciegas suele causar loops de render/refetch; requiere analisis caso por caso. (d) Split de componentes grandes y type hints en `models.py` (ya tipado via Pydantic) = churn alto, valor bajo. Quedan como backlog opcional a abordar incrementalmente si aparece un bug concreto.
+
+
 ### Cola durable de correos (background queue) (Jun 2026)
 Antes los correos se enviaban con `asyncio.create_task` (fire-and-forget): rapido pero fragil — si el pod se reiniciaba se perdian, sin reintentos y con riesgo de GC de la tarea. Se reemplazo por una cola durable respaldada en MongoDB, sin proceso worker aparte (compatible con el despliegue de 1 pod de Emergent).
 - **`email_service.py`**: `queue_email(...)` ahora es `async` y PERSISTE cada correo en `db.email_queue` (status=pending) en vez de lanzar una tarea suelta. Soporta `attachments` (se guardan en base64 en el doc). Nuevas piezas: `_process_email_queue_once` (reclama docs de forma atomica pending->sending con `find_one_and_update`, envia via `send_email` en hilo, marca sent o reintenta con backoff 30s->30min hasta `EMAIL_MAX_ATTEMPTS=5`, luego failed), `_recover_stale_sending` (devuelve a pending los "sending" colgados > `EMAIL_STALE_SENDING_SEC=300s`), y `email_worker_loop` (poll cada `EMAIL_WORKER_INTERVAL=5s`, drena rapido si hay backlog).

@@ -138,7 +138,7 @@ export default function SupportTicketsPage() {
       const { data } = await api.post('/api/support-tickets', form);
       if (pendingFiles.length > 0) {
         for (const f of pendingFiles) {
-          try { await uploadFile(data._id, f); } catch { /* ignore individual */ }
+          try { await uploadFile(data._id, f); } catch (e) { console.error('Fallo al subir adjunto del ticket:', e); }
         }
       }
       toast.success('Ticket enviado. Recibiras respuesta del equipo Cortexia.');
@@ -162,7 +162,7 @@ export default function SupportTicketsPage() {
         await api.post(`/api/support-tickets/${id}/read`);
         setTickets((prev) => prev.map((t) => (t._id === id ? { ...t, unread: false } : t)));
         api.get('/api/support-tickets/stats/summary').then((r) => setStats(r.data)).catch(() => {});
-      } catch { /* silent */ }
+      } catch (e) { console.error('No se pudo marcar el ticket como leido:', e); }
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail));
     }

@@ -90,7 +90,7 @@ export default function OnboardingPage() {
       const { data } = await api.get('/api/onboarding/status');
       setProgress(data.progress || {});
     } catch (err) {
-      // silent
+      console.error('No se pudo cargar el estado de onboarding:', err);
     } finally {
       setLoading(false);
     }
@@ -132,7 +132,7 @@ export default function OnboardingPage() {
       await api.post('/api/onboarding/dismiss');
       toast.success('Onboarding cerrado. Puedes volver a verlo desde el menú.');
       navigate('/dashboard');
-    } catch {}
+    } catch (e) { console.error('No se pudo cerrar el onboarding:', e); }
   };
 
   return (
