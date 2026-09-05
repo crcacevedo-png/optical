@@ -9,6 +9,9 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Regresion completa post-cambios (Jun 2026)
+Testing agent (iteration_5.json): 22/22 pruebas ejecutadas PASARON, 1 omitida (sin datos via ?type=eyeglass, PDFs de recetas ya verificados por separado), 0 fallos. CERO regresiones. Cubre: auth (login/me/refresh/logout/forgot-password), fix N+1 en consultas (64 filas con patient_name/professional_name), todos los PDFs/XLSX en hilo, cola durable de correos (email_queue: 6 docs todos 'sent'), y serialize_doc en listas. Frontend OK sin errores de compilacion. Observaciones menores del review (no bugs): list_consultations expone _id como string (consistencia, no fuga); CSRF rota en /auth/refresh (el interceptor del frontend ya lo maneja). Test file: backend/tests/test_regression_iter5.py.
+
 ### Revision de calidad de codigo — correcciones aplicadas (Jun 2026)
 Se recibio un reporte automatico de calidad. Se aplicaron SOLO las correcciones reales y de bajo riesgo (la app esta en produccion, no se refactoriza codigo que funciona por metricas de estilo):
 - **Secretos hardcodeados en tests (REAL, corregido)**: `tests/test_sessions.py`, `test_retention_dashboard.py` y `test_activation_tracking.py` hardcodeaban passwords de las cuentas seed. Ahora importan de `tests/_credentials.py` (lee SOLO de env vars, con `require()` que falla claro si faltan). La password del test que crea empresa temporal ahora es aleatoria (`uuid`).
