@@ -37,6 +37,7 @@ import JornadaPanelPage from './pages/JornadaPanelPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import RetentionDashboard from './pages/RetentionDashboard';
+import EmailQueuePage from './pages/EmailQueuePage';
 import './App.css';
 
 function App() {
@@ -79,6 +80,7 @@ function App() {
             <Route path="admin/comunicacion" element={<AnnouncementsPage />} />
             <Route path="admin/audit" element={<AuditLogPage />} />
             <Route path="admin/health" element={<HealthMetricsPage />} />
+            <Route path="admin/correos" element={<EmailQueuePage />} />
             <Route path="finance" element={<FinancePage />} />
             <Route path="branches" element={<BranchesPage />} />
             <Route path="users" element={<UsersPage />} />

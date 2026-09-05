@@ -9,6 +9,12 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Panel de Correos para SuperAdmin (Jun 2026)
+Vista para monitorear y reenviar la cola durable de correos (`email_queue`). Solo superadmin.
+- **Backend** `routes/email_queue_admin.py` (registrado en server.py): `GET /api/email-queue/stats` (conteos por estado), `GET /api/email-queue?status=&tag=&search=&limit=&skip=` (listado paginado, proyeccion EXCLUYE `html` y `attachments.content` para no traer payloads pesados; anota `attachment_count`/`attachment_names`), `POST /api/email-queue/{id}/resend` (reencola: status->pending, attempts=0, next_attempt_at=now, limpia completed_at), `POST /api/email-queue/retry-failed` (reencola todos los fallidos). Guard `role == superadmin` (403 si no). Audit: EMAIL_QUEUE_RESEND / EMAIL_QUEUE_RETRY_ALL_FAILED.
+- **Frontend** `pages/EmailQueuePage.jsx` + ruta `/admin/correos` + item de menu "Correos" (icono Mail) en la seccion superadmin de `MainLayout.js`. Tarjetas de estado (Total/Enviados/Pendientes/Enviando/Fallidos), tabs de filtro, busqueda por destinatario, tabla con badge de estado, tipo, intentos (n/max), ultimo error, adjunto (paperclip), fecha, y boton "Reenviar" por fila (un clic) + "Reintentar fallidos" (aparece si hay fallidos). Paginacion basica.
+- Verificado por curl (stats/list/resend/403) + screenshot E2E (renderiza 6 filas, botones reenviar; el reenvio via API volvio a pending y el worker lo re-envio a sent). Sin fugas de html/adjuntos en el listado.
+
 ### Regresion completa post-cambios (Jun 2026)
 Testing agent (iteration_5.json): 22/22 pruebas ejecutadas PASARON, 1 omitida (sin datos via ?type=eyeglass, PDFs de recetas ya verificados por separado), 0 fallos. CERO regresiones. Cubre: auth (login/me/refresh/logout/forgot-password), fix N+1 en consultas (64 filas con patient_name/professional_name), todos los PDFs/XLSX en hilo, cola durable de correos (email_queue: 6 docs todos 'sent'), y serialize_doc en listas. Frontend OK sin errores de compilacion. Observaciones menores del review (no bugs): list_consultations expone _id como string (consistencia, no fuga); CSRF rota en /auth/refresh (el interceptor del frontend ya lo maneja). Test file: backend/tests/test_regression_iter5.py.
 
