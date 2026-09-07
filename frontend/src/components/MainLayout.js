@@ -11,7 +11,7 @@ import { ScrollArea } from '../components/ui/scroll-area';
 import { 
   LayoutDashboard, Users, Calendar, FileText, Package, 
   ShoppingCart, DollarSign, Building2, UserCog, BarChart3,
-  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone, Key, ShieldAlert, Rocket, Activity, HandCoins, LifeBuoy, Tent, Sparkles, Mail
+  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone, Key, ShieldAlert, Rocket, Activity, HandCoins, LifeBuoy, Tent, Sparkles, Mail, UserPlus
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -55,6 +55,7 @@ export default function MainLayout() {
     { path: '/admin/audit', icon: ShieldAlert, label: 'Auditoria' },
     { path: '/admin/health', icon: Activity, label: 'Salud Sistema' },
     { path: '/admin/correos', icon: Mail, label: 'Correos' },
+    { path: '/admin/leads', icon: UserPlus, label: 'Solicitudes' },
     { path: '/users', icon: UserCog, label: 'Usuarios' },
     { path: '/settings', icon: Settings, label: 'Configuracion' },
   ] : [

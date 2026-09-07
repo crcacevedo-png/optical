@@ -38,6 +38,8 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import RetentionDashboard from './pages/RetentionDashboard';
 import EmailQueuePage from './pages/EmailQueuePage';
+import PublicLeadFormPage from './pages/PublicLeadFormPage';
+import LeadsAdminPage from './pages/LeadsAdminPage';
 import './App.css';
 
 function App() {
@@ -47,6 +49,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/registro" element={<PublicLeadFormPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route
@@ -81,6 +84,7 @@ function App() {
             <Route path="admin/audit" element={<AuditLogPage />} />
             <Route path="admin/health" element={<HealthMetricsPage />} />
             <Route path="admin/correos" element={<EmailQueuePage />} />
+            <Route path="admin/leads" element={<LeadsAdminPage />} />
             <Route path="finance" element={<FinancePage />} />
             <Route path="branches" element={<BranchesPage />} />
             <Route path="users" element={<UsersPage />} />

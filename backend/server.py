@@ -20,7 +20,7 @@ from routes import (
     notifications, security, data_export, audit_log, onboarding, health_metrics,
     cash_register, support_tickets, billing, jornadas, jornada_ops, jornada_consignment,
     superadmin_retention, reactivation_feedback, sessions, security_reports, user_guide,
-    email_queue_admin,
+    email_queue_admin, leads,
 )
 
 app = FastAPI(title="Cortexia Optical API")
@@ -69,6 +69,7 @@ api_router.include_router(sessions.router)
 api_router.include_router(security_reports.router)
 api_router.include_router(user_guide.router)
 api_router.include_router(email_queue_admin.router)
+api_router.include_router(leads.router)
 # Webhook Stripe: se registra a nivel raiz (no dentro de /api) porque el path
 # ya incluye /api/webhook/stripe segun la libreria emergentintegrations.
 app.include_router(billing.webhook_router)
@@ -475,6 +476,14 @@ async def startup():
     # --- Email queue (cola durable de correos con reintentos) ---
     await db.email_queue.create_index([("status", 1), ("next_attempt_at", 1)])
     await db.email_queue.create_index("completed_at", expireAfterSeconds=604800, name="email_queue_ttl")  # purga enviados/fallidos a los 7d
+
+    # --- Captacion de leads (global) ---
+    await db.leads.create_index("email", unique=True)
+    await db.leads.create_index([("created_at", -1)])
+    await db.leads.create_index("promo_code")
+    await db.leads.create_index("source")
+    await db.leads.create_index("whatsapp")
+    await db.promo_codes.create_index("code", unique=True)
 
     logger.info("MongoDB indexes verified/created OK")
 
