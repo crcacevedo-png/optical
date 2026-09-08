@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
-import { Eye, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
+import { CheckCircle2, Loader2, Sparkles } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const publicApi = axios.create({ baseURL: API_URL, withCredentials: false });
@@ -93,14 +93,13 @@ export default function PublicLeadFormPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 flex flex-col items-center justify-center px-4 py-8" data-testid="public-lead-page">
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <div className="w-11 h-11 rounded-2xl bg-[#1B2A49] flex items-center justify-center">
-            <Eye className="w-6 h-6 text-teal-300" />
-          </div>
-          <div className="text-left">
-            <div className="font-bold text-lg text-[#1B2A49] leading-tight">CORTEXIA</div>
-            <div className="text-[10px] tracking-[0.3em] text-teal-600 font-semibold">OPTICAL</div>
-          </div>
+        <div className="flex items-center justify-center mb-6">
+          <img
+            src="https://customer-assets.emergentagent.com/job_eyecare-erp/artifacts/80lobcqc_logo%20cortexia%20optical%20transparente.png"
+            alt="Cortexia Optical"
+            className="h-16 w-auto object-contain"
+            data-testid="public-lead-logo"
+          />
         </div>
 
         {done ? (
