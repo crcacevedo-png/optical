@@ -97,7 +97,7 @@ export default function PublicLeadFormPage() {
           <img
             src="https://customer-assets.emergentagent.com/job_eyecare-erp/artifacts/80lobcqc_logo%20cortexia%20optical%20transparente.png"
             alt="Cortexia Optical"
-            className="h-16 w-auto object-contain"
+            className="h-24 w-auto object-contain"
             data-testid="public-lead-logo"
           />
         </div>
