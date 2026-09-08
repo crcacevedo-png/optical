@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { OfflineProvider } from './context/OfflineContext';
 import { Toaster } from './components/ui/sonner';
 import ProtectedRoute from './components/ProtectedRoute';
+import RequireSuperAdmin from './components/RequireSuperAdmin';
 import MainLayout from './components/MainLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -83,8 +84,8 @@ function App() {
             <Route path="admin/comunicacion" element={<AnnouncementsPage />} />
             <Route path="admin/audit" element={<AuditLogPage />} />
             <Route path="admin/health" element={<HealthMetricsPage />} />
-            <Route path="admin/correos" element={<EmailQueuePage />} />
-            <Route path="admin/leads" element={<LeadsAdminPage />} />
+            <Route path="admin/correos" element={<RequireSuperAdmin><EmailQueuePage /></RequireSuperAdmin>} />
+            <Route path="admin/leads" element={<RequireSuperAdmin><LeadsAdminPage /></RequireSuperAdmin>} />
             <Route path="finance" element={<FinancePage />} />
             <Route path="branches" element={<BranchesPage />} />
             <Route path="users" element={<UsersPage />} />

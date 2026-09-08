@@ -6,9 +6,11 @@ import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Switch } from '../components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import {
   UserPlus, Download, Link2, Copy, MessageCircle, Search, Users, Tag,
   Ticket, Plus, RefreshCw, AlertTriangle, Inbox, ChevronDown, ChevronRight,
+  Building2, KeyRound, CheckCircle2, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -44,10 +46,17 @@ export default function LeadsAdminPage() {
   const [loading, setLoading] = useState(true);
   const [fCode, setFCode] = useState('');
   const [fSource, setFSource] = useState('');
+  const [fStatus, setFStatus] = useState('');
   const [fDup, setFDup] = useState(false);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 100;
+
+  // Alta de cuenta
+  const [accountLead, setAccountLead] = useState(null);
+  const [accountPassword, setAccountPassword] = useState('');
+  const [creatingAccount, setCreatingAccount] = useState(false);
+  const [accountResult, setAccountResult] = useState(null);
 
   // Filtros disponibles
   const [codes, setCodes] = useState([]);
@@ -81,13 +90,14 @@ export default function LeadsAdminPage() {
       const params = { limit: PAGE_SIZE, skip: page * PAGE_SIZE };
       if (fCode) params.promo_code = fCode;
       if (fSource) params.source = fSource;
+      if (fStatus) params.status = fStatus;
       if (fDup) params.duplicates = true;
       if (search.trim()) params.search = search.trim();
       const { data } = await api.get('/api/leads', { params });
       setItems(data.items || []); setTotal(data.total || 0);
     } catch (err) { toast.error(formatApiErrorDetail(err?.response?.data?.detail) || 'Error al cargar envíos'); }
     finally { setLoading(false); }
-  }, [fCode, fSource, fDup, search, page]);
+  }, [fCode, fSource, fStatus, fDup, search, page]);
 
   const loadGrouped = useCallback(async () => {
     try { const { data } = await api.get('/api/leads/grouped'); setGroups(data.groups || []); }
@@ -112,6 +122,31 @@ export default function LeadsAdminPage() {
       URL.revokeObjectURL(url);
       toast.success('Exportación descargada');
     } catch (err) { toast.error('No se pudo exportar'); }
+  };
+
+  const changeStatus = async (lead, status) => {
+    try {
+      await api.patch(`/api/leads/${lead._id}/status`, { status });
+      setItems((prev) => prev.map((x) => (x._id === lead._id ? { ...x, status } : x)));
+      loadStats();
+    } catch (err) { toast.error('No se pudo actualizar el estado'); }
+  };
+
+  const openAccount = (lead) => { setAccountLead(lead); setAccountPassword(''); setAccountResult(null); };
+
+  const submitAccount = async () => {
+    if (!accountLead) return;
+    try {
+      setCreatingAccount(true);
+      const { data } = await api.post(`/api/leads/${accountLead._id}/create-account`,
+        { admin_password: accountPassword.trim() || undefined });
+      setAccountResult(data);
+      toast.success('Cuenta creada correctamente');
+      setItems((prev) => prev.map((x) => (x._id === accountLead._id ? { ...x, status: 'cuenta_creada' } : x)));
+      loadStats();
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err?.response?.data?.detail) || 'No se pudo crear la cuenta');
+    } finally { setCreatingAccount(false); }
   };
 
   const createCode = async (e) => {
@@ -194,6 +229,15 @@ export default function LeadsAdminPage() {
                       {sources.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
+                  <div>
+                    <label className="text-xs text-slate-500 block mb-1">Estado</label>
+                    <select value={fStatus} onChange={(e) => { setPage(0); setFStatus(e.target.value); }} className="h-9 rounded-md border border-slate-200 text-sm px-2 bg-white" data-testid="filter-status">
+                      <option value="">Todos</option>
+                      <option value="nueva">Nueva</option>
+                      <option value="contactada">Contactada</option>
+                      <option value="cuenta_creada">Cuenta creada</option>
+                    </select>
+                  </div>
                   <label className="flex items-center gap-2 text-sm text-slate-600 h-9">
                     <Switch checked={fDup} onCheckedChange={(v) => { setPage(0); setFDup(v); }} data-testid="filter-duplicates" />
                     Solo duplicados
@@ -223,15 +267,16 @@ export default function LeadsAdminPage() {
                       <th className="py-2 px-3">Correo</th>
                       <th className="py-2 px-3">Código</th>
                       <th className="py-2 px-3">Origen</th>
+                      <th className="py-2 px-3">Estado</th>
                       <th className="py-2 px-3">Fecha</th>
                       <th className="py-2 px-3 text-right">Acción</th>
                     </tr>
                   </thead>
                   <tbody data-testid="leads-tbody">
                     {loading ? (
-                      <tr><td colSpan={9} className="py-10 text-center text-slate-400"><RefreshCw className="w-5 h-5 animate-spin inline mr-2" /> Cargando…</td></tr>
+                      <tr><td colSpan={10} className="py-10 text-center text-slate-400"><RefreshCw className="w-5 h-5 animate-spin inline mr-2" /> Cargando…</td></tr>
                     ) : items.length === 0 ? (
-                      <tr><td colSpan={9} className="py-10 text-center text-slate-400" data-testid="leads-empty"><Inbox className="w-8 h-8 mx-auto mb-2 opacity-40" /> No hay solicitudes.</td></tr>
+                      <tr><td colSpan={10} className="py-10 text-center text-slate-400" data-testid="leads-empty"><Inbox className="w-8 h-8 mx-auto mb-2 opacity-40" /> No hay solicitudes.</td></tr>
                     ) : items.map((it) => (
                       <tr key={it._id} className="border-b border-slate-100 hover:bg-slate-50/60" data-testid={`lead-row-${it._id}`}>
                         <td className="py-2.5 px-3 text-slate-800 font-medium">
@@ -244,13 +289,31 @@ export default function LeadsAdminPage() {
                         <td className="py-2.5 px-3 text-slate-600">{it.email}</td>
                         <td className="py-2.5 px-3">{it.promo_code ? <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200" variant="outline">{it.promo_code}</Badge> : <span className="text-slate-300">Sin código</span>}</td>
                         <td className="py-2.5 px-3 text-xs text-slate-500">{it.source}</td>
+                        <td className="py-2.5 px-3">
+                          {it.status === 'cuenta_creada' ? (
+                            <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-200">Cuenta creada</Badge>
+                          ) : (
+                            <select value={it.status || 'nueva'} onChange={(e) => changeStatus(it, e.target.value)}
+                              className="h-8 rounded-md border border-slate-200 text-xs px-1.5 bg-white" data-testid={`status-select-${it._id}`}>
+                              <option value="nueva">Nueva</option>
+                              <option value="contactada">Contactada</option>
+                            </select>
+                          )}
+                        </td>
                         <td className="py-2.5 px-3 text-xs text-slate-500 whitespace-nowrap">{fmtDate(it.created_at)}</td>
                         <td className="py-2.5 px-3 text-right">
-                          <a href={waLink(it.whatsapp)} target="_blank" rel="noreferrer">
-                            <Button size="sm" variant="outline" className="gap-1 text-emerald-600 border-emerald-200 hover:bg-emerald-50" data-testid={`wa-btn-${it._id}`}>
-                              <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
-                            </Button>
-                          </a>
+                          <div className="flex items-center justify-end gap-2">
+                            <a href={waLink(it.whatsapp)} target="_blank" rel="noreferrer">
+                              <Button size="sm" variant="outline" className="gap-1 text-emerald-600 border-emerald-200 hover:bg-emerald-50" data-testid={`wa-btn-${it._id}`}>
+                                <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                              </Button>
+                            </a>
+                            {it.status !== 'cuenta_creada' && (
+                              <Button size="sm" onClick={() => openAccount(it)} data-testid={`open-account-btn-${it._id}`} className="gap-1 bg-[#1B2A49] hover:bg-[#111d33]">
+                                <Building2 className="w-3.5 h-3.5" /> Abrir cuenta
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -378,6 +441,60 @@ export default function LeadsAdminPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!accountLead} onOpenChange={(o) => { if (!o) { setAccountLead(null); setAccountResult(null); } }}>
+        <DialogContent data-testid="account-dialog">
+          {!accountResult ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2"><Building2 className="w-5 h-5 text-indigo-600" /> Abrir cuenta</DialogTitle>
+                <DialogDescription>Se creará la óptica y su usuario administrador, y se enviará un correo de bienvenida con las credenciales.</DialogDescription>
+              </DialogHeader>
+              {accountLead && (
+                <div className="space-y-3 text-sm">
+                  <div className="bg-slate-50 rounded-lg p-3 space-y-1">
+                    <div><span className="text-slate-500">Óptica:</span> <b>{accountLead.optica_name || accountLead.name}</b></div>
+                    <div><span className="text-slate-500">Administrador:</span> {accountLead.name}</div>
+                    <div><span className="text-slate-500">Correo (usuario):</span> {accountLead.email}</div>
+                    {accountLead.location && <div><span className="text-slate-500">Ubicación:</span> {accountLead.location}</div>}
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 block mb-1">Contraseña temporal (opcional)</label>
+                    <Input value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} placeholder="Dejar vacío para generar automáticamente" data-testid="account-password-input" />
+                  </div>
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAccountLead(null)} data-testid="cancel-account-btn">Cancelar</Button>
+                <Button onClick={submitAccount} disabled={creatingAccount} data-testid="confirm-create-account-btn" className="bg-[#1B2A49] hover:bg-[#111d33]">
+                  {creatingAccount ? <><Loader2 className="w-4 h-4 animate-spin mr-1" /> Creando…</> : 'Crear cuenta'}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-emerald-700"><CheckCircle2 className="w-5 h-5" /> Cuenta creada</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 text-sm" data-testid="account-result">
+                <p className="text-slate-600">La óptica y su administrador fueron creados. Se envió un correo de bienvenida con las credenciales.</p>
+                <div className="bg-slate-50 rounded-lg p-3 space-y-2">
+                  <div><span className="text-slate-500">Usuario:</span> <b>{accountResult.admin_email}</b></div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-slate-500">Contraseña temporal:</span>
+                    <code className="bg-white border rounded px-2 py-0.5" data-testid="temp-password">{accountResult.temp_password}</code>
+                    <Button size="sm" variant="ghost" className="h-7" onClick={() => copy(accountResult.temp_password, 'Contraseña copiada')}><Copy className="w-3.5 h-3.5" /></Button>
+                  </div>
+                  <p className="text-xs text-amber-600 flex items-center gap-1"><KeyRound className="w-3 h-3" /> Comparte estas credenciales de forma segura. Se recomienda cambiar la contraseña al primer ingreso.</p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => { setAccountLead(null); setAccountResult(null); }} data-testid="close-account-dialog-btn">Listo</Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

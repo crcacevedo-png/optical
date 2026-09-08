@@ -9,6 +9,14 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Solicitudes de cuenta: guard, alta de cuenta, aviso y estados (Jun 2026)
+Cuatro mejoras sobre el módulo de Solicitudes (leads), todas verificadas por API + navegador:
+- **Guard de ruta admin**: nuevo `components/RequireSuperAdmin.jsx` (usa `useAuth().user.role`); envuelve `/admin/leads` y `/admin/correos` en App.js. Un no-superadmin es redirigido a `/dashboard` (antes solo veía toast + datos vacíos). Verificado: admin@cortexia.gt → redirigido.
+- **Abrir cuenta desde una solicitud** (alta real): `POST /api/leads/{id}/create-account` (superadmin) crea empresa + usuario admin REUTILIZANDO el flujo existente (`hash_password`, mismos campos que `POST /api/companies`, `render_welcome_company` + `queue_email`). Genera contraseña temporal fuerte (`secrets`) si no se pasa una, la devuelve para compartir, encola el correo de bienvenida con credenciales, marca la solicitud `cuenta_creada` + `company_id`, y hace rollback de la empresa si el correo ya existe como usuario (409). Verificado E2E: la cuenta creada **inicia sesión correctamente**. 409 si ya fue convertida. NO se escribió auth nuevo (se reutilizó el flujo vetado existente). UI: botón "Abrir cuenta" + diálogo con datos precargados y contraseña opcional; pantalla de éxito con la contraseña temporal (copiar).
+- **Aviso de nueva solicitud**: al enviar el formulario público, `_notify_superadmins_new_lead` encola (cola durable) un correo a todos los superadmins activos (fallback env `CORTEXIA_ALERTS_TO`/`ADMIN_EMAIL`) + crea notificación push. Best-effort (no rompe el submit). Verificado: 2 correos `tag=new_lead` encolados.
+- **Estado de solicitud**: campo `status` (nueva/contactada/cuenta_creada, default "nueva"). `PATCH /api/leads/{id}/status` (superadmin). Filtro por estado en `GET /api/leads` y en la UI; columna Estado con selector inline (nueva/contactada) o badge "Cuenta creada"; columna Estado añadida al export XLSX. Menú renombrado a "Solicitudes".
+
+
 ### Formulario público "Solicita tu cuenta" + panel SuperAdmin (Jun 2026)
 Formulario público compartible (sin login) para que ópticas soliciten abrir cuenta; datos SOLO para superadmin (global, sin tenant). Al enviar SOLO se registra la solicitud (el superadmin revisa y abre la cuenta manualmente — NO crea cuentas automáticamente).
 - **Backend** `routes/leads.py` (colecciones `leads` y `promo_codes`; índices únicos `leads.email` y `promo_codes.code`):
