@@ -217,27 +217,27 @@ def _toc(story, styles):
     story.append(Paragraph("Contenido", styles["H1"]))
     story.append(Spacer(1, 6))
     items = [
-        ("1", "Introduccion a Cortexia Optical", "3"),
-        ("2", "Antes de empezar: Primer ingreso", "4"),
-        ("3", "Guia para el Administrador", "5"),
-        ("3.1", "Configuracion inicial de la optica", "5"),
+        ("1", "Introduccion a Cortexia Optical", "4"),
+        ("2", "Antes de empezar: Primer ingreso", "5"),
+        ("3", "Guia para el Administrador", "6"),
+        ("3.1", "Configuracion inicial de la optica", "6"),
         ("3.2", "Gestion de sucursales y equipo", "6"),
         ("3.3", "Inventario y proveedores", "7"),
         ("3.4", "Caja y finanzas", "8"),
-        ("3.5", "Reportes y auditoria", "9"),
-        ("3.6", "Seguridad y sesiones activas", "10"),
-        ("4", "Guia para el Vendedor", "11"),
-        ("4.1", "Registro de pacientes", "11"),
-        ("4.2", "Cotizaciones y ventas", "12"),
-        ("4.3", "Manejo de caja diaria", "13"),
-        ("4.4", "Agenda y citas", "14"),
-        ("5", "Guia para el Doctor / Optometrista", "15"),
-        ("5.1", "Consultas oftalmologicas", "15"),
-        ("5.2", "Recetas de lentes y oftalmicas", "16"),
-        ("5.3", "Historial clinico del paciente", "17"),
-        ("6", "Modulo especial: Jornadas", "18"),
-        ("7", "Buenas practicas y consejos", "19"),
-        ("8", "Soporte y contacto", "20"),
+        ("3.5", "Reportes y auditoria", "10"),
+        ("3.6", "Seguridad y sesiones activas", "11"),
+        ("4", "Guia para el Vendedor", "12"),
+        ("4.1", "Registro de pacientes", "12"),
+        ("4.2", "Cotizaciones y ventas", "13"),
+        ("4.3", "Manejo de caja diaria", "14"),
+        ("4.4", "Agenda y citas", "15"),
+        ("5", "Guia para el Doctor / Optometrista", "16"),
+        ("5.1", "Consultas oftalmologicas", "16"),
+        ("5.2", "Recetas de anteojos, contacto y medicas", "17"),
+        ("5.3", "Historial clinico del paciente", "18"),
+        ("6", "Modulo especial: Jornadas", "19"),
+        ("7", "Buenas practicas y consejos", "20"),
+        ("8", "Soporte y contacto", "21"),
     ]
     rows = []
     for num, title, page in items:
@@ -326,6 +326,8 @@ def _intro(story, styles):
         ["Caja", "Apertura/cierre diario, control de efectivo por sucursal"],
         ["Cotizaciones", "Envio por email/WhatsApp, expiracion, conversion a venta"],
         ["Cuentas por Cobrar", "Seguimiento de saldos pendientes con recordatorios"],
+        ["Cuentas por Pagar", "Egresos a credito con abonos parciales y avisos de vencimiento"],
+        ["Estado de Resultados", "P&L base caja: ingresos, egresos y utilidad neta exportable"],
         ["Agenda", "Citas con recordatorio automatico, proxima cita post-consulta"],
         ["Jornadas", "Modulo para brigadas medicas y eventos externos"],
     ]
@@ -436,29 +438,70 @@ def _admin_section(story, styles):
     story.append(Paragraph("<b>Proveedores</b>", styles["H3"]))
     story.append(Paragraph(
         "En <b>Proveedores</b> registras a quien les compras (nombre, contacto, telefono, WhatsApp). "
-        "Luego los puedes vincular a productos para saber de donde vinieron.",
+        "Un mismo proveedor se puede vincular <b>tanto a productos del inventario</b> (para saber de "
+        "donde vinieron) <b>como a los egresos / compras del modulo Finanzas</b>. Asi el sistema "
+        "totaliza cuanto le compras a cada proveedor y cuanto le debes.",
         styles["Body"]))
 
     story.append(PageBreak())
     story.append(Paragraph("3.4 Caja y finanzas", styles["H2"]))
     story.append(Paragraph(
         "<b>Caja diaria</b>: el vendedor abre caja al iniciar el turno con un monto en efectivo. "
-        "Al cerrar, el sistema calcula si sobra o falta dinero. Ve a <b>Caja</b>.",
+        "Durante el dia se registran ventas y egresos, y al cerrar el sistema calcula si sobra o "
+        "falta dinero. Ve a <b>Caja</b>.",
         styles["Body"]))
-    story.append(Paragraph(
-        "<b>Modulo Finanzas</b>: acceso solo para admin. Muestra:",
-        styles["Body"]))
+    story.append(Paragraph("<b>El arqueo integra los egresos</b>", styles["H3"]))
     story.append(_bullets([
-        "Ingresos por sucursal, por metodo de pago, por dia/semana/mes.",
-        "Gastos operativos que puedes registrar manualmente.",
-        "Utilidad bruta calculada automaticamente (Precio − Costo).",
-        "Grafico de tendencia de ventas.",
+        "El <b>efectivo esperado</b> = fondo inicial + efectivo recaudado − <b>egresos en efectivo</b> del turno.",
+        "Solo los egresos pagados en <b>efectivo</b> restan del efectivo esperado; tarjeta, "
+        "transferencia o cheque no afectan el conteo de billetes.",
+        "El <b>resumen del turno en vivo</b> muestra en todo momento lo recaudado, los egresos y el "
+        "efectivo esperado sin necesidad de cerrar la caja.",
     ], styles))
-    story.append(Paragraph("<b>Cuentas por cobrar</b>", styles["H3"]))
+    story.append(Paragraph("<b>Registrar un egreso desde Caja</b>", styles["H3"]))
+    story.append(_bullets([
+        "Con el boton <b>Registrar egreso</b> (en la misma pantalla de Caja) anotas un gasto sin salir del turno.",
+        "Eliges la <b>categoria</b>, el <b>metodo de pago</b> y, cuando aplica, el <b>proveedor</b>.",
+        "Queda reflejado al instante en el resumen del turno y en el arqueo de cierre.",
+    ], styles))
+    story.append(Paragraph("<b>Imprimir y exportar el turno</b>", styles["H3"]))
+    story.append(_bullets([
+        "<b>Imprimir cierre (PDF)</b>: arqueo completo con el detalle de egresos linea por linea.",
+        "<b>Descargar egresos del turno (Excel)</b>: todos los gastos del turno para tu contabilidad.",
+    ], styles))
+    story.append(PageBreak())
+
+    story.append(Paragraph("3.4 Caja y finanzas (continuacion)", styles["H2"]))
     story.append(Paragraph(
-        "Cuando una venta se paga solo en parte, el saldo pendiente aparece en "
-        "<b>Cuentas por cobrar</b>. El sistema te sugiere fechas de seguimiento y "
-        "puedes enviar recordatorios por WhatsApp al paciente con un click.",
+        "El <b>modulo Finanzas</b> (solo admin) concentra ingresos por sucursal y metodo de pago, "
+        "gastos operativos, utilidad, tendencia de ventas y todo lo relacionado a egresos.",
+        styles["Body"]))
+    story.append(Paragraph("<b>Egresos con proveedor</b>", styles["H3"]))
+    story.append(Paragraph(
+        "Cada egreso puede llevar un <b>proveedor</b> (obligatorio en la categoria <b>Proveedores</b>), "
+        "lo que permite filtrar y totalizar cuanto le compras a cada uno.",
+        styles["Body"]))
+    story.append(Paragraph("<b>Egresos a credito y Cuentas por Pagar</b>", styles["H3"]))
+    story.append(_bullets([
+        "Un egreso a <b>credito</b> deja un saldo que aparece en <b>Cuentas por Pagar</b>.",
+        "Ahi registras <b>abonos parciales</b> y el sistema avisa de <b>vencimientos</b> (vencidos y por vencer).",
+    ], styles))
+    story.append(Paragraph("<b>Anular un movimiento</b>", styles["H3"]))
+    story.append(Paragraph(
+        "Si un ingreso o egreso quedo mal, <b>anulalo con un motivo</b> (no se borra): queda tachado y "
+        "auditable y <b>deja de contar</b> en totales, reportes, Cuentas por Pagar y caja. Lo puede anular "
+        "el <b>administrador</b> o <b>quien lo registro</b>.",
+        styles["Body"]))
+    story.append(Paragraph("<b>Estado de Resultados (P&amp;L)</b>", styles["H3"]))
+    story.append(Paragraph(
+        "En pantalla y exportable a <b>Excel y PDF</b>: ingresos y egresos por categoria y la <b>utilidad "
+        "neta</b> del periodo. Usa <b>base caja</b> (los egresos a credito cuentan solo por lo ya abonado), "
+        "a diferencia de la <b>utilidad bruta</b> Precio − Costo, que mide margen y no flujo de caja.",
+        styles["Body"]))
+    story.append(Paragraph("<b>Arrastre y Cuentas por Cobrar</b>", styles["H3"]))
+    story.append(Paragraph(
+        "Los saldos de ventas parciales van a <b>Cuentas por Cobrar</b> (con recordatorios por WhatsApp). "
+        "Cobrar y pagar <b>se arrastran entre periodos</b> hasta saldarse o anularse; cada abono baja el saldo.",
         styles["Body"]))
 
     story.append(PageBreak())
@@ -474,11 +517,18 @@ def _admin_section(story, styles):
         "<b>Historico de precios</b>: cambios de precio de cada producto.",
     ], styles))
     story.append(Paragraph("<b>Todos exportables a Excel y PDF.</b>", styles["Body"]))
+    story.append(Paragraph("<b>Reportes del modulo Finanzas</b>", styles["H3"]))
+    story.append(_bullets([
+        "<b>Compras por proveedor</b> (Excel): total comprado a cada proveedor en el periodo.",
+        "<b>Egresos por rango de fechas</b> (Excel): todos los gastos entre dos fechas, por categoria y metodo.",
+        "<b>Estado de Resultados</b> (Excel y PDF): utilidad neta en base caja del periodo.",
+    ], styles))
 
     story.append(Paragraph("Auditoria", styles["H3"]))
     story.append(Paragraph(
         "En <b>Auditoria</b> ves cada accion del equipo: quien creo un paciente, "
-        "quien modifico un precio, quien cerro caja, quien cambio permisos. "
+        "quien modifico un precio, quien cerro caja, quien cambio permisos y "
+        "<b>quien anulo un movimiento financiero y con que motivo</b>. "
         "Todo con fecha, hora, IP y usuario. Ideal para investigar discrepancias.",
         styles["Body"]))
 
@@ -550,6 +600,8 @@ def _vendor_section(story, styles):
         "Elige metodo(s) de pago — puedes combinar efectivo + tarjeta + transferencia.",
         "Si el pago es parcial, el saldo pendiente va a <b>Cuentas por cobrar</b>.",
         "El sistema descuenta el stock automaticamente e imprime el ticket.",
+        "Desde el detalle de la venta puedes <b>Imprimir el recibo</b> (PDF) o "
+        "<b>Compartirlo por WhatsApp</b> al paciente con un click.",
     ], styles))
 
     story.append(PageBreak())
@@ -563,15 +615,18 @@ def _vendor_section(story, styles):
     story.append(Paragraph("<b>Durante el dia</b>:", styles["H3"]))
     story.append(_bullets([
         "Cada venta se registra automaticamente en tu caja.",
-        "Si tienes que sacar dinero para un gasto (ej. compra de utiles), registralo como <b>Egreso</b>.",
-        "Si recibes ingresos no relacionados a ventas (ej. pago de anticipo), registralo como <b>Ingreso</b>.",
+        "Para sacar dinero por un gasto usa el boton <b>Registrar egreso</b> desde la misma pantalla "
+        "de Caja (eliges el metodo de pago y, si aplica, el proveedor).",
+        "El <b>resumen del turno en vivo</b> te muestra lo recaudado, los egresos y el <b>efectivo esperado</b> "
+        "sin tener que cerrar la caja.",
+        "Solo los egresos <b>en efectivo</b> restan del efectivo esperado; tarjeta, transferencia o cheque no.",
     ], styles))
     story.append(Paragraph("<b>Al cerrar tu turno</b>:", styles["H3"]))
     story.append(_bullets([
         "Cuenta el efectivo real que tienes en la caja.",
-        "Ve a <b>Caja</b> → <b>Cerrar caja</b>.",
-        "Ingresa el monto real. El sistema te muestra si sobra o falta dinero.",
-        "Imprime el reporte de cierre y adjuntalo al efectivo.",
+        "Ve a <b>Caja</b> → <b>Cerrar caja</b> e ingresa el monto real; el sistema te muestra si sobra o falta.",
+        "Usa <b>Imprimir cierre (PDF)</b> para el arqueo (incluye el detalle de egresos linea por linea).",
+        "Con <b>Descargar egresos del turno (Excel)</b> bajas todos los gastos del turno.",
     ], styles))
 
     story.append(PageBreak())
@@ -620,7 +675,7 @@ def _doctor_section(story, styles):
     ))
 
     story.append(PageBreak())
-    story.append(Paragraph("5.2 Recetas de lentes y oftalmicas", styles["H2"]))
+    story.append(Paragraph("5.2 Recetas de anteojos, contacto y medicas", styles["H2"]))
     story.append(Paragraph("<b>Receta de lentes graduados</b>", styles["H3"]))
     story.append(_bullets([
         "Dentro de la consulta, click en <b>Receta de lentes</b>.",
@@ -629,6 +684,14 @@ def _doctor_section(story, styles):
         "Firma digital (guardada una vez, se reutiliza).",
         "PDF generado con logo de la optica y colegiado.",
         "Envio directo por WhatsApp al paciente con un click.",
+    ], styles))
+
+    story.append(Paragraph("<b>Receta de lentes de contacto</b>", styles["H3"]))
+    story.append(_bullets([
+        "Pestaña <b>Lentes de Contacto</b> en Recetas: datos por ojo (<b>OD / OS</b>) con esfera, "
+        "cilindro, eje, adicion, <b>diametro</b> y <b>curva base</b>.",
+        "Marca, tipo de reemplazo y fecha de vencimiento del lente.",
+        "PDF con logo y envio por WhatsApp; el sistema avisa cuando el lente esta por vencer.",
     ], styles))
 
     story.append(Paragraph("<b>Receta medica (medicamentos)</b>", styles["H3"]))
@@ -675,12 +738,20 @@ def _jornadas_section(story, styles):
         "<b>POS aislado</b>: ventas rapidas sin descontar del stock principal.",
         "Registro de pacientes con etiqueta 'origen: Jornada X'.",
         "Consulta + receta encadenadas al vuelo desde el POS de Jornada.",
+        "<b>Modo sin internet (offline)</b>: si te quedas sin señal, puedes seguir capturando "
+        "pacientes; los datos se guardan cifrados en el dispositivo y se <b>sincronizan solos</b> "
+        "al volver la conexion.",
         "<b>Liquidacion final</b>: reporte PDF/Excel con ventas, saldos, stock restante.",
     ], styles))
     story.append(_tip_box(
         "Al finalizar la jornada, el sistema genera automaticamente un reporte de liquidacion "
         "con todo lo vendido y el saldo pendiente por cobrar. Ideal para brigadas cientificas.",
         styles, color=BRAND_AMBER, title="Ideal para"
+    ))
+    story.append(_tip_box(
+        "Un indicador en la barra superior te avisa cuando estas sin conexion y cuantos registros "
+        "faltan por sincronizar. Busca señal antes de cerrar la jornada para no perder capturas.",
+        styles, color=BRAND_TEAL, title="Modo offline"
     ))
     story.append(PageBreak())
 
@@ -702,6 +773,12 @@ def _best_practices(story, styles):
          "Todos tus datos estan respaldados en la nube. No necesitas hacer nada."),
         ("Compartir la responsabilidad",
          "El admin puede delegar tareas creando roles con permisos especificos. No todo lo debe hacer el dueño."),
+        ("Anula, no borres",
+         "Si un ingreso o egreso quedo mal, anulalo con su motivo en vez de eliminarlo. Queda tachado y "
+         "auditable y deja de contar en los totales; asi mantienes la trazabilidad."),
+        ("Revisa Cuentas por Pagar y sus vencimientos",
+         "Manten al dia los egresos a credito: registra los abonos y atiende los avisos de vencimiento "
+         "para cuidar la relacion con tus proveedores."),
     ]
     for t, d in tips:
         story.append(Paragraph(f"<b>· {t}</b>", styles["Body"]))

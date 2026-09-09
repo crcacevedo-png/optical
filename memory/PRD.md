@@ -9,6 +9,21 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Revisión completa de la Guía de Usuario PDF (Jun 2026)
+Revisión sección por sección de la guía (`routes/user_guide.py`) para dejarla al día con todas las funciones actuales (también sirve como material comercial vía enlace público). Sin rediseño visual ni cambios en los pasos del Inicio rápido (opción A: se dejan los 8 pasos). Solo contenido. Antes de documentar, se verificó en el código que cada función exista.
+- **§1 Módulos**: agregados "Cuentas por Pagar" y "Estado de Resultados" a la tabla de módulos.
+- **§3.3 Inventario/proveedores**: aclarado que un proveedor se vincula tanto a productos como a egresos/compras de Finanzas.
+- **§3.4 Caja y finanzas** (mayor actualización, ahora 2 páginas): egresos integrados en el arqueo (solo efectivo resta del efectivo esperado), resumen del turno en vivo, botón "Registrar egreso" desde Caja (método+proveedor), "Imprimir cierre (PDF)" y "Descargar egresos del turno (Excel)", egreso con proveedor (obligatorio en categoría Proveedores), egresos a crédito → Cuentas por Pagar con abonos y vencimientos, anular movimiento con motivo (auditable), Estado de Resultados base caja vs utilidad bruta, y arrastre de cuentas por cobrar/pagar.
+- **§3.5 Reportes/auditoría**: añadidos reportes de Finanzas (compras por proveedor, egresos por rango, Estado de Resultados) y nota de que las anulaciones quedan registradas en Auditoría.
+- **§4.2 Ventas**: mención de "Imprimir recibo" y "Compartir por WhatsApp" del comprobante.
+- **§4.3 Caja diaria**: botón Registrar egreso desde Caja, resumen del turno en vivo, Imprimir cierre (PDF), Descargar egresos (Excel), y que solo egresos en efectivo afectan el efectivo esperado.
+- **§5.2 Recetas**: agregado bloque "Receta de lentes de contacto" (OD/OS: esfera, cilindro, eje, adición, diámetro, curva base; marca/reemplazo/vencimiento; PDF y WhatsApp). Sección renombrada a "Recetas de anteojos, contacto y médicas".
+- **§6 Jornadas**: agregado modo offline (captura sin internet, datos cifrados en el dispositivo, sincronización automática) + tip del indicador de sincronización.
+- **§7 Buenas prácticas**: 2 consejos nuevos ("Anula, no borres" y "Revisa Cuentas por Pagar y sus vencimientos").
+- **TOC**: números de página corregidos a los valores reales (el PDF ahora tiene 21 páginas; el índice ocupa 2 páginas).
+- Verificado: `_build_pdf()` genera 21 páginas válidas (%PDF), sin errores de encoding (ñ, acentos, −, P&L), y el endpoint en vivo `GET /api/docs/user-guide.pdf` responde 200 con admin (cookie httpOnly).
+
+
 ### Estado de Resultados mensual (P&L, base caja) (Jun 2026)
 Vista y exportación del P&L (ingresos por categoría − egresos por categoría = utilidad neta) en Finanzas, usando el rango de fechas y sucursal seleccionados. **Base CAJA** (decisión del usuario): los ingresos ya son base caja (una entrada por pago real; los abonos a cuentas por cobrar generan su propia entrada), los egresos de contado cuentan por su fecha, y **los egresos a crédito cuentan SOLO por los abonos realmente pagados** (payments[] con fecha en el rango), NO por el total devengado. Excluye anulados. Coexiste con `/summary` (que sigue en base devengado para la vista de Movimientos).
 - **Backend** `routes/finance.py`: `_compute_income_statement(...)`; `GET /api/finance/income-statement` (JSON), `/income-statement.xlsx` (`_render_pl_xlsx`, hoja INGRESOS/EGRESOS/UTILIDAD NETA) y `/income-statement.pdf` (`_render_pl_pdf`, reportlab). superadmin 403, branch_id inválido 400. Audit `FINANCE_INCOME_STATEMENT`.
