@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [alertDetails, setAlertDetails] = useState([]);
+  const [payablesAlerts, setPayablesAlerts] = useState(null);
   const [loading, setLoading] = useState(true);
   const [branchId, setBranchId] = useState('');
   const [announcements, setAnnouncements] = useState([]);
@@ -59,6 +60,9 @@ export default function DashboardPage() {
       ]);
       setData(dashRes.data);
       setAlertDetails(alertsRes.data || []);
+      api.get('/api/finance/payables/alerts', { params })
+        .then(r => setPayablesAlerts(r.data))
+        .catch(() => setPayablesAlerts(null));
     } catch (error) {
       console.error('Error fetching dashboard:', error);
     } finally {
@@ -225,7 +229,48 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Stats Grid */}
+      {/* Cuentas por Pagar: vencidas / por vencer */}
+      {payablesAlerts && (payablesAlerts.overdue?.count > 0 || payablesAlerts.due_soon?.count > 0) && (
+        <Card
+          className={`${payablesAlerts.overdue?.count > 0 ? 'border-red-200 bg-red-50/50' : 'border-amber-200 bg-amber-50/50'}`}
+          data-testid="payables-reminder-card"
+        >
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className={`p-2 rounded-lg ${payablesAlerts.overdue?.count > 0 ? 'bg-red-100' : 'bg-amber-100'}`}>
+                <Clock className={`w-5 h-5 ${payablesAlerts.overdue?.count > 0 ? 'text-red-600' : 'text-amber-600'}`} />
+              </div>
+              <div className="flex-1">
+                <h3 className={`font-semibold text-sm ${payablesAlerts.overdue?.count > 0 ? 'text-red-900' : 'text-amber-900'}`}>
+                  Cuentas por pagar
+                </h3>
+                <div className="mt-1 space-y-1">
+                  {payablesAlerts.overdue?.count > 0 && (
+                    <p className="text-sm text-red-700 flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      {payablesAlerts.overdue.count} cuenta{payablesAlerts.overdue.count !== 1 ? 's' : ''} vencida{payablesAlerts.overdue.count !== 1 ? 's' : ''} · {formatCurrency(payablesAlerts.overdue.total)}
+                    </p>
+                  )}
+                  {payablesAlerts.due_soon?.count > 0 && (
+                    <p className="text-sm text-amber-700 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      {payablesAlerts.due_soon.count} por vencer (próx. {payablesAlerts.days} días) · {formatCurrency(payablesAlerts.due_soon.total)}
+                    </p>
+                  )}
+                </div>
+                <Link
+                  to="/payables"
+                  className="inline-block text-xs font-medium mt-2 text-pine-700 hover:underline"
+                  data-testid="payables-reminder-link"
+                >
+                  Ver cuentas por pagar →
+                </Link>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
           <Card key={stat.title} className="border-slate-200/80" data-testid={`stat-card-${index}`}>

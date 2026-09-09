@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { api, useAuth } from '../context/AuthContext';
 import { GlobalSearch } from './GlobalSearch';
 import { NotificationBell } from './NotificationBell';
 import { OfflineIndicator } from './OfflineIndicator';
@@ -27,6 +27,7 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [payablesBadge, setPayablesBadge] = useState(0);
 
   const handleLogout = async () => {
     await logout();
@@ -44,6 +45,15 @@ export default function MainLayout() {
   // Permisos por rol (config del admin). null = sin restriccion (admin).
   const allowedMenuItems = user?.allowed_menu_items;
   const canAccess = (key) => !allowedMenuItems || allowedMenuItems.includes(key);
+
+  useEffect(() => {
+    if (user && user.role !== 'superadmin' && hasModule('finanzas') && canAccess('payables')) {
+      api.get('/api/finance/payables/alerts')
+        .then((r) => setPayablesBadge((r.data?.overdue?.count || 0) + (r.data?.due_soon?.count || 0)))
+        .catch(() => setPayablesBadge(0));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const navItems = isSuperAdmin ? [
     { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -72,7 +82,7 @@ export default function MainLayout() {
     ...(hasModule('inventario') ? [{ path: '/inventory', icon: Package, label: 'Inventario', key: 'inventory' }] : []),
     ...(hasModule('jornadas') ? [{ path: '/jornadas', icon: Tent, label: 'Jornadas', key: 'jornadas' }] : []),
     ...(hasModule('finanzas') ? [{ path: '/finance', icon: DollarSign, label: 'Finanzas', key: 'finance' }] : []),
-    ...(hasModule('finanzas') ? [{ path: '/payables', icon: Banknote, label: 'Cuentas por Pagar', key: 'payables' }] : []),
+    ...(hasModule('finanzas') ? [{ path: '/payables', icon: Banknote, label: 'Cuentas por Pagar', key: 'payables', badge: payablesBadge }] : []),
     ...(hasModule('proveedores') ? [{ path: '/suppliers', icon: Truck, label: 'Proveedores', key: 'suppliers' }] : []),
     ...(isAdmin ? [
       { path: '/reports', icon: BarChart3, label: 'Reportes' },
@@ -111,6 +121,14 @@ export default function MainLayout() {
         >
           <item.icon className="w-5 h-5" />
           <span>{item.label}</span>
+          {item.badge > 0 && (
+            <span
+              className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-semibold"
+              data-testid={`nav-badge-${item.path.replace(/\//g, '')}`}
+            >
+              {item.badge}
+            </span>
+          )}
         </Link>
         {hasChildren && isOpen && (
           <div className="mt-1 ml-4 pl-3 border-l border-slate-200 space-y-1" data-testid={`submenu-${item.label.toLowerCase()}`}>

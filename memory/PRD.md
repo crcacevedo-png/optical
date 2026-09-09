@@ -9,6 +9,16 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Recordatorio de vencimiento de Cuentas por Pagar (Jun 2026)
+Avisos in-app al admin cuando un egreso a crédito está por vencer o ya venció (base contable devengado; canal in-app, consistente con las alertas de plan/stock del Dashboard).
+- **Backend** `routes/finance.py`: `GET /api/finance/payables/alerts?days=7&branch_id` → `{days, overdue:{count,total}, due_soon:{count,total}}` (vencidas = due_date < hoy; por vencer = hoy..hoy+days). `list_payables` ahora añade `days_until_due` e `is_due_soon` (≤7 días) por item.
+- **Frontend**:
+  - `DashboardPage.js`: tarjeta `payables-reminder-card` (roja si hay vencidas, ámbar si solo por vencer) con conteos + montos y enlace "Ver cuentas por pagar →".
+  - `MainLayout.js`: insignia roja con el conteo (vencidas+por vencer) en el ítem "Cuentas por Pagar" (fetch a `/payables/alerts` solo para no-superadmin con módulo finanzas y permiso `payables`). `nav-badge-payables`.
+  - `PayablesPage.js`: nuevo KPI "Por vencer" (próximos 7 días).
+- Nota: la vista/menú Finanzas y Cuentas por Pagar requieren el módulo `finanzas` en el plan (el plan Basic demo no lo incluye; verificado habilitándolo temporalmente y revirtiendo). El umbral de "por vencer" es 7 días. No se agregó aviso por correo (posible mejora futura).
+- Verificado E2E: alerts con 1 vencida (Q400) + 1 por vencer (Q250) y la lejana (+60d) excluida; tarjeta del Dashboard con montos correctos; insignia "2" en el menú (plan con finanzas); KPI "Por vencer" en la página. Datos de prueba y módulo del plan revertidos.
+
 ### Reporte de compras (Excel) + Cuentas por Pagar (Jun 2026)
 Dos features sobre proveedores en Finanzas:
 

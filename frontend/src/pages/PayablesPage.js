@@ -166,6 +166,7 @@ export default function PayablesPage() {
 
   const uniqueSuppliers = (data.by_supplier || []).length;
   const overdueCount = data.items.filter((e) => e.is_overdue).length;
+  const dueSoonCount = data.items.filter((e) => e.is_due_soon && !e.is_overdue).length;
 
   return (
     <div className="space-y-6" data-testid="payables-page">
@@ -183,7 +184,7 @@ export default function PayablesPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card className="border-0 bg-gradient-to-br from-rose-500 to-red-500 text-white" data-testid="kpi-total-payable">
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
@@ -205,6 +206,20 @@ export default function PayablesPage() {
                 <p className="text-xs text-slate-400 mt-1">Distintos proveedores</p>
               </div>
               <div className="p-2.5 rounded-lg bg-blue-100"><Truck className="w-5 h-5 text-blue-600" /></div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-slate-200/80" data-testid="kpi-due-soon">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Por vencer</p>
+                <p className="font-heading text-3xl font-bold text-slate-900 mt-1">{dueSoonCount}</p>
+                <p className="text-xs text-slate-400 mt-1">Próximos 7 días</p>
+              </div>
+              <div className={`p-2.5 rounded-lg ${dueSoonCount > 0 ? 'bg-amber-100' : 'bg-slate-100'}`}>
+                <CalendarClock className={`w-5 h-5 ${dueSoonCount > 0 ? 'text-amber-600' : 'text-slate-400'}`} />
+              </div>
             </div>
           </CardContent>
         </Card>

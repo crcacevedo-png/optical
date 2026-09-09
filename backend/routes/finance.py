@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import StreamingResponse
 from bson import ObjectId
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 import io
 import asyncio
@@ -130,6 +130,17 @@ async def list_payables(
         except Exception:
             e["days_pending"] = 0
         e["is_overdue"] = bool(e.get("due_date") and e["due_date"] < today)
+        if e.get("due_date"):
+            try:
+                due_d = datetime.strptime(e["due_date"][:10], "%Y-%m-%d").date()
+                e["days_until_due"] = (due_d - datetime.now(timezone.utc).date()).days
+                e["is_due_soon"] = 0 <= e["days_until_due"] <= 7
+            except Exception:
+                e["days_until_due"] = None
+                e["is_due_soon"] = False
+        else:
+            e["days_until_due"] = None
+            e["is_due_soon"] = False
         bal = float(e.get("balance", 0) or 0)
         total_pending += bal
         name = e.get("supplier_name") or "(sin proveedor)"
@@ -144,6 +155,52 @@ async def list_payables(
         "total_pending": round(total_pending, 2),
         "count": len(entries),
         "by_supplier": supplier_summary,
+    }
+
+
+@router.get("/payables/alerts")
+async def payables_alerts(
+    user: dict = Depends(get_current_user),
+    days: int = 7,
+    branch_id: Optional[str] = None,
+):
+    """Resumen de cuentas por pagar vencidas o por vencer (para avisar al admin)."""
+    if user["role"] == "superadmin":
+        return {"days": days, "overdue": {"count": 0, "total": 0.0}, "due_soon": {"count": 0, "total": 0.0}}
+
+    query = {
+        "company_id": ObjectId(user["company_id"]),
+        "type": "egreso",
+        "is_credit": True,
+        "balance": {"$gt": 0},
+        "due_date": {"$exists": True, "$ne": None},
+    }
+    if branch_id:
+        try:
+            query["branch_id"] = ObjectId(branch_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="branch_id invalido")
+    elif user.get("branch_id"):
+        query["branch_id"] = ObjectId(user["branch_id"])
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    limit_date = (datetime.now(timezone.utc).date() + timedelta(days=max(0, days))).strftime("%Y-%m-%d")
+
+    overdue_count = overdue_total = 0
+    due_soon_count = due_soon_total = 0
+    async for e in db.finance_entries.find(query, {"balance": 1, "due_date": 1}):
+        bal = float(e.get("balance", 0) or 0)
+        dd = e.get("due_date")
+        if dd < today:
+            overdue_count += 1
+            overdue_total += bal
+        elif dd <= limit_date:
+            due_soon_count += 1
+            due_soon_total += bal
+    return {
+        "days": days,
+        "overdue": {"count": overdue_count, "total": round(overdue_total, 2)},
+        "due_soon": {"count": due_soon_count, "total": round(due_soon_total, 2)},
     }
 
 
