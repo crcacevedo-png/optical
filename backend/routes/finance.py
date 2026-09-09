@@ -12,6 +12,26 @@ from models import FinanceEntryCreate
 
 router = APIRouter(prefix="/finance", tags=["Finanzas"])
 
+
+async def _resolve_branch_id(user: dict) -> Optional[ObjectId]:
+    """Sucursal a la que se atribuye un movimiento financiero.
+    Vendedores/doctores usan su branch; admins sin branch_id usan la sucursal
+    principal (o la primera activa) — consistente con la caja para que los
+    egresos en efectivo se reflejen en el arqueo del turno del admin."""
+    if user.get("branch_id"):
+        return ObjectId(user["branch_id"])
+    company_oid = ObjectId(user["company_id"])
+    main = await db.branches.find_one(
+        {"company_id": company_oid, "is_active": {"$ne": False}, "is_main": True}, {"_id": 1}
+    )
+    if main:
+        return main["_id"]
+    any_branch = await db.branches.find_one(
+        {"company_id": company_oid, "is_active": {"$ne": False}}, {"_id": 1}, sort=[("_id", 1)]
+    )
+    return any_branch["_id"] if any_branch else None
+
+
 @router.get("")
 async def list_finance_entries(
     user: dict = Depends(get_current_user),
@@ -37,6 +57,11 @@ async def list_finance_entries(
         query["date"] = {"$gte": date_from, "$lte": date_to}
     
     entries = await db.finance_entries.find(query).sort("date", -1).to_list(500)
+    for e in entries:
+        serialize_doc(e)
+        for p in e.get("payments", []) or []:
+            if isinstance(p.get("created_by"), ObjectId):
+                p["created_by"] = str(p["created_by"])
     return [serialize_doc(e) for e in entries]
 
 @router.post("")
@@ -44,9 +69,10 @@ async def create_finance_entry(data: FinanceEntryCreate, user: dict = Depends(ge
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
     
+    branch_oid = await _resolve_branch_id(user)
     entry_doc = {
         "company_id": ObjectId(user["company_id"]),
-        "branch_id": ObjectId(user["branch_id"]) if user.get("branch_id") else None,
+        "branch_id": branch_oid,
         "type": data.type, "category": data.category, "amount": data.amount,
         "description": data.description,
         "date": data.date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
@@ -67,6 +93,13 @@ async def create_finance_entry(data: FinanceEntryCreate, user: dict = Depends(ge
     elif data.type == "egreso" and (data.category == "suppliers" or data.is_credit):
         raise HTTPException(status_code=400, detail="Selecciona un proveedor para egresos de la categoria Proveedores.")
 
+    # Metodo de pago del egreso (para el arqueo de caja). Default efectivo.
+    if data.type == "egreso":
+        pm = (data.payment_method or "cash")
+        if pm not in ("cash", "card", "transfer", "check", "other"):
+            pm = "cash"
+        entry_doc["payment_method"] = pm
+
     # Egreso a credito (devengado): el monto total cuenta como gasto desde el registro;
     # los abonos solo bajan el saldo (no generan nuevos movimientos).
     if data.type == "egreso" and data.is_credit:
@@ -81,6 +114,7 @@ async def create_finance_entry(data: FinanceEntryCreate, user: dict = Depends(ge
         entry_doc["payments"] = []
         if paid > 0:
             entry_doc["payments"].append({
+                "method": entry_doc.get("payment_method", "cash"),
                 "amount": round(paid, 2),
                 "note": "Abono inicial",
                 "created_at": datetime.now(timezone.utc).isoformat(),

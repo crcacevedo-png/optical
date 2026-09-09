@@ -39,7 +39,8 @@ export default function FinancePage() {
     supplier_id: '',
     is_credit: false,
     amount_paid: '',
-    due_date: ''
+    due_date: '',
+    payment_method: 'cash'
   });
 
   const incomeCategories = [
@@ -105,14 +106,15 @@ export default function FinancePage() {
         supplier_id: formData.type === 'egreso' && formData.supplier_id ? formData.supplier_id : null,
         is_credit: isCredit,
         amount_paid: isCredit ? parseFloat(formData.amount_paid || 0) : null,
-        due_date: isCredit ? (formData.due_date || null) : null
+        due_date: isCredit ? (formData.due_date || null) : null,
+        payment_method: formData.type === 'egreso' ? formData.payment_method : null
       });
       toast.success('Entrada registrada exitosamente');
       setShowDialog(false);
       setFormData({
         type: 'ingreso', category: '', amount: '', description: '',
         date: new Date().toISOString().slice(0, 10), reference: '', supplier_id: '',
-        is_credit: false, amount_paid: '', due_date: ''
+        is_credit: false, amount_paid: '', due_date: '', payment_method: 'cash'
       });
       fetchData();
     } catch (error) {
@@ -210,7 +212,7 @@ export default function FinancePage() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setFormData({...formData, type: 'ingreso', category: '', supplier_id: '', is_credit: false, amount_paid: '', due_date: ''})}
+                    onClick={() => setFormData({...formData, type: 'ingreso', category: '', supplier_id: '', is_credit: false, amount_paid: '', due_date: '', payment_method: 'cash'})}
                     className={`flex-1 p-3 rounded-lg border flex items-center justify-center gap-2 transition-colors ${
                       formData.type === 'ingreso'
                         ? 'border-green-500 bg-green-50 text-green-700'
@@ -273,6 +275,28 @@ export default function FinancePage() {
                   data-testid="entry-description"
                 />
               </div>
+
+              {formData.type === 'egreso' && (
+                <div className="space-y-2" data-testid="payment-method-field">
+                  <Label>Método de pago</Label>
+                  <Select
+                    value={formData.payment_method}
+                    onValueChange={(v) => setFormData({...formData, payment_method: v})}
+                  >
+                    <SelectTrigger data-testid="entry-payment-method">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Efectivo</SelectItem>
+                      <SelectItem value="card">Tarjeta</SelectItem>
+                      <SelectItem value="transfer">Transferencia</SelectItem>
+                      <SelectItem value="check">Cheque</SelectItem>
+                      <SelectItem value="other">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-slate-400">Solo los egresos en <b>efectivo</b> se descuentan del arqueo de caja del turno.</p>
+                </div>
+              )}
 
               {formData.type === 'egreso' && (
                 <div className="space-y-2" data-testid="supplier-field">

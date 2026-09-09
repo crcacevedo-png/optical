@@ -245,6 +245,7 @@ class FinanceEntryCreate(BaseModel):
     is_credit: bool = False
     amount_paid: Optional[float] = None
     due_date: Optional[str] = None
+    payment_method: Optional[str] = None
 
 class QuotationCreate(BaseModel):
     patient_id: str

@@ -125,7 +125,11 @@ async def get_current_preview(
     totals = await _compute_close_totals(
         ObjectId(user["company_id"]), bid, reg["opened_at"], now_iso
     )
-    expected_cash = round(float(reg.get("opening_amount", 0) or 0) + totals["totals_by_method"].get("cash", 0), 2)
+    expected_cash = round(
+        float(reg.get("opening_amount", 0) or 0)
+        + totals["totals_by_method"].get("cash", 0)
+        - totals["egresos_cash"], 2
+    )
 
     # Attach patient names to receivables (parity con GET /{id})
     if totals.get("sales_in_window"):
@@ -154,6 +158,11 @@ async def get_current_preview(
         "receivables_total": totals["receivables_total"],
         "payments_detail": totals["payments_detail"],
         "sales_in_window": totals["sales_in_window"],
+        "egresos_by_method": totals["egresos_by_method"],
+        "egresos_total": totals["egresos_total"],
+        "egresos_cash": totals["egresos_cash"],
+        "egresos_count": totals["egresos_count"],
+        "egresos_detail": totals["egresos_detail"],
         "is_preview": True,
     })
     return serialize_doc(reg)
@@ -252,6 +261,40 @@ async def _compute_close_totals(company_id: ObjectId, branch_id: ObjectId, opene
         sum(s["balance"] for s in sales_in_window if s["balance"] > 0), 2
     )
 
+    # 2. Egresos (compras/gastos) creados en la ventana, en la sucursal.
+    #    La salida de efectivo se resta del efectivo esperado (solo metodo 'cash').
+    egresos_by_method = {"cash": 0.0, "card": 0.0, "transfer": 0.0, "check": 0.0, "other": 0.0}
+    egresos_detail = []
+    egresos_cursor = db.finance_entries.find({
+        "company_id": company_id,
+        "branch_id": branch_id,
+        "type": "egreso",
+        "created_at": {"$gte": opened_at_iso, "$lte": closed_at_iso},
+    })
+    async for e in egresos_cursor:
+        method = e.get("payment_method", "cash") or "cash"
+        if method not in egresos_by_method:
+            method = "other"
+        is_credit = bool(e.get("is_credit"))
+        # Salida al momento de registrar: monto total (contado) o abono inicial (credito)
+        out = float(e.get("amount_paid", 0) or 0) if is_credit else float(e.get("amount", 0) or 0)
+        if out <= 0:
+            continue
+        egresos_by_method[method] += out
+        egresos_detail.append({
+            "entry_id": str(e["_id"]),
+            "description": e.get("description", ""),
+            "supplier_name": e.get("supplier_name", ""),
+            "category": e.get("category", ""),
+            "method": method,
+            "amount": round(out, 2),
+            "is_credit": is_credit,
+            "created_at": e.get("created_at"),
+        })
+    egresos_total = round(sum(egresos_by_method.values()), 2)
+    egresos_cash = round(egresos_by_method.get("cash", 0), 2)
+    egresos_by_method = {k: round(v, 2) for k, v in egresos_by_method.items()}
+
     return {
         "totals_by_method": totals_by_method,
         "total_received": total_received,
@@ -262,6 +305,11 @@ async def _compute_close_totals(company_id: ObjectId, branch_id: ObjectId, opene
         "receivables_sale_ids": receivables_in_window,
         "payments_detail": payments_detail,
         "sales_in_window": sales_in_window,
+        "egresos_by_method": egresos_by_method,
+        "egresos_total": egresos_total,
+        "egresos_cash": egresos_cash,
+        "egresos_count": len(egresos_detail),
+        "egresos_detail": egresos_detail,
     }
 
 
@@ -287,7 +335,11 @@ async def close_register(data: CloseCashRegister, request: Request, user: dict =
         reg["opened_at"], closed_at_iso
     )
 
-    expected_cash = round(float(reg.get("opening_amount", 0) or 0) + totals["totals_by_method"].get("cash", 0), 2)
+    expected_cash = round(
+        float(reg.get("opening_amount", 0) or 0)
+        + totals["totals_by_method"].get("cash", 0)
+        - totals["egresos_cash"], 2
+    )
     counted_cash = float(data.counted_cash) if data.counted_cash is not None else None
     cash_difference = round((counted_cash - expected_cash), 2) if counted_cash is not None else None
 
@@ -309,6 +361,11 @@ async def close_register(data: CloseCashRegister, request: Request, user: dict =
         "receivables_sale_ids": totals["receivables_sale_ids"],
         "payments_detail": totals["payments_detail"],
         "sales_in_window": totals["sales_in_window"],
+        "egresos_by_method": totals["egresos_by_method"],
+        "egresos_total": totals["egresos_total"],
+        "egresos_cash": totals["egresos_cash"],
+        "egresos_count": totals["egresos_count"],
+        "egresos_detail": totals["egresos_detail"],
     }
     await db.cash_registers.update_one({"_id": reg["_id"]}, {"$set": update})
 
@@ -386,6 +443,8 @@ async def _build_report(user: dict, date_from: Optional[str], date_to: Optional[
     grand_opening = 0.0
     grand_receivables = 0.0
     grand_diff = 0.0
+    grand_egresos = 0.0
+    grand_egresos_cash = 0.0
     diff_count = 0
     rows = []
 
@@ -398,6 +457,8 @@ async def _build_report(user: dict, date_from: Optional[str], date_to: Optional[
         grand_total += float(r.get("total_received", 0) or 0)
         grand_opening += float(r.get("opening_amount", 0) or 0)
         grand_receivables += float(r.get("receivables_total", 0) or 0)
+        grand_egresos += float(r.get("egresos_total", 0) or 0)
+        grand_egresos_cash += float(r.get("egresos_cash", 0) or 0)
         if r.get("cash_difference") is not None:
             grand_diff += float(r["cash_difference"])
             diff_count += 1
@@ -416,6 +477,8 @@ async def _build_report(user: dict, date_from: Optional[str], date_to: Optional[
             "totals_by_method": {k: float((m or {}).get(k, 0) or 0) for k in totals_by_method},
             "receivables_total": float(r.get("receivables_total", 0) or 0),
             "receivables_count": int(r.get("receivables_count", 0) or 0),
+            "egresos_total": float(r.get("egresos_total", 0) or 0),
+            "egresos_cash": float(r.get("egresos_cash", 0) or 0),
         })
 
     return {
@@ -427,6 +490,8 @@ async def _build_report(user: dict, date_from: Optional[str], date_to: Optional[
         "grand_total_received": round(grand_total, 2),
         "grand_opening": round(grand_opening, 2),
         "grand_receivables_total": round(grand_receivables, 2),
+        "grand_egresos_total": round(grand_egresos, 2),
+        "grand_egresos_cash": round(grand_egresos_cash, 2),
         "grand_cash_difference": round(grand_diff, 2) if diff_count else None,
         "rows": rows,
     }
@@ -520,6 +585,8 @@ def _render_cash_report_pdf(data: dict, company_name: str, branch_name: Optional
         ["Cheque", _fmt_q(tm.get("check"))],
         ["Otros", _fmt_q(tm.get("other"))],
         ["TOTAL RECAUDADO", _fmt_q(data["grand_total_received"])],
+        ["Egresos del turno (efectivo)", _fmt_q(data.get("grand_egresos_cash"))],
+        ["Egresos del turno (total)", _fmt_q(data.get("grand_egresos_total"))],
         ["Cuentas por cobrar generadas", _fmt_q(data["grand_receivables_total"])],
         ["Fondo inicial acumulado", _fmt_q(data["grand_opening"])],
     ]
@@ -532,8 +599,8 @@ def _render_cash_report_pdf(data: dict, company_name: str, branch_name: Optional
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#CBD5E1')),
-        ('BACKGROUND', (0, -4), (-1, -4), colors.HexColor('#ECFDF5')),
-        ('FONTNAME', (0, -4), (-1, -4), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 6), (-1, 6), colors.HexColor('#ECFDF5')),
+        ('FONTNAME', (0, 6), (-1, 6), 'Helvetica-Bold'),
         ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
         ('LEFTPADDING', (0, 0), (-1, -1), 8),
         ('RIGHTPADDING', (0, 0), (-1, -1), 8),

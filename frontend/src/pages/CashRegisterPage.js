@@ -21,6 +21,7 @@ const METHOD_META = {
   cash: { label: 'Efectivo', icon: Banknote, color: 'emerald' },
   card: { label: 'Tarjeta', icon: CreditCard, color: 'blue' },
   transfer: { label: 'Transferencia', icon: Smartphone, color: 'violet' },
+  check: { label: 'Cheque', icon: ClipboardList, color: 'amber' },
   other: { label: 'Otro', icon: HandCoins, color: 'slate' },
 };
 
@@ -31,6 +32,7 @@ function MethodTile({ method, amount, testId }) {
     emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     blue: 'bg-blue-50 text-blue-700 border-blue-200',
     violet: 'bg-violet-50 text-violet-700 border-violet-200',
+    amber: 'bg-amber-50 text-amber-700 border-amber-200',
     slate: 'bg-slate-50 text-slate-700 border-slate-200',
   }[meta.color];
   return (
@@ -56,6 +58,8 @@ export default function CashRegisterPage() {
   const [openForm, setOpenForm] = useState({ opening_amount: '', opening_notes: '' });
   const [closeForm, setCloseForm] = useState({ counted_cash: '', closing_notes: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -74,6 +78,24 @@ export default function CashRegisterPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Vista previa en vivo del cierre (recaudado, egresos y efectivo esperado)
+  useEffect(() => {
+    if (!showClose) { setPreview(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        setPreviewLoading(true);
+        const { data } = await api.get('/api/cash-register/current/preview');
+        if (!cancelled) setPreview(data);
+      } catch (err) {
+        if (!cancelled) toast.error(formatApiErrorDetail(err.response?.data?.detail));
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [showClose]);
 
   const handleOpen = async () => {
     try {
@@ -310,8 +332,36 @@ export default function CashRegisterPage() {
           <div className="space-y-3">
             <p className="text-sm text-slate-600">
               Al cerrar la caja se calcularan los totales por medio de pago recibidos durante el turno,
-              y se listaran las cuentas por cobrar creadas.
+              se restaran los egresos en efectivo y se listaran las cuentas por cobrar creadas.
             </p>
+
+            {/* Vista previa en vivo del turno */}
+            {previewLoading && (
+              <div className="text-sm text-slate-500 flex items-center gap-2" data-testid="close-preview-loading">
+                <RefreshCw className="w-4 h-4 animate-spin" /> Calculando totales del turno...
+              </div>
+            )}
+            {preview && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2" data-testid="close-preview">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Resumen del turno</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                  <div className="flex justify-between"><span className="text-slate-500">Fondo inicial</span><strong>{fmt(preview.opening_amount)}</strong></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Recaudado efectivo</span><strong className="text-emerald-700">{fmt(preview.totals_by_method?.cash)}</strong></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Total recaudado</span><strong>{fmt(preview.total_received)}</strong></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Egresos efectivo</span><strong className="text-red-600" data-testid="close-preview-egresos-cash">- {fmt(preview.egresos_cash)}</strong></div>
+                </div>
+                <div className="flex justify-between items-center pt-2 mt-1 border-t border-slate-200">
+                  <span className="text-sm font-semibold text-slate-700">Efectivo esperado</span>
+                  <span className="font-heading text-lg font-bold text-slate-900" data-testid="close-preview-expected-cash">{fmt(preview.expected_cash)}</span>
+                </div>
+                {preview.egresos_count > 0 && (
+                  <p className="text-xs text-slate-500" data-testid="close-preview-egresos-note">
+                    {preview.egresos_count} egreso(s) del turno · total {fmt(preview.egresos_total)} · en efectivo {fmt(preview.egresos_cash)} (ya restado del esperado).
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <Label>Efectivo contado al cierre (opcional)</Label>
               <Input
@@ -323,6 +373,17 @@ export default function CashRegisterPage() {
               />
               <p className="text-xs text-slate-500 mt-1">Si lo llenas, se calcula la diferencia con el efectivo esperado.</p>
             </div>
+            {preview && closeForm.counted_cash !== '' && (() => {
+              const diff = Math.round(((parseFloat(closeForm.counted_cash) || 0) - (preview.expected_cash || 0)) * 100) / 100;
+              return (
+                <div className="flex justify-between items-center text-sm px-1" data-testid="close-preview-difference">
+                  <span className="text-slate-500">Diferencia (contado − esperado)</span>
+                  <strong className={diff === 0 ? 'text-emerald-600' : diff > 0 ? 'text-blue-600' : 'text-red-600'}>
+                    {diff > 0 ? '+' : ''}{fmt(diff)}
+                  </strong>
+                </div>
+              );
+            })()}
             <div>
               <Label>Notas de cierre</Label>
               <Textarea
@@ -367,6 +428,13 @@ export default function CashRegisterPage() {
                 </div>
                 <div><span className="text-slate-500">Fondo inicial:</span> <strong>{fmt(detail.opening_amount)}</strong></div>
                 <div><span className="text-slate-500">Total recaudado:</span> <strong className="text-emerald-700">{fmt(detail.total_received)}</strong></div>
+                {detail.egresos_total > 0 && (
+                  <div data-testid="detail-egresos-summary">
+                    <span className="text-slate-500">Egresos del turno:</span>{' '}
+                    <strong className="text-red-600">{fmt(detail.egresos_total)}</strong>
+                    {detail.egresos_cash ? <span className="text-slate-400"> (efectivo {fmt(detail.egresos_cash)})</span> : null}
+                  </div>
+                )}
                 {detail.counted_cash != null && (
                   <>
                     <div><span className="text-slate-500">Efectivo esperado:</span> <strong>{fmt(detail.expected_cash)}</strong></div>
@@ -418,6 +486,39 @@ export default function CashRegisterPage() {
                             <td className="p-2.5 text-right">{fmt(s.total)}</td>
                             <td className="p-2.5 text-right text-slate-500">{fmt(s.amount_paid)}</td>
                             <td className="p-2.5 text-right font-bold text-amber-700">{fmt(s.balance)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Egresos del turno */}
+              {detail.egresos_detail && detail.egresos_detail.length > 0 && (
+                <div data-testid="cash-egresos-section">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                    <Banknote className="inline w-3.5 h-3.5 mr-1" />
+                    Egresos del turno ({detail.egresos_count} · {fmt(detail.egresos_total)}
+                    {detail.egresos_cash ? ` · efectivo ${fmt(detail.egresos_cash)}` : ''})
+                  </p>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-red-50 text-xs text-red-800">
+                          <th className="text-left p-2.5 font-semibold">Descripcion</th>
+                          <th className="text-left p-2.5 font-semibold">Proveedor</th>
+                          <th className="text-left p-2.5 font-semibold">Metodo</th>
+                          <th className="text-right p-2.5 font-semibold">Monto</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detail.egresos_detail.map((e, i) => (
+                          <tr key={e.entry_id || i} className="border-t border-slate-100" data-testid={`egreso-row-${i}`}>
+                            <td className="p-2.5">{e.description || '—'}{e.is_credit ? ' (crédito)' : ''}</td>
+                            <td className="p-2.5 text-slate-600">{e.supplier_name || '—'}</td>
+                            <td className="p-2.5">{METHOD_META[e.method]?.label || e.method}</td>
+                            <td className="p-2.5 text-right font-bold text-red-600">- {fmt(e.amount)}</td>
                           </tr>
                         ))}
                       </tbody>
