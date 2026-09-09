@@ -8,11 +8,31 @@ import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import {
   Landmark, LockOpen, Lock, DollarSign, CreditCard, Smartphone, HandCoins,
-  Banknote, ClipboardList, TrendingUp, AlertTriangle, CheckCircle2, RefreshCw
+  Banknote, ClipboardList, TrendingUp, AlertTriangle, CheckCircle2, RefreshCw,
+  MinusCircle, Printer
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+const EGRESO_CATEGORIES = [
+  { value: 'payroll', label: 'Planilla' },
+  { value: 'rent', label: 'Alquiler' },
+  { value: 'utilities', label: 'Servicios' },
+  { value: 'suppliers', label: 'Proveedores' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'maintenance', label: 'Mantenimiento' },
+  { value: 'other_expense', label: 'Otros Gastos' },
+];
+
+const PAY_METHODS = [
+  { value: 'cash', label: 'Efectivo' },
+  { value: 'card', label: 'Tarjeta' },
+  { value: 'transfer', label: 'Transferencia' },
+  { value: 'check', label: 'Cheque' },
+  { value: 'other', label: 'Otro' },
+];
 
 const fmt = (n) =>
   `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -60,6 +80,11 @@ export default function CashRegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [preview, setPreview] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [shiftPreview, setShiftPreview] = useState(null);
+  const [suppliers, setSuppliers] = useState([]);
+  const [showEgreso, setShowEgreso] = useState(false);
+  const [egresoForm, setEgresoForm] = useState({ amount: '', description: '', category: '', payment_method: 'cash', supplier_id: '' });
+  const [egresoSubmitting, setEgresoSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -68,8 +93,17 @@ export default function CashRegisterPage() {
         api.get('/api/cash-register/current'),
         api.get('/api/cash-register'),
       ]);
-      setCurrent(curRes.data?.register || null);
+      const reg = curRes.data?.register || null;
+      setCurrent(reg);
       setHistory(histRes.data || []);
+      if (reg) {
+        try {
+          const pv = await api.get('/api/cash-register/current/preview');
+          setShiftPreview(pv.data);
+        } catch { setShiftPreview(null); }
+      } else {
+        setShiftPreview(null);
+      }
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail));
     } finally {
@@ -78,6 +112,12 @@ export default function CashRegisterPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    api.get('/api/suppliers')
+      .then((res) => setSuppliers(res.data || []))
+      .catch(() => setSuppliers([]));
+  }, []);
 
   // Vista previa en vivo del cierre (recaudado, egresos y efectivo esperado)
   useEffect(() => {
@@ -131,6 +171,45 @@ export default function CashRegisterPage() {
       toast.error(formatApiErrorDetail(err.response?.data?.detail));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleEgreso = async () => {
+    const amt = parseFloat(egresoForm.amount);
+    if (!amt || amt <= 0) { toast.error('Ingresa un monto valido'); return; }
+    if (!egresoForm.category) { toast.error('Selecciona una categoria'); return; }
+    if (egresoForm.category === 'suppliers' && !egresoForm.supplier_id) {
+      toast.error('Selecciona un proveedor para egresos de la categoria Proveedores');
+      return;
+    }
+    try {
+      setEgresoSubmitting(true);
+      await api.post('/api/finance', {
+        type: 'egreso',
+        category: egresoForm.category,
+        amount: amt,
+        description: egresoForm.description || '',
+        payment_method: egresoForm.payment_method || 'cash',
+        ...(egresoForm.supplier_id ? { supplier_id: egresoForm.supplier_id } : {}),
+      });
+      toast.success('Egreso registrado');
+      setShowEgreso(false);
+      setEgresoForm({ amount: '', description: '', category: '', payment_method: 'cash', supplier_id: '' });
+      load();
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail));
+    } finally {
+      setEgresoSubmitting(false);
+    }
+  };
+
+  const printCierre = async (id) => {
+    try {
+      const res = await api.get(`/api/cash-register/${id}/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data);
+      window.open(url, '_blank');
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail));
     }
   };
 
@@ -188,11 +267,19 @@ export default function CashRegisterPage() {
               </div>
             </div>
             {isOpen ? (
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <div className="text-right">
                   <p className="text-xs text-slate-500 uppercase tracking-wide">Fondo inicial</p>
                   <p className="font-heading text-xl font-bold text-slate-900">{fmt(current.opening_amount)}</p>
                 </div>
+                <Button
+                  variant="outline"
+                  className="border-red-200 text-red-700 hover:bg-red-50"
+                  onClick={() => setShowEgreso(true)}
+                  data-testid="register-egreso-btn"
+                >
+                  <MinusCircle className="w-4 h-4 mr-2" /> Registrar egreso
+                </Button>
                 <Button
                   className="bg-red-600 hover:bg-red-700"
                   onClick={() => setShowClose(true)}
@@ -213,6 +300,31 @@ export default function CashRegisterPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Live shift summary (solo con caja abierta) */}
+      {isOpen && shiftPreview && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="shift-summary">
+          <div className="border border-emerald-200 bg-emerald-50 rounded-xl p-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 mb-1">Recaudado</p>
+            <p className="font-heading text-xl font-bold text-emerald-800">{fmt(shiftPreview.total_received)}</p>
+          </div>
+          <div className="border border-red-200 bg-red-50 rounded-xl p-4" data-testid="shift-egresos">
+            <p className="text-xs font-bold uppercase tracking-wider text-red-700 mb-1">Egresos ({shiftPreview.egresos_count || 0})</p>
+            <p className="font-heading text-xl font-bold text-red-700">{fmt(shiftPreview.egresos_total)}</p>
+            {shiftPreview.egresos_cash > 0 && (
+              <p className="text-[11px] text-red-600 mt-0.5">Efectivo {fmt(shiftPreview.egresos_cash)}</p>
+            )}
+          </div>
+          <div className="border border-slate-200 bg-slate-50 rounded-xl p-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Fondo inicial</p>
+            <p className="font-heading text-xl font-bold text-slate-900">{fmt(shiftPreview.opening_amount)}</p>
+          </div>
+          <div className="border-2 border-emerald-300 bg-white rounded-xl p-4" data-testid="shift-expected-cash">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Efectivo esperado</p>
+            <p className="font-heading text-xl font-bold text-slate-900">{fmt(shiftPreview.expected_cash)}</p>
+          </div>
+        </div>
+      )}
 
       {/* History */}
       <Card className="border-slate-200/80">
@@ -409,6 +521,92 @@ export default function CashRegisterPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Egreso Dialog */}
+      <Dialog open={showEgreso} onOpenChange={setShowEgreso}>
+        <DialogContent className="sm:max-w-md" data-testid="egreso-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-heading flex items-center gap-2">
+              <MinusCircle className="w-5 h-5 text-red-600" /> Registrar egreso
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-600">
+              Registra una salida del turno (compra o gasto). Los egresos en efectivo se restan del efectivo esperado al cerrar.
+            </p>
+            <div>
+              <Label>Monto *</Label>
+              <Input
+                type="number" step="0.01" min="0"
+                value={egresoForm.amount}
+                onChange={(e) => setEgresoForm({ ...egresoForm, amount: e.target.value })}
+                placeholder="0.00"
+                autoFocus
+                data-testid="egreso-amount"
+              />
+            </div>
+            <div>
+              <Label>Categoria *</Label>
+              <Select value={egresoForm.category} onValueChange={(v) => setEgresoForm({ ...egresoForm, category: v, supplier_id: v === 'suppliers' ? egresoForm.supplier_id : '' })}>
+                <SelectTrigger data-testid="egreso-category"><SelectValue placeholder="Selecciona categoria" /></SelectTrigger>
+                <SelectContent>
+                  {EGRESO_CATEGORIES.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Metodo de pago</Label>
+              <Select value={egresoForm.payment_method} onValueChange={(v) => setEgresoForm({ ...egresoForm, payment_method: v })}>
+                <SelectTrigger data-testid="egreso-method"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PAY_METHODS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Proveedor {egresoForm.category === 'suppliers' ? '*' : '(opcional)'}</Label>
+              {suppliers.length === 0 ? (
+                <p className="text-xs text-slate-500 mt-1">No hay proveedores. Agregalos en la seccion Proveedores.</p>
+              ) : (
+                <Select value={egresoForm.supplier_id || 'none'} onValueChange={(v) => setEgresoForm({ ...egresoForm, supplier_id: v === 'none' ? '' : v })}>
+                  <SelectTrigger data-testid="egreso-supplier"><SelectValue placeholder="Sin proveedor" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin proveedor</SelectItem>
+                    {suppliers.map((s) => (
+                      <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <div>
+              <Label>Descripcion</Label>
+              <Textarea
+                rows={2}
+                value={egresoForm.description}
+                onChange={(e) => setEgresoForm({ ...egresoForm, description: e.target.value })}
+                placeholder="Ej. Compra de insumos de limpieza"
+                data-testid="egreso-description"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setShowEgreso(false)}>Cancelar</Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700"
+                onClick={handleEgreso}
+                disabled={egresoSubmitting}
+                data-testid="egreso-submit"
+              >
+                {egresoSubmitting ? 'Guardando...' : 'Registrar egreso'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Detail Dialog */}
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto" data-testid="cash-detail-dialog">
@@ -419,6 +617,19 @@ export default function CashRegisterPage() {
           </DialogHeader>
           {detail && (
             <div className="space-y-5">
+              {detail.closed_at && (
+                <div className="flex justify-end -mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-pine-200 text-pine-800 hover:bg-pine-50"
+                    onClick={() => printCierre(detail._id)}
+                    data-testid="print-cierre-btn"
+                  >
+                    <Printer className="w-4 h-4 mr-1.5" /> Imprimir cierre (PDF)
+                  </Button>
+                </div>
+              )}
               {/* Meta */}
               <div className="grid grid-cols-2 gap-3 text-sm bg-slate-50 p-4 rounded-lg border border-slate-100">
                 <div><span className="text-slate-500">Abierta:</span> <strong>{(detail.opened_at || '').slice(0, 16).replace('T', ' ')}</strong> por {detail.opened_by_name}</div>

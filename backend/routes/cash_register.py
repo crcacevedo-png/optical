@@ -26,6 +26,11 @@ from audit import log_audit
 
 router = APIRouter(prefix="/cash-register", tags=["Caja"])
 
+_METHOD_LABELS = {
+    "cash": "Efectivo", "card": "Tarjeta", "transfer": "Transferencia",
+    "check": "Cheque", "other": "Otro",
+}
+
 
 class OpenCashRegister(BaseModel):
     opening_amount: float = 0
@@ -447,6 +452,7 @@ async def _build_report(user: dict, date_from: Optional[str], date_to: Optional[
     grand_egresos_cash = 0.0
     diff_count = 0
     rows = []
+    egresos_all = []
 
     for r in regs:
         _serialize(r)
@@ -462,6 +468,17 @@ async def _build_report(user: dict, date_from: Optional[str], date_to: Optional[
         if r.get("cash_difference") is not None:
             grand_diff += float(r["cash_difference"])
             diff_count += 1
+        for e in (r.get("egresos_detail") or []):
+            egresos_all.append({
+                "closed_at": r.get("closed_at"),
+                "branch_name": r.get("branch_name"),
+                "description": e.get("description", ""),
+                "supplier_name": e.get("supplier_name", ""),
+                "category": e.get("category", ""),
+                "method": e.get("method", ""),
+                "amount": float(e.get("amount", 0) or 0),
+                "is_credit": bool(e.get("is_credit")),
+            })
         rows.append({
             "_id": r.get("_id"),
             "branch_name": r.get("branch_name"),
@@ -494,6 +511,7 @@ async def _build_report(user: dict, date_from: Optional[str], date_to: Optional[
         "grand_egresos_cash": round(grand_egresos_cash, 2),
         "grand_cash_difference": round(grand_diff, 2) if diff_count else None,
         "rows": rows,
+        "egresos_detail": egresos_all,
     }
 
 
@@ -647,8 +665,225 @@ def _render_cash_report_pdf(data: dict, company_name: str, branch_name: Optional
         ]))
         story.append(tbl)
 
+    # Detalle de egresos del periodo (linea por linea)
+    egresos = data.get("egresos_detail") or []
+    if egresos:
+        story.append(Spacer(1, 16))
+        story.append(Paragraph(
+            f"<b>Detalle de egresos del periodo ({len(egresos)} - {_fmt_q(data.get('grand_egresos_total'))})</b>",
+            styles['Heading3']))
+        story.append(Spacer(1, 4))
+        eg_data = [["Cierre", "Sucursal", "Descripcion", "Proveedor", "Metodo", "Monto"]]
+        for e in egresos:
+            desc = (e.get("description") or "-")
+            if e.get("is_credit"):
+                desc = f"{desc} (credito)"
+            eg_data.append([
+                (e.get("closed_at") or "")[:16].replace('T', ' '),
+                e.get("branch_name") or "-",
+                desc[:40],
+                e.get("supplier_name") or "-",
+                _METHOD_LABELS.get(e.get("method"), e.get("method") or "-"),
+                _fmt_q(e.get("amount")),
+            ])
+        eg_tbl = Table(eg_data, colWidths=[1.05 * inch, 0.95 * inch, 1.85 * inch, 1.2 * inch, 0.9 * inch, 0.85 * inch])
+        eg_tbl.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#7F1D1D')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 7.5),
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#CBD5E1')),
+            ('ALIGN', (5, 0), (5, -1), 'RIGHT'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FEF2F2')]),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        story.append(eg_tbl)
+
     doc.build(story)
     return buf.getvalue()
+
+
+def _render_single_cierre_pdf(reg: dict, company_name: str, branch_name: Optional[str]) -> bytes:
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=letter,
+        leftMargin=0.6 * inch, rightMargin=0.6 * inch,
+        topMargin=0.55 * inch, bottomMargin=0.55 * inch,
+        title=f"Arqueo de Caja - {company_name}",
+    )
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('t', parent=styles['Title'], fontSize=16, textColor=colors.HexColor('#0F4C3A'))
+    small = ParagraphStyle('s', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#475569'))
+    label = ParagraphStyle('lbl', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#334155'))
+
+    story = []
+    story.append(Paragraph("Arqueo de Caja (Cierre)", title_style))
+    story.append(Paragraph(f"<b>{company_name}</b>" + (f" - {branch_name}" if branch_name else ""), styles['Normal']))
+    opened = (reg.get("opened_at") or "")[:16].replace('T', ' ')
+    closed = (reg.get("closed_at") or "")[:16].replace('T', ' ') if reg.get("closed_at") else "En curso"
+    story.append(Paragraph(f"Apertura: {opened} por {reg.get('opened_by_name','-')}", small))
+    story.append(Paragraph(f"Cierre: {closed}" + (f" por {reg.get('closed_by_name','-')}" if reg.get('closed_at') else ""), small))
+    story.append(Paragraph(f"Generado: {datetime.now(timezone.utc).isoformat()[:19].replace('T', ' ')}", small))
+    story.append(Spacer(1, 12))
+
+    tm = reg.get("totals_by_method") or {}
+    summary_data = [
+        ["Concepto", "Monto"],
+        ["Fondo inicial", _fmt_q(reg.get("opening_amount"))],
+        ["Efectivo (ventas)", _fmt_q(tm.get("cash"))],
+        ["Transferencia", _fmt_q(tm.get("transfer"))],
+        ["Tarjeta", _fmt_q(tm.get("card"))],
+        ["Cheque", _fmt_q(tm.get("check"))],
+        ["Otros", _fmt_q(tm.get("other"))],
+        ["TOTAL RECAUDADO", _fmt_q(reg.get("total_received"))],
+        ["Egresos del turno (efectivo)", _fmt_q(reg.get("egresos_cash"))],
+        ["Egresos del turno (total)", _fmt_q(reg.get("egresos_total"))],
+        ["EFECTIVO ESPERADO", _fmt_q(reg.get("expected_cash"))],
+    ]
+    if reg.get("counted_cash") is not None:
+        summary_data.append(["Efectivo contado", _fmt_q(reg.get("counted_cash"))])
+        summary_data.append(["Diferencia", _fmt_q(reg.get("cash_difference"))])
+    if reg.get("receivables_total"):
+        summary_data.append([f"Cuentas por cobrar ({int(reg.get('receivables_count', 0) or 0)})", _fmt_q(reg.get("receivables_total"))])
+    t = Table(summary_data, colWidths=[3.4 * inch, 2.0 * inch])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0F4C3A')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9.5),
+        ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#CBD5E1')),
+        ('BACKGROUND', (0, 7), (-1, 7), colors.HexColor('#ECFDF5')),
+        ('FONTNAME', (0, 7), (-1, 7), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 10), (-1, 10), colors.HexColor('#ECFDF5')),
+        ('FONTNAME', (0, 10), (-1, 10), 'Helvetica-Bold'),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    story.append(t)
+
+    # Egresos linea por linea
+    egresos = reg.get("egresos_detail") or []
+    story.append(Spacer(1, 16))
+    story.append(Paragraph(f"<b>Egresos del turno ({len(egresos)})</b>", styles['Heading3']))
+    story.append(Spacer(1, 4))
+    if not egresos:
+        story.append(Paragraph("Sin egresos registrados en el turno.", small))
+    else:
+        eg_data = [["Hora", "Descripcion", "Proveedor", "Metodo", "Monto"]]
+        for e in egresos:
+            desc = (e.get("description") or "-")
+            if e.get("is_credit"):
+                desc = f"{desc} (credito)"
+            eg_data.append([
+                (e.get("created_at") or "")[11:16],
+                desc[:44],
+                e.get("supplier_name") or "-",
+                _METHOD_LABELS.get(e.get("method"), e.get("method") or "-"),
+                _fmt_q(e.get("amount")),
+            ])
+        eg_tbl = Table(eg_data, colWidths=[0.7 * inch, 2.5 * inch, 1.5 * inch, 1.0 * inch, 0.9 * inch])
+        eg_tbl.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#7F1D1D')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#CBD5E1')),
+            ('ALIGN', (4, 0), (4, -1), 'RIGHT'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FEF2F2')]),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        story.append(eg_tbl)
+
+    # Cuentas por cobrar generadas
+    recv = [s for s in (reg.get("sales_in_window") or []) if (s.get("balance") or 0) > 0]
+    if recv:
+        story.append(Spacer(1, 16))
+        story.append(Paragraph(f"<b>Cuentas por cobrar generadas ({len(recv)})</b>", styles['Heading3']))
+        story.append(Spacer(1, 4))
+        rc_data = [["Cliente", "Total", "Pagado", "Saldo"]]
+        for s in recv:
+            rc_data.append([
+                (s.get("patient_name") or "Consumidor final")[:40],
+                _fmt_q(s.get("total")), _fmt_q(s.get("amount_paid")), _fmt_q(s.get("balance")),
+            ])
+        rc_tbl = Table(rc_data, colWidths=[3.0 * inch, 1.2 * inch, 1.2 * inch, 1.2 * inch])
+        rc_tbl.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#B45309')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8.5),
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#CBD5E1')),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FFFBEB')]),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        story.append(rc_tbl)
+
+    if reg.get("closing_notes"):
+        story.append(Spacer(1, 14))
+        story.append(Paragraph("<b>Notas de cierre</b>", label))
+        story.append(Paragraph(str(reg.get("closing_notes")), small))
+
+    doc.build(story)
+    return buf.getvalue()
+
+
+@router.get("/{register_id}/pdf")
+async def cash_register_single_pdf(register_id: str, user: dict = Depends(get_current_user)):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    try:
+        oid = ObjectId(register_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="register_id invalido")
+    reg = await db.cash_registers.find_one({"_id": oid})
+    if not reg or str(reg["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Caja no encontrada")
+
+    branch_oid = reg.get("branch_id")
+    _serialize(reg)
+    # Attach patient names for receivables
+    if reg.get("sales_in_window"):
+        pids = list({s["patient_id"] for s in reg["sales_in_window"] if s.get("patient_id")})
+        pmap = {}
+        if pids:
+            try:
+                docs = await db.patients.find({"_id": {"$in": [ObjectId(p) for p in pids]}}, {"first_name": 1, "last_name": 1}).to_list(len(pids))
+                pmap = {str(p["_id"]): f"{p.get('first_name','')} {p.get('last_name','')}".strip() for p in docs}
+            except Exception:
+                pass
+        for s in reg["sales_in_window"]:
+            s["patient_name"] = pmap.get(s.get("patient_id"), "Consumidor final")
+
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1})
+    company_name = (company or {}).get("name", "Optica")
+    branch_name = None
+    if branch_oid:
+        b = await db.branches.find_one({"_id": branch_oid}, {"name": 1})
+        branch_name = (b or {}).get("name")
+
+    pdf_bytes = await asyncio.to_thread(_render_single_cierre_pdf, reg, company_name, branch_name)
+
+    await log_audit("CASH_REGISTER_CIERRE_PDF", actor_id=user["_id"], actor_email=user.get("email"),
+                    metadata={"register_id": register_id})
+
+    filename = f"arqueo_caja_{(reg.get('closed_at') or reg.get('opened_at') or '')[:10]}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes), media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'}
+    )
 
 
 @router.get("/{register_id}")
