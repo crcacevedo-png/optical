@@ -34,9 +34,7 @@ async def list_finance_entries(
         query["date"] = {"$gte": date_from, "$lte": date_to}
     
     entries = await db.finance_entries.find(query).sort("date", -1).to_list(500)
-    for e in entries:
-        serialize_doc(e)
-    return entries
+    return [serialize_doc(e) for e in entries]
 
 @router.post("")
 async def create_finance_entry(data: FinanceEntryCreate, user: dict = Depends(get_current_user)):
@@ -53,6 +51,16 @@ async def create_finance_entry(data: FinanceEntryCreate, user: dict = Depends(ge
         "created_at": datetime.now(timezone.utc).isoformat(),
         "created_by": ObjectId(user["_id"])
     }
+    if data.supplier_id:
+        try:
+            sup_oid = ObjectId(data.supplier_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="supplier_id invalido")
+        supplier = await db.suppliers.find_one({"_id": sup_oid, "company_id": ObjectId(user["company_id"])})
+        if not supplier:
+            raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+        entry_doc["supplier_id"] = sup_oid
+        entry_doc["supplier_name"] = supplier.get("name")
     result = await db.finance_entries.insert_one(entry_doc)
     return {"_id": str(result.inserted_id), "message": "Entrada registrada"}
 

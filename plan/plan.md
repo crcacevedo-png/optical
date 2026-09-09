@@ -1,41 +1,43 @@
-# Cuentas de cortesía (sin costo mensual) — acción del SuperAdmin
+# Agregar "Descarga la Guía de usuarios" como Paso 1 en Inicio rápido
 
 ## Objetivo
-Permitir que el SuperAdmin marque una óptica como "cuenta de cortesía" para que su
-costo mensual quede en Q0, sin cambiarle el plan ni los módulos. Pensado para un
-grupo de optometristas a quienes se les regala el acceso.
+Añadir en "Inicio rápido" un paso nuevo para descargar la Guía de usuarios,
+ubicado como **Paso 1** (el primero de la lista). Los pasos actuales se recorren
+un lugar (el actual Paso 1 "Cambia tu contraseña inicial" pasa a ser Paso 2, y así
+sucesivamente). Además, se actualiza el contenido de la Guía de usuarios para que
+sea coherente con este cambio.
 
 ## Qué se construye
-Un control, visible únicamente para el SuperAdmin dentro de la ficha de cada
-óptica, que activa o desactiva la cortesía de esa óptica.
+1. **Nuevo Paso 1 en Inicio rápido**:
+   - Título: "Descarga la Guía de usuarios".
+   - Descripción breve invitando a descargar la guía para conocer la plataforma.
+   - Botón que descarga la Guía de usuarios en PDF (la guía oficial que la
+     plataforma ya genera hoy).
+   - Casilla para marcarlo como completado, igual que los demás pasos.
+   - Se marca como completado automáticamente al descargar la guía (también se
+     puede marcar/desmarcar a mano).
+2. **Renumeración y progreso**:
+   - La lista pasa de 7 a **8 pasos**. El nuevo es el Paso 1; los 7 actuales pasan
+     a ser 2–8, conservando su orden y textos.
+   - El Paso 1 cuenta para el progreso: el medidor y el texto pasan a "X de 8
+     pasos completados".
+3. **Actualización de la Guía de usuarios**:
+   - En la sección "Antes de empezar: Primer ingreso", donde hoy dice que el
+     onboarding tiene "7 pasos", se actualiza a "8 pasos".
+   - Se agrega, como primer paso del onboarding descrito en la guía, el de
+     descargar la Guía de usuarios, para que la guía coincida con lo que el
+     usuario ve en pantalla.
 
-- Cuando la cortesía está activa, el costo mensual efectivo de esa óptica es **Q0**.
-- El plan asignado, sus módulos y sus límites **no cambian**. Solo se elimina el
-  cobro mensual.
-- Es **reversible**: el SuperAdmin puede quitar la cortesía y la óptica vuelve al
-  precio de su plan.
-- Queda registrado quién activó/quitó la cortesía y cuándo (auditoría).
-
-## Cómo se comporta (decisiones confirmadas por el usuario)
-- **Se aplica óptica por óptica, a mano.** El SuperAdmin entra a cada óptica del
-  grupo y le activa la cortesía. No hay aplicación en bloque.
-- **Cortesía = costo mensual en Q0 (waiver total).** No es un precio personalizado
-  arbitrario.
-- **La cortesía es permanente hasta que el SuperAdmin la quite.** Sin fecha de
-  vencimiento automática.
-- **La óptica ve simplemente Q0** como su costo mensual, sin ninguna etiqueta de
-  "cortesía".
-- **Solo afecta el costo mensual.** No toca módulos, límites ni el plan.
-
-## Dónde se refleja
-- El costo mensual efectivo (Q0 si es cortesía, si no el del plan) se muestra en la
-  vista "Mi Plan" de la óptica y en el panel del SuperAdmin.
-- Las cuentas de cortesía aportan Q0 a los totales de ingresos del SuperAdmin.
-- Si en el futuro se activan reglas de inactivación por falta de pago, las cuentas
-  de cortesía quedan exentas.
+## Decisiones tomadas (se pueden objetar)
+1. **Posición y numeración**: el nuevo va como Paso 1 y el resto se recorre a 2–8
+   (confirmado por el usuario).
+2. **Cuenta para el progreso**: sí; el total visible pasa a 8 pasos.
+3. **Marcado automático al descargar**: sí, además del marcado manual.
+4. **Guía a descargar**: la Guía de usuarios oficial existente (no se crea una
+   guía nueva; solo se ajusta el texto indicado arriba).
 
 ## Fuera de alcance
-- Cobros reales, pasarela de pago o facturación (no se procesa dinero).
-- Aplicación masiva a un grupo con un clic.
-- Precios personalizados distintos de Q0 (descuentos parciales).
-- Cambios de plan, módulos o límites de la óptica.
+- Reescribir o rediseñar el resto del contenido de la Guía de usuarios (solo el
+  ajuste de "7 → 8 pasos" y la mención del nuevo primer paso).
+- Cambiar el orden o los textos de los pasos existentes.
+- Agregar el paso en vistas fuera de "Inicio rápido".

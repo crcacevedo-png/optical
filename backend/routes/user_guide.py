@@ -354,7 +354,8 @@ def _first_time(story, styles):
         "Abre <b>cortexiaoptical.com</b> en Chrome, Firefox, Safari o Edge (movil o desktop).",
         "Ingresa tu correo y contraseña temporal.",
         "El sistema te pedira <b>cambiar la contraseña</b> por seguridad.",
-        "Vas a ver el <b>Onboarding</b> — 7 pasos para dejar todo listo en menos de 30 minutos.",
+        "Vas a ver el <b>Onboarding</b> — 8 pasos para dejar todo listo en menos de 30 minutos. "
+        "El <b>Paso 1</b> es <b>descargar esta Guia de usuarios</b> en PDF; tenla a mano mientras configuras tu optica.",
         "Puedes saltar pasos y retomarlos despues; el sistema lleva el progreso automaticamente.",
     ]
     story.append(_bullets(steps, styles))

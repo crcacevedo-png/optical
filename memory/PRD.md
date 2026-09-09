@@ -9,7 +9,20 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
-### Filtro de cortesías + exención de inactivación (Jun 2026)
+### Proveedor en Egresos (Finanzas) (Jun 2026)
+En "Nueva Entrada Financiera" (`FinancePage.js`), al elegir tipo **Egreso** aparece un campo **Proveedor** (select) poblado desde la lista de proveedores existente (`GET /api/suppliers`). Decisiones: solo visible en Egresos; **opcional**; si no hay proveedores muestra un enlace a `/suppliers` para agregarlos.
+- **Backend**: `FinanceEntryCreate` +`supplier_id: Optional[str]`. `POST /api/finance` valida que el proveedor exista y pertenezca a la company (400 id inválido, 404 no encontrado) y guarda `supplier_id` (ObjectId) + `supplier_name` (resuelto en el servidor). El listado serializa el `supplier_id`.
+- **Frontend**: fetch de proveedores al montar; select `entry-supplier` (con opción "Sin proveedor"); se limpia al cambiar a Ingreso; solo se envía `supplier_id` si es egreso. Nueva columna "Proveedor" en la tabla de Movimientos (muestra `supplier_name` o "—"). Data-testids: `supplier-field`, `entry-supplier`, `add-supplier-link`.
+- Verificado E2E: egreso con proveedor guarda `supplier_name`+`supplier_id`; 400/404 en validación; UI muestra el select solo en Egresos (oculto en Ingresos) y la columna Proveedor. Datos de prueba limpiados.
+
+### Onboarding: nuevo Paso 1 "Descarga la Guía de usuarios" (Jun 2026)
+`OnboardingPage.js` — se agregó como **Paso 1** el paso "Descarga la Guía de usuarios" (icono BookOpen). Los 7 pasos previos pasan a 2–8 (mismo orden/textos). Total ahora **8 pasos**; el medidor y el texto muestran "X de 8".
+- Botón "Descargar la guía" descarga `GET /api/docs/user-guide.pdf` (blob) y **auto-marca** el paso como completado (también editable a mano con el checkbox). `id='download_guide'` agregado a `ALLOWED_STEP_IDS` en `routes/onboarding.py`.
+- `OnboardingWidget.js` (dashboard) refleja el total 8 automáticamente (importa `STEPS`).
+- Guía PDF (`user_guide.py`): sección "Antes de empezar" actualizada de "7 pasos" → "8 pasos" y se menciona que el Paso 1 es descargar la Guía de usuarios.
+- Verificado E2E: PUT status `download_guide` 200; guía contiene "8 pasos" (ya no "7 pasos"); UI muestra 8 cards, Paso 1 = descarga guía, renumeración correcta, botón descarga + auto-marca (2→3 de 8). Estado de prueba restaurado.
+
+
 Dos mejoras sobre las cuentas de cortesía:
 - **Filtro "Cortesía" (SuperAdmin)**: `AdminOpticasPage.js` — nueva pestaña de filtro `activation-filter-cortesia` (junto a Todas/Sin activar/Activas/Inactivas) que muestra solo las ópticas con `is_courtesy`. Cada card muestra además un badge verde "Cortesía" (`courtesy-badge-{id}`) para verlas de un vistazo. Filtrado client-side sobre el campo `is_courtesy` que ya devuelve `GET /companies`.
 - **Exención de inactivación**: helper `db.is_billing_exempt(company)` → True para cortesías. `activation_task._process_deactivations` ahora excluye del pipeline las cuentas de cortesía (`company.is_courtesy: {$ne: True}`): NUNCA se desactivan automáticamente (por expiración de activación hoy, ni por futuras reglas de falta de pago). Docstring actualizado.

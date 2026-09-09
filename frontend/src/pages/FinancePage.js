@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { api, formatApiErrorDetail } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -18,6 +19,7 @@ import { BranchFilter } from '../components/BranchFilter';
 export default function FinancePage() {
   const [entries, setEntries] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
@@ -31,7 +33,8 @@ export default function FinancePage() {
     amount: '',
     description: '',
     date: new Date().toISOString().slice(0, 10),
-    reference: ''
+    reference: '',
+    supplier_id: ''
   });
 
   const incomeCategories = [
@@ -53,6 +56,12 @@ export default function FinancePage() {
   useEffect(() => {
     fetchData();
   }, [branchId, dateFrom, dateTo]);
+
+  useEffect(() => {
+    api.get('/api/suppliers')
+      .then(({ data }) => setSuppliers(data || []))
+      .catch(() => setSuppliers([]));
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -79,13 +88,14 @@ export default function FinancePage() {
     try {
       await api.post('/api/finance', {
         ...formData,
-        amount: parseFloat(formData.amount)
+        amount: parseFloat(formData.amount),
+        supplier_id: formData.type === 'egreso' && formData.supplier_id ? formData.supplier_id : null
       });
       toast.success('Entrada registrada exitosamente');
       setShowDialog(false);
       setFormData({
         type: 'ingreso', category: '', amount: '', description: '',
-        date: new Date().toISOString().slice(0, 10), reference: ''
+        date: new Date().toISOString().slice(0, 10), reference: '', supplier_id: ''
       });
       fetchData();
     } catch (error) {
@@ -136,7 +146,7 @@ export default function FinancePage() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setFormData({...formData, type: 'ingreso', category: ''})}
+                    onClick={() => setFormData({...formData, type: 'ingreso', category: '', supplier_id: ''})}
                     className={`flex-1 p-3 rounded-lg border flex items-center justify-center gap-2 transition-colors ${
                       formData.type === 'ingreso'
                         ? 'border-green-500 bg-green-50 text-green-700'
@@ -199,6 +209,35 @@ export default function FinancePage() {
                   data-testid="entry-description"
                 />
               </div>
+
+              {formData.type === 'egreso' && (
+                <div className="space-y-2" data-testid="supplier-field">
+                  <Label>Proveedor</Label>
+                  {suppliers.length > 0 ? (
+                    <Select
+                      value={formData.supplier_id || 'none'}
+                      onValueChange={(v) => setFormData({...formData, supplier_id: v === 'none' ? '' : v})}
+                    >
+                      <SelectTrigger data-testid="entry-supplier">
+                        <SelectValue placeholder="Seleccionar proveedor (opcional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin proveedor</SelectItem>
+                        {suppliers.map((s) => (
+                          <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-xs text-slate-500">
+                      No tienes proveedores registrados.{' '}
+                      <Link to="/suppliers" className="text-pine-700 font-medium hover:underline" data-testid="add-supplier-link">
+                        Agrega uno en Proveedores
+                      </Link>.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -380,6 +419,7 @@ export default function FinancePage() {
                 <TableHead>Fecha</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Categoría</TableHead>
+                <TableHead>Proveedor</TableHead>
                 <TableHead>Descripción</TableHead>
                 <TableHead className="text-right">Monto</TableHead>
               </TableRow>
@@ -399,6 +439,7 @@ export default function FinancePage() {
                     </span>
                   </TableCell>
                   <TableCell className="capitalize">{entry.category?.replace('_', ' ')}</TableCell>
+                  <TableCell className="text-slate-600">{entry.supplier_name || '—'}</TableCell>
                   <TableCell>{entry.description}</TableCell>
                   <TableCell className={`text-right font-medium ${
                     entry.type === 'ingreso' ? 'text-green-600' : 'text-red-600'
@@ -409,7 +450,7 @@ export default function FinancePage() {
               ))}
               {filteredEntries.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={6} className="text-center py-8 text-slate-500">
                     <Wallet className="w-12 h-12 mx-auto mb-2 opacity-30" />
                     <p>No hay movimientos registrados</p>
                   </TableCell>

@@ -241,6 +241,7 @@ class FinanceEntryCreate(BaseModel):
     description: str
     date: Optional[str] = None
     reference: Optional[str] = None
+    supplier_id: Optional[str] = None
 
 class QuotationCreate(BaseModel):
     patient_id: str

@@ -8,11 +8,21 @@ import { Progress } from '../components/ui/progress';
 import {
   Rocket, CheckCircle2, Circle, ArrowRight, Lock, Building2,
   Store, Users, Package, UserPlus, ShoppingCart, Sparkles, Download,
-  ShieldCheck, Mail
+  ShieldCheck, Mail, BookOpen
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const STEPS = [
+  {
+    id: 'download_guide',
+    icon: BookOpen,
+    title: 'Descarga la Guía de usuarios',
+    description: 'Descarga la guía en PDF para conocer la plataforma y aprovecharla al máximo desde el primer día.',
+    cta: 'Descargar la guía',
+    href: null,
+    action: 'download_guide',
+    color: '#13B8B0',
+  },
   {
     id: 'change_password',
     icon: Lock,
@@ -84,6 +94,7 @@ export default function OnboardingPage() {
   const navigate = useNavigate();
   const [progress, setProgress] = useState({});
   const [loading, setLoading] = useState(true);
+  const [downloadingGuide, setDownloadingGuide] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -117,13 +128,43 @@ export default function OnboardingPage() {
   const isComplete = completedCount === STEPS.length;
 
   const handleAction = (step) => {
-    if (step.href) {
+    if (step.action === 'download_guide') {
+      handleDownloadGuide();
+    } else if (step.href) {
       navigate(step.href);
     } else if (step.action === 'open_password_dialog') {
       toast('Abre el menú superior derecho → "Cambiar mi contraseña"', {
         icon: '👆',
         duration: 5000,
       });
+    }
+  };
+
+  const handleDownloadGuide = async () => {
+    setDownloadingGuide(true);
+    const toastId = toast.loading('Generando la Guía de usuarios...');
+    try {
+      const response = await api.get('/api/docs/user-guide.pdf', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const cd = response.headers?.['content-disposition'] || '';
+      const match = cd.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : 'cortexia-optical-guia-usuario.pdf';
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Guía descargada', { id: toastId });
+      if (!progress['download_guide']) {
+        toggleStep('download_guide', true);
+      }
+    } catch (error) {
+      toast.error('No se pudo descargar la guía', { id: toastId });
+    } finally {
+      setDownloadingGuide(false);
     }
   };
 
@@ -251,10 +292,15 @@ export default function OnboardingPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => handleAction(step)}
+                          disabled={step.action === 'download_guide' && downloadingGuide}
                           className="text-sm"
                           data-testid={`cta-${step.id}`}
                         >
-                          {step.cta} <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                          {step.action === 'download_guide' && downloadingGuide ? (
+                            'Descargando…'
+                          ) : (
+                            <>{step.cta} <ArrowRight className="w-3.5 h-3.5 ml-1.5" /></>
+                          )}
                         </Button>
                       )}
                     </div>

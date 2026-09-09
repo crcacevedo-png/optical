@@ -12,6 +12,7 @@ router = APIRouter(prefix="/onboarding", tags=["Onboarding"])
 # Sin esto, un cliente podria inyectar keys arbitrarias en el sub-documento
 # `onboarding_progress` via el $set con clave construida a partir de input.
 ALLOWED_STEP_IDS = {
+    "download_guide",
     "company_data",
     "branches",
     "users",
