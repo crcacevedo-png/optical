@@ -9,7 +9,21 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
-### Proveedor en Egresos: obligatorio + filtro + totales (Jun 2026)
+### Reporte de compras (Excel) + Cuentas por Pagar (Jun 2026)
+Dos features sobre proveedores en Finanzas:
+
+**Reporte de compras a Excel**
+- `GET /api/finance/purchases-report.xlsx?date_from&date_to&branch_id` (admin/vendedor; superadmin 403). Agrupa egresos con proveedor del periodo. Genera xlsx en hilo (`_render_purchases_xlsx`, openpyxl) con 2 hojas: "Por Proveedor" (proveedor, nº egresos, total pagado, TOTAL) y "Detalle" (fecha, proveedor, categoría, descripción, referencia, monto). Encabezado navy #1B2A49.
+- Frontend `FinancePage.js`: botón "Exportar a Excel" (`export-purchases-btn`) en la tarjeta "Egresos por Proveedor"; descarga con los filtros de fecha/sucursal actuales.
+
+**Cuentas por Pagar (egresos a crédito, devengado)**
+- Registro desde el modal "Nueva Entrada Financiera" (Egreso): checkbox "Egreso a crédito (cuenta por pagar)" + "Monto pagado ahora" (abono inicial) + "Fecha de vencimiento". Proveedor obligatorio para crédito.
+- **Base contable: DEVENGADO** — el monto TOTAL del egreso cuenta como gasto desde el registro (aparece en el total de Egresos/Utilidad de inmediato). Los abonos SOLO bajan el saldo; NO crean nuevos movimientos. (Nota: los ingresos por ventas siguen siendo base caja; esta asimetría fue una decisión explícita del usuario para egresos.)
+- Backend `routes/finance.py`: en `POST /api/finance`, si `is_credit` guarda `is_credit`, `amount_paid`, `balance`, `status` (pendiente/pagado), `due_date`, `payments[]` (abono inicial si aplica). `GET /api/finance/payables` (egresos crédito con balance>0: items + total_pending + count + by_supplier, con `days_pending` e `is_overdue`). `POST /api/finance/payables/{id}/payment?amount&method&note` (abono: valida no exceder saldo → 400; actualiza amount_paid/balance/status; push a payments).
+- Frontend: nueva página `PayablesPage.js` (`/payables`) estilo "Cuentas por Cobrar": KPIs (saldo total por pagar, proveedores con deuda, vencidas), "Saldo por Proveedor", tabla (fecha, proveedor, concepto, vencimiento con badge "Vencida", total, pagado, saldo, antigüedad, botón "Abonar") y diálogo de abono (`PayableAbonoDialog`). Ítem de menú "Cuentas por Pagar" (icono Banknote) bajo módulo `finanzas`; agregado a `RolePermissionsSection` (key `payables`). Modelo `FinanceEntryCreate` +`is_credit/amount_paid/due_date`. Badge "Crédito · saldo" en la tabla de Movimientos.
+- Verificado E2E: Excel con hojas Resumen+Detalle y totales correctos; crédito 1000 pagado 200 → balance 800; sin proveedor 400; payables list OK; abono 300 → 500; abono que excede → 400; summary incluye el total 1000 (devengado). Frontend: modal con bloque crédito, página con KPIs/tabla, diálogo de abono. Datos de prueba limpiados.
+
+
 Tres mejoras sobre el proveedor en Finanzas (`FinancePage.js` + `routes/finance.py`):
 - **Proveedor obligatorio en categoría "Proveedores"**: si el egreso es de categoría `suppliers` y no se elige proveedor, se bloquea. Frontend valida (toast) y muestra `*` en la etiqueta; backend devuelve 400 "Selecciona un proveedor para egresos de la categoria Proveedores.".
 - **Filtro por proveedor en Movimientos**: select `supplier-filter` (poblado con los proveedores que aparecen en los movimientos del periodo) que filtra la tabla por `supplier_id` (client-side, junto al filtro de tipo).

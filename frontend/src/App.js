@@ -29,6 +29,7 @@ import AuditLogPage from './pages/AuditLogPage';
 import OnboardingPage from './pages/OnboardingPage';
 import HealthMetricsPage from './pages/HealthMetricsPage';
 import ReceivablesPage from './pages/ReceivablesPage';
+import PayablesPage from './pages/PayablesPage';
 import CashRegisterPage from './pages/CashRegisterPage';
 import SupportTicketsPage from './pages/SupportTicketsPage';
 import MyPlanPage from './pages/MyPlanPage';
@@ -71,6 +72,7 @@ function App() {
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="sales" element={<SalesPage />} />
             <Route path="receivables" element={<ReceivablesPage />} />
+            <Route path="payables" element={<PayablesPage />} />
             <Route path="cash-register" element={<CashRegisterPage />} />
             <Route path="quotations" element={<QuotationsPage />} />
             <Route path="jornadas" element={<JornadasPage />} />

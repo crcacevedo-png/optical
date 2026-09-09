@@ -7,11 +7,12 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Checkbox } from '../components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   Plus, TrendingUp, TrendingDown, DollarSign, 
-  ArrowUpCircle, ArrowDownCircle, Wallet, Filter, BarChart3, Truck
+  ArrowUpCircle, ArrowDownCircle, Wallet, Filter, BarChart3, Truck, Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BranchFilter } from '../components/BranchFilter';
@@ -35,7 +36,10 @@ export default function FinancePage() {
     description: '',
     date: new Date().toISOString().slice(0, 10),
     reference: '',
-    supplier_id: ''
+    supplier_id: '',
+    is_credit: false,
+    amount_paid: '',
+    due_date: ''
   });
 
   const incomeCategories = [
@@ -86,21 +90,29 @@ export default function FinancePage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (formData.type === 'egreso' && formData.category === 'suppliers' && !formData.supplier_id) {
-      toast.error('Selecciona un proveedor para egresos de la categoría Proveedores');
+    const requiresSupplier = formData.type === 'egreso' && (formData.category === 'suppliers' || formData.is_credit);
+    if (requiresSupplier && !formData.supplier_id) {
+      toast.error(formData.is_credit
+        ? 'Selecciona un proveedor para el egreso a crédito'
+        : 'Selecciona un proveedor para egresos de la categoría Proveedores');
       return;
     }
+    const isCredit = formData.type === 'egreso' && formData.is_credit;
     try {
       await api.post('/api/finance', {
         ...formData,
         amount: parseFloat(formData.amount),
-        supplier_id: formData.type === 'egreso' && formData.supplier_id ? formData.supplier_id : null
+        supplier_id: formData.type === 'egreso' && formData.supplier_id ? formData.supplier_id : null,
+        is_credit: isCredit,
+        amount_paid: isCredit ? parseFloat(formData.amount_paid || 0) : null,
+        due_date: isCredit ? (formData.due_date || null) : null
       });
       toast.success('Entrada registrada exitosamente');
       setShowDialog(false);
       setFormData({
         type: 'ingreso', category: '', amount: '', description: '',
-        date: new Date().toISOString().slice(0, 10), reference: '', supplier_id: ''
+        date: new Date().toISOString().slice(0, 10), reference: '', supplier_id: '',
+        is_credit: false, amount_paid: '', due_date: ''
       });
       fetchData();
     } catch (error) {
@@ -110,6 +122,32 @@ export default function FinancePage() {
 
   const formatCurrency = (amount) => {
     return `Q ${(amount || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`;
+  };
+
+  const handleExportPurchases = async () => {
+    const toastId = toast.loading('Generando reporte de compras...');
+    try {
+      const params = {};
+      if (branchId) params.branch_id = branchId;
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
+      const response = await api.get('/api/finance/purchases-report.xlsx', { params, responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const cd = response.headers?.['content-disposition'] || '';
+      const match = cd.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : 'compras-proveedores.xlsx';
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Reporte descargado', { id: toastId });
+    } catch (error) {
+      toast.error('No se pudo generar el reporte', { id: toastId });
+    }
   };
 
   const filteredEntries = entries.filter(e => {
@@ -172,7 +210,7 @@ export default function FinancePage() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setFormData({...formData, type: 'ingreso', category: '', supplier_id: ''})}
+                    onClick={() => setFormData({...formData, type: 'ingreso', category: '', supplier_id: '', is_credit: false, amount_paid: '', due_date: ''})}
                     className={`flex-1 p-3 rounded-lg border flex items-center justify-center gap-2 transition-colors ${
                       formData.type === 'ingreso'
                         ? 'border-green-500 bg-green-50 text-green-700'
@@ -238,7 +276,7 @@ export default function FinancePage() {
 
               {formData.type === 'egreso' && (
                 <div className="space-y-2" data-testid="supplier-field">
-                  <Label>Proveedor {formData.category === 'suppliers' ? '*' : ''}</Label>
+                  <Label>Proveedor {(formData.category === 'suppliers' || formData.is_credit) ? '*' : ''}</Label>
                   {suppliers.length > 0 ? (
                     <Select
                       value={formData.supplier_id || 'none'}
@@ -261,6 +299,45 @@ export default function FinancePage() {
                         Agrega uno en Proveedores
                       </Link>.
                     </p>
+                  )}
+                </div>
+              )}
+
+              {formData.type === 'egreso' && (
+                <div className="space-y-3 rounded-lg border border-slate-200 p-3" data-testid="credit-block">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="is-credit"
+                      checked={formData.is_credit}
+                      onCheckedChange={(v) => setFormData({...formData, is_credit: !!v})}
+                      data-testid="entry-is-credit"
+                    />
+                    <Label htmlFor="is-credit" className="cursor-pointer">Egreso a crédito (cuenta por pagar)</Label>
+                  </div>
+                  {formData.is_credit && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Monto pagado ahora</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={formData.amount_paid}
+                          onChange={(e) => setFormData({...formData, amount_paid: e.target.value})}
+                          data-testid="entry-amount-paid"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Fecha de vencimiento</Label>
+                        <Input
+                          type="date"
+                          value={formData.due_date}
+                          onChange={(e) => setFormData({...formData, due_date: e.target.value})}
+                          data-testid="entry-due-date"
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
@@ -428,9 +505,20 @@ export default function FinancePage() {
       {supplierTotals.length > 0 && (
         <Card className="border-slate-200/80" data-testid="supplier-totals-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Truck className="w-4 h-4 text-red-600" /> Egresos por Proveedor
-            </CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Truck className="w-4 h-4 text-red-600" /> Egresos por Proveedor
+              </CardTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleExportPurchases}
+                className="h-8 text-xs"
+                data-testid="export-purchases-btn"
+              >
+                <Download className="w-3.5 h-3.5 mr-1.5" /> Exportar a Excel
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -508,7 +596,13 @@ export default function FinancePage() {
                   </TableCell>
                   <TableCell className="capitalize">{entry.category?.replace('_', ' ')}</TableCell>
                   <TableCell className="text-slate-600">{entry.supplier_name || '—'}</TableCell>
-                  <TableCell>{entry.description}</TableCell>
+                  <TableCell>{entry.description}
+                    {entry.is_credit && entry.balance > 0 && (
+                      <span className="ml-2 inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700" data-testid={`credit-badge-${entry._id}`}>
+                        Crédito · saldo {formatCurrency(entry.balance)}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className={`text-right font-medium ${
                     entry.type === 'ingreso' ? 'text-green-600' : 'text-red-600'
                   }`}>

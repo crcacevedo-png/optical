@@ -242,6 +242,9 @@ class FinanceEntryCreate(BaseModel):
     date: Optional[str] = None
     reference: Optional[str] = None
     supplier_id: Optional[str] = None
+    is_credit: bool = False
+    amount_paid: Optional[float] = None
+    due_date: Optional[str] = None
 
 class QuotationCreate(BaseModel):
     patient_id: str
