@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   Plus, TrendingUp, TrendingDown, DollarSign, 
-  ArrowUpCircle, ArrowDownCircle, Wallet, Filter, BarChart3
+  ArrowUpCircle, ArrowDownCircle, Wallet, Filter, BarChart3, Truck
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BranchFilter } from '../components/BranchFilter';
@@ -23,6 +23,7 @@ export default function FinancePage() {
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const [supplierFilter, setSupplierFilter] = useState('all');
   const [branchId, setBranchId] = useState('');
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 8) + '01');
   const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
@@ -85,6 +86,10 @@ export default function FinancePage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (formData.type === 'egreso' && formData.category === 'suppliers' && !formData.supplier_id) {
+      toast.error('Selecciona un proveedor para egresos de la categoría Proveedores');
+      return;
+    }
     try {
       await api.post('/api/finance', {
         ...formData,
@@ -108,9 +113,30 @@ export default function FinancePage() {
   };
 
   const filteredEntries = entries.filter(e => {
-    if (activeTab === 'all') return true;
-    return e.type === activeTab;
+    if (activeTab !== 'all' && e.type !== activeTab) return false;
+    if (supplierFilter !== 'all' && e.supplier_id !== supplierFilter) return false;
+    return true;
   });
+
+  // Proveedores que aparecen en los movimientos del periodo (para el filtro)
+  const supplierOptions = Object.values(entries.reduce((acc, e) => {
+    if (e.type === 'egreso' && e.supplier_id && e.supplier_name && !acc[e.supplier_id]) {
+      acc[e.supplier_id] = { id: e.supplier_id, name: e.supplier_name };
+    }
+    return acc;
+  }, {}));
+
+  // Total pagado por proveedor en el periodo seleccionado
+  const supplierTotalsMap = entries.reduce((acc, e) => {
+    if (e.type === 'egreso' && e.supplier_name) {
+      const key = e.supplier_id || e.supplier_name;
+      if (!acc[key]) acc[key] = { name: e.supplier_name, amount: 0 };
+      acc[key].amount += e.amount || 0;
+    }
+    return acc;
+  }, {});
+  const supplierTotals = Object.values(supplierTotalsMap).sort((a, b) => b.amount - a.amount);
+  const totalSupplierExpense = supplierTotals.reduce((s, x) => s + x.amount, 0);
 
   if (loading) {
     return (
@@ -212,7 +238,7 @@ export default function FinancePage() {
 
               {formData.type === 'egreso' && (
                 <div className="space-y-2" data-testid="supplier-field">
-                  <Label>Proveedor</Label>
+                  <Label>Proveedor {formData.category === 'suppliers' ? '*' : ''}</Label>
                   {suppliers.length > 0 ? (
                     <Select
                       value={formData.supplier_id || 'none'}
@@ -398,18 +424,60 @@ export default function FinancePage() {
         </div>
       )}
 
+      {/* Total por Proveedor */}
+      {supplierTotals.length > 0 && (
+        <Card className="border-slate-200/80" data-testid="supplier-totals-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Truck className="w-4 h-4 text-red-600" /> Egresos por Proveedor
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {supplierTotals.map((s) => {
+                const pct = totalSupplierExpense > 0 ? (s.amount / totalSupplierExpense) * 100 : 0;
+                return (
+                  <div key={s.name} className="flex items-center gap-3" data-testid={`supplier-total-${s.name}`}>
+                    <span className="text-xs text-slate-600 w-40 truncate">{s.name}</span>
+                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-red-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-xs font-medium text-slate-700 w-24 text-right">{formatCurrency(s.amount)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Transactions */}
       <Card className="border-slate-200/80">
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <CardTitle className="font-heading text-lg">Movimientos</CardTitle>
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList>
-                <TabsTrigger value="all">Todos</TabsTrigger>
-                <TabsTrigger value="ingreso">Ingresos</TabsTrigger>
-                <TabsTrigger value="egreso">Egresos</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              {supplierOptions.length > 0 && (
+                <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                  <SelectTrigger className="h-9 w-full sm:w-52" data-testid="supplier-filter">
+                    <SelectValue placeholder="Todos los proveedores" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los proveedores</SelectItem>
+                    {supplierOptions.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList>
+                  <TabsTrigger value="all">Todos</TabsTrigger>
+                  <TabsTrigger value="ingreso">Ingresos</TabsTrigger>
+                  <TabsTrigger value="egreso">Egresos</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

@@ -9,6 +9,13 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Proveedor en Egresos: obligatorio + filtro + totales (Jun 2026)
+Tres mejoras sobre el proveedor en Finanzas (`FinancePage.js` + `routes/finance.py`):
+- **Proveedor obligatorio en categoría "Proveedores"**: si el egreso es de categoría `suppliers` y no se elige proveedor, se bloquea. Frontend valida (toast) y muestra `*` en la etiqueta; backend devuelve 400 "Selecciona un proveedor para egresos de la categoria Proveedores.".
+- **Filtro por proveedor en Movimientos**: select `supplier-filter` (poblado con los proveedores que aparecen en los movimientos del periodo) que filtra la tabla por `supplier_id` (client-side, junto al filtro de tipo).
+- **Total por proveedor**: tarjeta "Egresos por Proveedor" (`supplier-totals-card`) que agrupa y suma los egresos con proveedor del periodo seleccionado, ordenados de mayor a menor, con barra proporcional.
+- Verificado E2E: 400 sin proveedor en categoría Proveedores; tarjeta muestra totales correctos (Essilor Q500 / Optilab Q450); filtro por Optilab deja 2 filas. Datos de prueba limpiados.
+
 ### Proveedor en Egresos (Finanzas) (Jun 2026)
 En "Nueva Entrada Financiera" (`FinancePage.js`), al elegir tipo **Egreso** aparece un campo **Proveedor** (select) poblado desde la lista de proveedores existente (`GET /api/suppliers`). Decisiones: solo visible en Egresos; **opcional**; si no hay proveedores muestra un enlace a `/suppliers` para agregarlos.
 - **Backend**: `FinanceEntryCreate` +`supplier_id: Optional[str]`. `POST /api/finance` valida que el proveedor exista y pertenezca a la company (400 id inválido, 404 no encontrado) y guarda `supplier_id` (ObjectId) + `supplier_name` (resuelto en el servidor). El listado serializa el `supplier_id`.

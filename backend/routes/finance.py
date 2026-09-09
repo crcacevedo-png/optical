@@ -61,6 +61,8 @@ async def create_finance_entry(data: FinanceEntryCreate, user: dict = Depends(ge
             raise HTTPException(status_code=404, detail="Proveedor no encontrado")
         entry_doc["supplier_id"] = sup_oid
         entry_doc["supplier_name"] = supplier.get("name")
+    elif data.type == "egreso" and data.category == "suppliers":
+        raise HTTPException(status_code=400, detail="Selecciona un proveedor para egresos de la categoria Proveedores.")
     result = await db.finance_entries.insert_one(entry_doc)
     return {"_id": str(result.inserted_id), "message": "Entrada registrada"}
 
