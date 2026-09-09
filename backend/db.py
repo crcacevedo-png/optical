@@ -75,3 +75,10 @@ def effective_monthly_cost(company, plan) -> float:
     if plan:
         return float(plan.get("price_monthly") or plan.get("price", 0) or 0)
     return 0.0
+
+
+def is_billing_exempt(company) -> bool:
+    """True si la óptica está exenta de reglas de inactivación por facturación/pago.
+    Las cuentas de cortesía (is_courtesy) nunca se desactivan automáticamente por
+    falta de pago (ni por expiración de activación)."""
+    return bool(company and company.get("is_courtesy"))

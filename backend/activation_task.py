@@ -161,6 +161,11 @@ async def _process_deactivations(now: datetime):
       como "En riesgo" para que el SuperAdmin las contacte manualmente.
     - Otras reglas de desactivacion (falta de pago Stripe, etc.) se
       definiran cuando el modulo de pagos este completamente operativo.
+
+    EXENCION (Jun 2026): las CUENTAS DE CORTESIA (company.is_courtesy) quedan
+    EXENTAS de toda desactivacion automatica (por expiracion de activacion y por
+    cualquier futura regla de falta de pago). Son accesos regalados por el
+    SuperAdmin y permanecen activos hasta que el SuperAdmin quite la cortesia.
     """
     pipeline = [
         {"$match": {
@@ -176,7 +181,7 @@ async def _process_deactivations(now: datetime):
             "as": "company",
         }},
         {"$unwind": "$company"},
-        {"$match": {"company.is_active": True}},
+        {"$match": {"company.is_active": True, "company.is_courtesy": {"$ne": True}}},
     ]
     async for admin in db.users.aggregate(pipeline):
         company = admin["company"]

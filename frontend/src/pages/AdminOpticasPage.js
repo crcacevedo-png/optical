@@ -254,6 +254,7 @@ export default function AdminOpticasPage() {
     if (activationFilter === 'inactivas') {
       return c.admin_activated && (c.days_since_last_login ?? 0) > 30;
     }
+    if (activationFilter === 'cortesia') return !!c.is_courtesy;
     return true;
   });
 
@@ -352,6 +353,7 @@ export default function AdminOpticasPage() {
               { k: 'sin_activar', l: 'Sin activar' },
               { k: 'activas', l: 'Activas' },
               { k: 'inactivas', l: 'Inactivas' },
+              { k: 'cortesia', l: 'Cortesía' },
             ].map((opt) => (
               <button
                 key={opt.k}
@@ -419,6 +421,15 @@ export default function AdminOpticasPage() {
                     <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700">
                       <CreditCard className="w-2.5 h-2.5 mr-1" /> {c.plan_name || 'Sin plan'}
                     </span>
+                    {c.is_courtesy && (
+                      <span
+                        className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700"
+                        title="Cuenta de cortesía (costo mensual Q0)"
+                        data-testid={`courtesy-badge-${c._id}`}
+                      >
+                        Cortesía
+                      </span>
+                    )}
                     {(c.patients_warning || c.branches_warning) && (
                       <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">
                         <AlertTriangle className="w-2.5 h-2.5 mr-1" /> Cerca del limite

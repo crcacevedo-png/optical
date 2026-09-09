@@ -9,7 +9,13 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
-### Cuentas de cortesía (costo mensual Q0) por óptica (SuperAdmin) (Jun 2026)
+### Filtro de cortesías + exención de inactivación (Jun 2026)
+Dos mejoras sobre las cuentas de cortesía:
+- **Filtro "Cortesía" (SuperAdmin)**: `AdminOpticasPage.js` — nueva pestaña de filtro `activation-filter-cortesia` (junto a Todas/Sin activar/Activas/Inactivas) que muestra solo las ópticas con `is_courtesy`. Cada card muestra además un badge verde "Cortesía" (`courtesy-badge-{id}`) para verlas de un vistazo. Filtrado client-side sobre el campo `is_courtesy` que ya devuelve `GET /companies`.
+- **Exención de inactivación**: helper `db.is_billing_exempt(company)` → True para cortesías. `activation_task._process_deactivations` ahora excluye del pipeline las cuentas de cortesía (`company.is_courtesy: {$ne: True}`): NUNCA se desactivan automáticamente (por expiración de activación hoy, ni por futuras reglas de falta de pago). Docstring actualizado.
+- Verificado: exención E2E (empresa creada hace 40 días con admin sin login: con cortesía queda `is_active=True`; sin cortesía se desactiva con `deactivated_reason=activation_expired`); filtro E2E (muestra 1/3, badge "Cortesía" en el card). Datos de prueba limpiados (0 cortesías activas).
+
+
 El SuperAdmin puede marcar una óptica como "cuenta de cortesía" para que su costo mensual efectivo sea **Q0**, SIN cambiar plan, módulos ni límites. Pensado para regalar acceso a un grupo de optometristas. Óptica por óptica, a mano; permanente hasta que se quite; reversible; auditado.
 - **Costo mensual efectivo**: helper `db.effective_monthly_cost(company, plan)` → Q0 si `company.is_courtesy`, si no `plan.price_monthly` (o `price`).
 - **Backend**:
