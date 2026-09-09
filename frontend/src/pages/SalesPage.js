@@ -12,7 +12,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import {
-  Plus, ShoppingCart, Trash2, User, Receipt, Eye, HandCoins, Printer
+  Plus, ShoppingCart, Trash2, User, Receipt, Eye, HandCoins, Printer, MessageCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BranchFilter } from '../components/BranchFilter';
@@ -36,6 +36,7 @@ export default function SalesPage() {
   const [deleting, setDeleting] = useState(false);
   const [receiptSale, setReceiptSale] = useState(null);
   const [printingId, setPrintingId] = useState(null);
+  const [sharingId, setSharingId] = useState(null);
 
   const [cart, setCart] = useState([]);
   const [saleForm, setSaleForm] = useState({
@@ -138,6 +139,24 @@ export default function SalesPage() {
       toast.error('No se pudo generar el recibo de pago');
     } finally {
       setPrintingId(null);
+    }
+  };
+
+  const shareReceiptWhatsApp = async (saleId) => {
+    if (!saleId) return;
+    try {
+      setSharingId(saleId);
+      const { data } = await api.get(`/api/sales/${saleId}/receipt-share-link`);
+      const fullUrl = `${window.location.origin}${data.path}`;
+      const text = `${data.message}${fullUrl}`;
+      const phone = (data.phone || '').replace(/[^\d]/g, '');
+      const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+      window.open(waUrl, '_blank');
+    } catch (error) {
+      console.error('No se pudo generar el enlace del recibo:', error);
+      toast.error('No se pudo generar el enlace para compartir');
+    } finally {
+      setSharingId(null);
     }
   };
 
@@ -615,6 +634,18 @@ export default function SalesPage() {
                 {printingId === detailSale._id ? 'Generando…' : 'Imprimir recibo de pago'}
               </Button>
 
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                onClick={() => shareReceiptWhatsApp(detailSale._id)}
+                disabled={sharingId === detailSale._id}
+                data-testid="detail-whatsapp-receipt-btn"
+              >
+                <MessageCircle className="w-4 h-4 mr-2" />
+                {sharingId === detailSale._id ? 'Generando…' : 'Enviar recibo por WhatsApp'}
+              </Button>
+
               {isAdmin && (
                 <Button
                   type="button"
@@ -669,6 +700,16 @@ export default function SalesPage() {
               >
                 <Printer className="w-4 h-4 mr-2" />
                 {printingId === receiptSale._id ? 'Generando…' : 'Imprimir recibo de pago'}
+              </Button>
+              <Button
+                type="button"
+                className="w-full bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => shareReceiptWhatsApp(receiptSale._id)}
+                disabled={sharingId === receiptSale._id}
+                data-testid="sale-receipt-whatsapp-btn"
+              >
+                <MessageCircle className="w-4 h-4 mr-2" />
+                {sharingId === receiptSale._id ? 'Generando…' : 'Enviar por WhatsApp'}
               </Button>
               <Button
                 type="button"

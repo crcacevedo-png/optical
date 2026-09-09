@@ -1,18 +1,53 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from bson import ObjectId
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 import io
 import asyncio
+import os
+import uuid
+import logging
+import jwt as pyjwt
 
-from db import db, serialize_doc
-from auth_utils import get_current_user
+from db import db, serialize_doc, UPLOADS_DIR
+from auth_utils import get_current_user, get_jwt_secret, JWT_ALGORITHM
 from models import SaleCreate
 from audit import log_audit
 from cache import invalidate_inventory
+from rate_limiter import limiter
+import object_storage as objstore
 
 router = APIRouter(prefix="/sales", tags=["Ventas"])
+
+logger = logging.getLogger(__name__)
+
+RECEIPT_SHARE_SUB = "sale-receipt"
+RECEIPT_SHARE_HOURS = int(os.environ.get("RECEIPT_SHARE_HOURS", "720"))  # 30d
+
+
+def _normalize_phone(raw: str) -> str:
+    """Solo digitos; antepone 502 (Guatemala) si son 8 digitos locales."""
+    digits = "".join(ch for ch in (raw or "") if ch.isdigit())
+    if len(digits) == 8:
+        digits = "502" + digits
+    return digits
+
+
+async def _get_company_logo_bytes(company: dict) -> Optional[bytes]:
+    """Devuelve los bytes del logo de la empresa (Object Storage o local), o None."""
+    if not company or not company.get("logo_filename"):
+        return None
+    try:
+        if company.get("logo_storage_path") and objstore.is_enabled():
+            data, _ct = await asyncio.to_thread(objstore.get_object, company["logo_storage_path"])
+            return data
+        fp = UPLOADS_DIR / company["logo_filename"]
+        if fp.exists():
+            return fp.read_bytes()
+    except Exception as e:
+        logger.warning(f"No se pudo cargar el logo para el recibo: {e}")
+    return None
 
 
 def _serialize_payments(sale: dict) -> None:
@@ -292,129 +327,277 @@ async def sale_receipt_pdf(sale_id: str, user: dict = Depends(get_current_user))
     if not sale or str(sale["company_id"]) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
 
-    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}) or {}
-
-    patient_name = sale.get("patient_name_override") or "Consumidor final"
-    if sale.get("patient_id"):
-        p = await db.patients.find_one({"_id": sale["patient_id"]}, {"first_name": 1, "last_name": 1})
-        if p:
-            patient_name = f"{p.get('first_name','')} {p.get('last_name','')}".strip() or patient_name
-
-    seller_name = ""
-    if sale.get("created_by"):
-        u = await db.users.find_one({"_id": sale["created_by"]}, {"name": 1})
-        if u:
-            seller_name = u.get("name", "")
-
-    pdf_bytes = await asyncio.to_thread(_render_sale_receipt_pdf, sale, company, patient_name, seller_name)
+    pdf_bytes = await _build_sale_receipt_pdf(sale)
     return StreamingResponse(
         io.BytesIO(pdf_bytes), media_type="application/pdf",
         headers={"Content-Disposition": f"inline; filename=recibo_{sale_id[-8:]}.pdf"},
     )
 
 
-def _render_sale_receipt_pdf(sale: dict, company: dict, patient_name: str, seller_name: str) -> bytes:
+async def _build_sale_receipt_pdf(sale: dict) -> bytes:
+    """Resuelve empresa/cliente/vendedor/logo y renderiza el recibo (en hilo)."""
+    company = await db.companies.find_one({"_id": sale["company_id"]}) or {}
+    patient_name = sale.get("patient_name_override") or "Consumidor final"
+    if sale.get("patient_id"):
+        p = await db.patients.find_one({"_id": sale["patient_id"]}, {"first_name": 1, "last_name": 1})
+        if p:
+            patient_name = f"{p.get('first_name','')} {p.get('last_name','')}".strip() or patient_name
+    seller_name = ""
+    if sale.get("created_by"):
+        u = await db.users.find_one({"_id": sale["created_by"]}, {"name": 1})
+        if u:
+            seller_name = u.get("name", "")
+    logo_bytes = await _get_company_logo_bytes(company)
+    return await asyncio.to_thread(_render_sale_receipt_pdf, sale, company, patient_name, seller_name, logo_bytes)
+
+
+@router.get("/{sale_id}/receipt-share-link")
+async def sale_receipt_share_link(sale_id: str, user: dict = Depends(get_current_user)):
+    """Genera un enlace publico firmado (JWT) del recibo + datos para compartir por WhatsApp."""
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    try:
+        oid = ObjectId(sale_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="sale_id invalido") from exc
+    sale = await db.sales.find_one({"_id": oid})
+    if not sale or str(sale["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+    company = await db.companies.find_one({"_id": sale["company_id"]}, {"name": 1}) or {}
+    patient_name = sale.get("patient_name_override") or "Consumidor final"
+    phone = ""
+    if sale.get("patient_id"):
+        p = await db.patients.find_one({"_id": sale["patient_id"]}, {"first_name": 1, "last_name": 1, "phone": 1})
+        if p:
+            patient_name = f"{p.get('first_name','')} {p.get('last_name','')}".strip() or patient_name
+            phone = _normalize_phone(p.get("phone", ""))
+
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(hours=RECEIPT_SHARE_HOURS)
+    token = pyjwt.encode({
+        "sub": RECEIPT_SHARE_SUB,
+        "sale_id": str(sale["_id"]),
+        "company_id": str(sale["company_id"]),
+        "iat": int(now.timestamp()),
+        "exp": exp,
+        "jti": str(uuid.uuid4()),
+    }, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+
+    first_name = patient_name.split(" ")[0] if patient_name and patient_name != "Consumidor final" else ""
+    greeting = f"Hola {first_name}, " if first_name else "Hola, "
+    message = (
+        f"{greeting}aqui esta tu recibo de compra en {company.get('name') or 'Cortexia Optical'} "
+        f"por un total de Q{float(sale.get('total', 0) or 0):.2f}. Puedes verlo aqui: "
+    )
+    return {
+        "path": f"/api/sales/public/receipt?token={token}",
+        "token": token,
+        "expires_at": exp.isoformat(),
+        "phone": phone,
+        "patient_name": patient_name,
+        "message": message,
+    }
+
+
+@router.get("/public/receipt")
+@limiter.limit("20/minute")
+async def public_sale_receipt(request: Request, token: str = Query(..., min_length=10, max_length=2048)):
+    """Endpoint publico (sin auth): valida el JWT firmado y sirve el recibo PDF."""
+    try:
+        decoded = pyjwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+    except pyjwt.ExpiredSignatureError:
+        raise HTTPException(status_code=410, detail="El enlace expiro. Solicita uno nuevo.")
+    except pyjwt.InvalidTokenError:
+        raise HTTPException(status_code=403, detail="Enlace invalido.")
+    if decoded.get("sub") != RECEIPT_SHARE_SUB:
+        raise HTTPException(status_code=403, detail="Enlace invalido.")
+    try:
+        oid = ObjectId(decoded.get("sale_id"))
+    except Exception as exc:
+        raise HTTPException(status_code=403, detail="Enlace invalido.") from exc
+    sale = await db.sales.find_one({"_id": oid})
+    if not sale or str(sale.get("company_id")) != decoded.get("company_id"):
+        raise HTTPException(status_code=404, detail="Recibo no encontrado")
+
+    pdf_bytes = await _build_sale_receipt_pdf(sale)
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes), media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"inline; filename=recibo_{str(sale['_id'])[-8:]}.pdf",
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
+
+
+def _render_sale_receipt_pdf(sale: dict, company: dict, patient_name: str, seller_name: str, logo_bytes: bytes = None) -> bytes:
     from reportlab.lib import colors
-    from reportlab.lib.units import mm
+    from reportlab.lib.units import inch
+    from reportlab.lib.utils import ImageReader
     from reportlab.pdfgen import canvas
 
-    width = 80 * mm
-    lines_items = len(sale.get("items") or [])
-    lines_pay = len(sale.get("payments") or [])
-    height = (70 + 7 * lines_items + 5 * lines_pay + 30) * mm
-    buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=(width, height))
+    NAVY = colors.HexColor("#1B2A49")
+    GRAY = colors.HexColor("#64748b")
+    LIGHT = colors.HexColor("#eef2f7")
+    AMBER = colors.HexColor("#d97706")
 
-    y = height - 8 * mm
-    c.setFont("Helvetica-Bold", 10)
-    c.drawCentredString(width / 2, y, str(company.get("name") or "Cortexia Optical"))
-    y -= 4 * mm
-    c.setFont("Helvetica", 7)
-    if company.get("legal_name"):
-        c.drawCentredString(width / 2, y, str(company.get("legal_name"))[:44])
-        y -= 3 * mm
+    w, h = 8.5 * inch, 5.5 * inch  # media carta horizontal (igual que recetas)
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(w, h))
+
+    # ── Banda de encabezado ──
+    c.setFillColor(NAVY)
+    c.rect(0, h - 0.9 * inch, w, 0.9 * inch, fill=True, stroke=False)
+    text_x = 0.4 * inch
+    if logo_bytes:
+        try:
+            img = ImageReader(io.BytesIO(logo_bytes))
+            iw, ih = img.getSize()
+            aspect = iw / ih
+            lh = 0.55 * inch
+            lw = min(lh * aspect, 1.2 * inch)
+            lh = lw / aspect
+            c.drawImage(img, 0.3 * inch, h - 0.72 * inch, width=lw, height=lh,
+                        preserveAspectRatio=True, mask="auto")
+            text_x = 0.3 * inch + lw + 0.2 * inch
+        except Exception:
+            pass
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(text_x, h - 0.42 * inch, str(company.get("name") or "Cortexia Optical"))
+    c.setFont("Helvetica", 7.5)
+    line2 = company.get("legal_name") or company.get("address") or ""
+    if line2:
+        c.drawString(text_x, h - 0.57 * inch, str(line2)[:70])
+    bits = []
     if company.get("tax_id"):
-        c.drawCentredString(width / 2, y, f"NIT: {company.get('tax_id')}")
-        y -= 3 * mm
+        bits.append(f"NIT: {company['tax_id']}")
     if company.get("phone"):
-        c.drawCentredString(width / 2, y, f"Tel: {company.get('phone')}")
-        y -= 3 * mm
-    if company.get("address"):
-        c.drawCentredString(width / 2, y, str(company.get("address"))[:44])
-        y -= 3 * mm
-    y -= 2 * mm
-    c.setFont("Helvetica-Bold", 8)
-    c.drawCentredString(width / 2, y, "RECIBO DE PAGO")
-    y -= 3 * mm
-    c.line(4 * mm, y, width - 4 * mm, y)
-    y -= 3.5 * mm
-    c.setFont("Helvetica", 7)
+        bits.append(f"Tel: {company['phone']}")
+    if company.get("email"):
+        bits.append(str(company["email"]))
+    if bits:
+        c.drawString(text_x, h - 0.72 * inch, "   ".join(bits)[:90])
+
+    # ── Titulo ──
+    c.setFillColor(NAVY)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(w / 2, h - 1.18 * inch, "RECIBO DE PAGO")
+    c.setStrokeColor(NAVY)
+    c.setLineWidth(0.7)
+    c.line(0.4 * inch, h - 1.28 * inch, w - 0.4 * inch, h - 1.28 * inch)
+
+    # ── Meta (recibo / fecha / cliente / vendedor) ──
+    y = h - 1.5 * inch
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(GRAY)
+    c.drawString(0.4 * inch, y, "Recibo:")
+    c.drawString(4.4 * inch, y, "Fecha:")
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawString(1.0 * inch, y, str(sale["_id"])[-8:].upper())
     date_str = (sale.get("created_at") or "")[:19].replace("T", " ")
-    c.drawString(4 * mm, y, f"Recibo: {str(sale['_id'])[-8:].upper()}")
-    c.drawRightString(width - 4 * mm, y, date_str)
-    y -= 3.5 * mm
-    c.drawString(4 * mm, y, f"Cliente: {patient_name[:35]}")
-    y -= 3.5 * mm
+    c.drawString(4.95 * inch, y, date_str)
+    y -= 0.22 * inch
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(GRAY)
+    c.drawString(0.4 * inch, y, "Cliente:")
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawString(1.0 * inch, y, patient_name[:48])
     if seller_name:
-        c.drawString(4 * mm, y, f"Atendio: {seller_name[:35]}")
-        y -= 3.5 * mm
-    c.line(4 * mm, y, width - 4 * mm, y)
-    y -= 3.5 * mm
-    c.setFont("Helvetica-Bold", 7)
-    c.drawString(4 * mm, y, "Producto")
-    c.drawRightString(width - 4 * mm, y, "Total")
-    y -= 3.5 * mm
-    c.setFont("Helvetica", 7)
+        c.setFont("Helvetica", 8.5)
+        c.setFillColor(GRAY)
+        c.drawString(4.4 * inch, y, "Atendio:")
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8.5)
+        c.drawString(4.95 * inch, y, seller_name[:32])
+    y -= 0.3 * inch
+
+    # ── Tabla de articulos ──
+    x_prod = 0.42 * inch
+    x_qty = 5.3 * inch
+    x_price = 6.6 * inch
+    x_total = w - 0.42 * inch
+    c.setFillColor(LIGHT)
+    c.rect(0.35 * inch, y - 0.06 * inch, w - 0.7 * inch, 0.24 * inch, fill=True, stroke=False)
+    c.setFillColor(NAVY)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(x_prod, y, "PRODUCTO")
+    c.drawRightString(x_qty, y, "CANT")
+    c.drawRightString(x_price, y, "PRECIO")
+    c.drawRightString(x_total, y, "TOTAL")
+    y -= 0.26 * inch
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica", 8.5)
     for it in (sale.get("items") or []):
-        name = str(it.get("name", ""))[:32]
+        name = str(it.get("name", ""))[:58]
         qty = int(it.get("quantity", 0) or 0)
         price = float(it.get("price", it.get("unit_price", 0)) or 0)
         line_total = float(it.get("total", it.get("subtotal", qty * price)) or 0)
-        c.drawString(4 * mm, y, name)
-        c.drawRightString(width - 4 * mm, y, f"Q {line_total:.2f}")
-        y -= 3 * mm
-        c.drawString(6 * mm, y, f"  {qty} x Q {price:.2f}")
-        y -= 3.5 * mm
-    y -= 1 * mm
-    c.line(4 * mm, y, width - 4 * mm, y)
-    y -= 3.5 * mm
-    c.setFont("Helvetica", 7)
-    c.drawString(4 * mm, y, "Subtotal")
-    c.drawRightString(width - 4 * mm, y, f"Q {float(sale.get('subtotal', 0) or 0):.2f}")
-    y -= 3 * mm
+        c.drawString(x_prod, y, name)
+        c.drawRightString(x_qty, y, str(qty))
+        c.drawRightString(x_price, y, f"Q {price:.2f}")
+        c.drawRightString(x_total, y, f"Q {line_total:.2f}")
+        y -= 0.2 * inch
+        if y < 1.2 * inch:  # evitar invadir el pie
+            break
+    block_top = y + 0.02 * inch
+    c.setStrokeColor(colors.HexColor("#cbd5e1"))
+    c.setLineWidth(0.5)
+    c.line(0.4 * inch, block_top + 0.02 * inch, x_total, block_top + 0.02 * inch)
+
+    # ── Totales (bloque derecho) ──
+    ty = block_top - 0.18 * inch
+
+    def _tot(label, value, bold=False, color=colors.black):
+        c.setFillColor(GRAY if not bold else color)
+        c.setFont("Helvetica-Bold" if bold else "Helvetica", 10 if bold else 8.5)
+        c.drawString(5.6 * inch, ty, label)
+        c.setFillColor(color if bold else colors.black)
+        c.drawRightString(x_total, ty, value)
+
+    _tot("Subtotal", f"Q {float(sale.get('subtotal', 0) or 0):.2f}")
+    ty -= 0.2 * inch
     if float(sale.get("discount", 0) or 0) > 0:
-        c.drawString(4 * mm, y, "Descuento")
-        c.drawRightString(width - 4 * mm, y, f"-Q {float(sale.get('discount', 0)):.2f}")
-        y -= 3 * mm
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(4 * mm, y, "TOTAL")
-    c.drawRightString(width - 4 * mm, y, f"Q {float(sale.get('total', 0) or 0):.2f}")
-    y -= 4 * mm
-    c.setFont("Helvetica", 7)
-    method_labels = {"cash": "Efectivo", "card": "Tarjeta", "transfer": "Transf.", "check": "Cheque", "other": "Otro"}
-    for p in (sale.get("payments") or []):
-        m = method_labels.get(p.get("method"), p.get("method", ""))
-        c.drawString(4 * mm, y, f"Pago {m}")
-        c.drawRightString(width - 4 * mm, y, f"Q {float(p.get('amount', 0) or 0):.2f}")
-        y -= 3 * mm
-    c.setFont("Helvetica", 7)
-    c.drawString(4 * mm, y, "Pagado")
-    c.drawRightString(width - 4 * mm, y, f"Q {float(sale.get('amount_paid', 0) or 0):.2f}")
-    y -= 3 * mm
+        _tot("Descuento", f"-Q {float(sale.get('discount', 0)):.2f}")
+        ty -= 0.2 * inch
+    _tot("TOTAL", f"Q {float(sale.get('total', 0) or 0):.2f}", bold=True, color=NAVY)
+    ty -= 0.28 * inch
+    _tot("Pagado", f"Q {float(sale.get('amount_paid', 0) or 0):.2f}")
+    ty -= 0.2 * inch
     if float(sale.get("balance", 0) or 0) > 0.01:
+        _tot("SALDO PENDIENTE", f"Q {float(sale.get('balance', 0)):.2f}", bold=True, color=AMBER)
+
+    # ── Pagos (bloque izquierdo) ──
+    py = block_top - 0.18 * inch
+    method_labels = {"cash": "Efectivo", "card": "Tarjeta", "transfer": "Transferencia", "check": "Cheque", "other": "Otro"}
+    pays = sale.get("payments") or []
+    if pays:
+        c.setFillColor(GRAY)
         c.setFont("Helvetica-Bold", 8)
-        c.setFillColor(colors.HexColor("#d97706"))
-        c.drawString(4 * mm, y, "SALDO PENDIENTE")
-        c.drawRightString(width - 4 * mm, y, f"Q {float(sale.get('balance', 0)):.2f}")
-        c.setFillColor(colors.black)
-        y -= 3.5 * mm
-    y -= 2 * mm
-    c.line(4 * mm, y, width - 4 * mm, y)
-    y -= 3.5 * mm
-    c.setFont("Helvetica", 6)
-    c.drawCentredString(width / 2, y, "Gracias por su compra")
-    y -= 3 * mm
-    c.drawCentredString(width / 2, y, "www.cortexiaoptical.com")
+        c.drawString(0.42 * inch, py, "FORMA DE PAGO")
+        py -= 0.22 * inch
+        c.setFont("Helvetica", 8.5)
+        for p in pays:
+            m = method_labels.get(p.get("method"), p.get("method", ""))
+            c.setFillColor(colors.black)
+            c.drawString(0.42 * inch, py, m)
+            c.drawString(2.2 * inch, py, f"Q {float(p.get('amount', 0) or 0):.2f}")
+            py -= 0.2 * inch
+            if py < 0.9 * inch:
+                break
+
+    # ── Pie ──
+    c.setFillColor(GRAY)
+    c.setFont("Helvetica", 7)
+    footer = (company.get("prescription_style", {}) or {}).get("footer_text") or "Gracias por su compra"
+    c.drawCentredString(w / 2, 0.55 * inch, str(footer)[:90])
+    c.setStrokeColor(NAVY)
+    c.setLineWidth(0.7)
+    c.line(0.4 * inch, 0.75 * inch, w - 0.4 * inch, 0.75 * inch)
+    c.setFont("Helvetica", 6.5)
+    c.drawCentredString(w / 2, 0.4 * inch, "www.cortexiaoptical.com")
 
     c.showPage()
     c.save()
