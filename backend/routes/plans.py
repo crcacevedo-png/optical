@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from bson import ObjectId
 from datetime import datetime, timezone
 
-from db import db, serialize_doc, effective_max_patients
+from db import db, serialize_doc, effective_max_patients, effective_monthly_cost
 from auth_utils import get_current_user
 from models import PlanCreate, PlanUpdate
 from routes.notifications import create_notification
@@ -148,6 +148,9 @@ async def get_plan_usage(company_id: str, user: dict = Depends(get_current_user)
         "max_branches": max_branches,
         "patient_limit_override": company.get("patient_limit_override"),
         "plan_max_patients": (plan.get("max_patients", 0) if plan else 0),
+        "is_courtesy": bool(company.get("is_courtesy")),
+        "monthly_cost": effective_monthly_cost(company, plan),
+        "plan_monthly_cost": float((plan or {}).get("price_monthly") or (plan or {}).get("price", 0) or 0),
         "patients_percent": round((patients_count / max_patients * 100), 1) if max_patients > 0 else 0,
         "branches_percent": round((branches_count / max_branches * 100), 1) if max_branches > 0 else 0,
         "patients_warning": max_patients > 0 and patients_count >= max_patients * 0.8,
@@ -180,11 +183,15 @@ async def plans_stats_summary(user: dict = Depends(get_current_user)):
     plans = await db.plans.find({}).to_list(500)
     plans_map = {str(p["_id"]): p for p in plans}
 
-    # Agrupacion: empresas activas por plan, tambien contando ciclo de facturacion
+    # Agrupacion: empresas activas por plan, ciclo de facturacion y cortesía
     pipeline = [
         {"$match": {"is_active": {"$ne": False}}},
         {"$group": {
-            "_id": {"plan_id": "$plan_id", "billing_cycle": {"$ifNull": ["$billing_cycle", "monthly"]}},
+            "_id": {
+                "plan_id": "$plan_id",
+                "billing_cycle": {"$ifNull": ["$billing_cycle", "monthly"]},
+                "is_courtesy": {"$ifNull": ["$is_courtesy", False]},
+            },
             "count": {"$sum": 1},
         }},
     ]
@@ -193,11 +200,13 @@ async def plans_stats_summary(user: dict = Depends(get_current_user)):
     # Construir stats por plan
     per_plan = {}
     total_companies = 0
+    total_courtesy = 0
     mrr_total = 0.0
     arr_total = 0.0
     for row in rows:
         plan_oid = row["_id"].get("plan_id")
         cycle = row["_id"].get("billing_cycle") or "monthly"
+        is_courtesy = bool(row["_id"].get("is_courtesy"))
         count = row["count"]
         total_companies += count
         pid = str(plan_oid) if plan_oid else "none"
@@ -211,11 +220,16 @@ async def plans_stats_summary(user: dict = Depends(get_current_user)):
                 "currency": (plan_doc.get("currency") or "GTQ").upper(),
                 "companies_monthly": 0,
                 "companies_yearly": 0,
+                "companies_courtesy": 0,
                 "total_companies": 0,
                 "mrr": 0.0,
                 "arr": 0.0,
             }
-        if cycle == "yearly":
+        # Las cuentas de cortesía NO aportan a MRR (costo efectivo Q0)
+        if is_courtesy:
+            per_plan[pid]["companies_courtesy"] += count
+            total_courtesy += count
+        elif cycle == "yearly":
             per_plan[pid]["companies_yearly"] += count
         else:
             per_plan[pid]["companies_monthly"] += count
@@ -245,6 +259,7 @@ async def plans_stats_summary(user: dict = Depends(get_current_user)):
 
     return {
         "total_companies_active": total_companies,
+        "total_courtesy": total_courtesy,
         "total_plans": len(plans),
         "mrr_projected": round(mrr_total, 2),
         "arr_projected": round(arr_total, 2),

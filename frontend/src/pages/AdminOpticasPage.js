@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Switch } from '../components/ui/switch';
 import {
   Plus, Building2, MapPin, Phone, Mail, Users, GitBranch,
   Shield, UserCheck, UserX, Eye, EyeOff, ChevronRight, Store, UserCog, Upload, Image, Trash2,
@@ -47,6 +48,7 @@ export default function AdminOpticasPage() {
   const [editCompanyForm, setEditCompanyForm] = useState({});
   const [patientLimitInput, setPatientLimitInput] = useState('150');
   const [savingLimit, setSavingLimit] = useState(false);
+  const [savingCourtesy, setSavingCourtesy] = useState(false);
 
   useEffect(() => {
     if (selectedCompany) {
@@ -298,6 +300,28 @@ export default function AdminOpticasPage() {
     }
   };
 
+  const handleToggleCourtesy = async (companyId, value) => {
+    try {
+      setSavingCourtesy(true);
+      const { data } = await api.put(`/api/companies/${companyId}/courtesy`, { is_courtesy: value });
+      toast.success(value
+        ? 'Cortesia activada: el costo mensual de esta optica es Q0.'
+        : 'Cortesia quitada: la optica vuelve al precio de su plan.');
+      if (selectedCompany?._id === companyId) {
+        setSelectedCompany(prev => ({
+          ...prev,
+          is_courtesy: data.is_courtesy,
+          monthly_cost: data.effective_monthly_cost,
+        }));
+      }
+      loadCompanies();
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err?.response?.data?.detail));
+    } finally {
+      setSavingCourtesy(false);
+    }
+  };
+
   return (
     <div className="space-y-6" data-testid="admin-opticas-page">
       {/* Header */}
@@ -531,7 +555,33 @@ export default function AdminOpticasPage() {
                         )}
                       </div>
                     </div>
-                    {/* Limite de pacientes personalizado (solo SuperAdmin) */}
+                    {/* Cuenta de cortesia (solo SuperAdmin) */}
+                    <div className="mt-4 pt-3 border-t" data-testid="courtesy-section">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="w-3.5 h-3.5 text-slate-400" />
+                            <p className="text-xs font-semibold text-slate-400 uppercase">Cuenta de cortesia</p>
+                            {selectedCompany.is_courtesy && (
+                              <Badge className="bg-emerald-100 text-emerald-800 text-[10px]" data-testid="courtesy-active-badge">
+                                Activa
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Sin costo mensual (Q0), sin cambiar el plan ni los modulos.
+                            {' '}Costo mensual actual: <span className="font-medium text-slate-700">Q{(selectedCompany.monthly_cost ?? 0).toFixed(2)}</span>
+                            {selectedCompany.is_courtesy ? ' (cortesia)' : ''}.
+                          </p>
+                        </div>
+                        <Switch
+                          checked={!!selectedCompany.is_courtesy}
+                          disabled={savingCourtesy}
+                          onCheckedChange={(v) => handleToggleCourtesy(selectedCompany._id, v)}
+                          data-testid="courtesy-switch"
+                        />
+                      </div>
+                    </div>
                     <div className="mt-4 pt-3 border-t" data-testid="patient-limit-section">
                       <div className="flex items-center gap-2 mb-1">
                         <Users className="w-3.5 h-3.5 text-slate-400" />

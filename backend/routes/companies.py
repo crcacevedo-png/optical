@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse, Response
 from bson import ObjectId
 from datetime import datetime, timezone
 
-from db import db, serialize_doc, UPLOADS_DIR, effective_max_patients
+from db import db, serialize_doc, UPLOADS_DIR, effective_max_patients, effective_monthly_cost
 from auth_utils import get_current_user, hash_password
 from models import CompanyCreate, CompanyUpdate
 from routes.notifications import create_notification
@@ -108,6 +108,9 @@ async def list_companies(
         else:
             c["plan_name"] = "Sin plan"
             c["max_patients"] = effective_max_patients(c, None)
+        c["is_courtesy"] = bool(c.get("is_courtesy"))
+        c["monthly_cost"] = effective_monthly_cost(c, plan)
+        c["plan_monthly_cost"] = float((plan or {}).get("price_monthly") or (plan or {}).get("price", 0) or 0)
 
         # Datos de activacion del admin
         act = admin_activity.get(cid_str)
@@ -250,6 +253,54 @@ async def set_patient_limit(company_id: str, data: PatientLimitUpdate, request: 
     )
     return {"ok": True, "patient_limit_override": new_val,
             "effective_max_patients": eff, "plan_max_patients": plan_max}
+
+
+class CourtesyUpdate(BaseModel):
+    is_courtesy: bool
+
+
+@router.put("/{company_id}/courtesy")
+async def set_courtesy(company_id: str, data: CourtesyUpdate, request: Request, user: dict = Depends(get_current_user)):
+    """SuperAdmin activa/quita la cortesía de una óptica (costo mensual efectivo Q0).
+    No cambia plan, módulos ni límites. Reversible + auditado."""
+    if user["role"] != "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    try:
+        oid = ObjectId(company_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="company_id invalido")
+    company = await db.companies.find_one({"_id": oid})
+    if not company:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+
+    now = datetime.now(timezone.utc).isoformat()
+    if data.is_courtesy:
+        await db.companies.update_one(
+            {"_id": oid},
+            {"$set": {"is_courtesy": True, "courtesy_updated_at": now, "courtesy_updated_by": ObjectId(user["_id"])}},
+        )
+        action = "COMPANY_COURTESY_GRANTED"
+    else:
+        await db.companies.update_one(
+            {"_id": oid},
+            {"$unset": {"is_courtesy": ""},
+             "$set": {"courtesy_updated_at": now, "courtesy_updated_by": ObjectId(user["_id"])}},
+        )
+        action = "COMPANY_COURTESY_REVOKED"
+
+    plan = await db.plans.find_one({"_id": company["plan_id"]}) if company.get("plan_id") else None
+    company["is_courtesy"] = bool(data.is_courtesy)
+    eff = effective_monthly_cost(company, plan)
+    plan_monthly = float((plan or {}).get("price_monthly") or (plan or {}).get("price", 0) or 0)
+    await log_audit(
+        action, actor_id=user["_id"], actor_email=user.get("email"), actor_role="superadmin",
+        metadata={"company_id": company_id, "is_courtesy": bool(data.is_courtesy),
+                  "plan_monthly_cost": plan_monthly, "effective_monthly_cost": eff},
+        request=request,
+    )
+    return {"ok": True, "is_courtesy": bool(data.is_courtesy),
+            "effective_monthly_cost": eff, "plan_monthly_cost": plan_monthly}
+
 
 
 @router.delete("/{company_id}")

@@ -65,3 +65,13 @@ def effective_max_patients(company, plan) -> int:
     if plan:
         return int(plan.get("max_patients", 0) or 0)
     return 0
+
+
+def effective_monthly_cost(company, plan) -> float:
+    """Costo mensual efectivo: Q0 si la óptica es cuenta de cortesía; de lo
+    contrario, el precio mensual del plan (price_monthly o price)."""
+    if company and company.get("is_courtesy"):
+        return 0.0
+    if plan:
+        return float(plan.get("price_monthly") or plan.get("price", 0) or 0)
+    return 0.0

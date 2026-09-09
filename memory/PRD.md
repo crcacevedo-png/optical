@@ -9,7 +9,22 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
-### Límite de pacientes personalizado por óptica (SuperAdmin) (Jun 2026)
+### Cuentas de cortesía (costo mensual Q0) por óptica (SuperAdmin) (Jun 2026)
+El SuperAdmin puede marcar una óptica como "cuenta de cortesía" para que su costo mensual efectivo sea **Q0**, SIN cambiar plan, módulos ni límites. Pensado para regalar acceso a un grupo de optometristas. Óptica por óptica, a mano; permanente hasta que se quite; reversible; auditado.
+- **Costo mensual efectivo**: helper `db.effective_monthly_cost(company, plan)` → Q0 si `company.is_courtesy`, si no `plan.price_monthly` (o `price`).
+- **Backend**:
+  - **NUEVO** `PUT /api/companies/{id}/courtesy` (SuperAdmin, CSRF). Body `{is_courtesy: bool}`. `true` setea `is_courtesy=True`; `false` hace `$unset`. Guarda `courtesy_updated_at/by`. Audita `COMPANY_COURTESY_GRANTED` / `COMPANY_COURTESY_REVOKED`. Devuelve `{ok, is_courtesy, effective_monthly_cost, plan_monthly_cost}`. 403 no-superadmin.
+  - `GET /companies`: añade `is_courtesy`, `monthly_cost` (efectivo) y `plan_monthly_cost`.
+  - `GET /plans/usage/{id}`: añade `is_courtesy`, `monthly_cost`, `plan_monthly_cost`.
+  - `GET /plans/stats/summary`: el MRR ahora **excluye** las cuentas de cortesía (agrupa por `is_courtesy`; las de cortesía no suman a `companies_monthly/yearly`). Añade `companies_courtesy` por plan y `total_courtesy` global. La distribución (`total_companies`) sí las incluye.
+- **Frontend**:
+  - `AdminOpticasPage.js` (tab Info): sección "Cuenta de cortesía" con `Switch` (data-testid `courtesy-switch`), badge "Activa" (`courtesy-active-badge`) cuando está activa, y texto "Costo mensual actual: Q… (cortesía)". Actualiza `selectedCompany` + recarga listado.
+  - `MyPlanPage.js`: la tarjeta "Plan actual" muestra una fila "Costo mensual" con el costo efectivo (`usage.monthly_cost`) — Q0.00 si es cortesía, sin ninguna etiqueta de cortesía (la óptica solo ve Q0). Data-testids `monthly-cost-row`, `monthly-cost-value`.
+- Campo Mongo `companies.is_courtesy` (bool, opcional).
+- **Reglas de inactivación por falta de pago**: no existen aún (se definirán con el módulo de pagos); cuando existan, deberán exentar `is_courtesy`.
+- Verificado E2E: activar cortesía en óptica de plan Q699 → efectivo Q0; usage y listado reflejan Q0+is_courtesy; MRR bajó 998→299 (−699) y `total_courtesy=1`; quitar → vuelve a Q699; no-superadmin 403. Frontend: switch con badge "Activa" + toast + "Q0.00 (cortesía)"; "Mi Plan" muestra "Costo mensual Q 299.00" (no cortesía). Datos de prueba limpiados (0 cortesías activas).
+
+
 El SuperAdmin puede subir el tope de pacientes de una óptica específica (p. ej. de 50 a 150) SIN cambiar su plan, precio ni módulos. Pensado como beneficio para ópticas que llegaron con código de promoción. Óptica por óptica, a mano; reversible; auditado.
 - **Concepto "límite efectivo"**: helper `db.effective_max_patients(company, plan)` → devuelve `company.patient_limit_override` si está fijado (>0), si no `plan.max_patients`.
 - **Backend**:

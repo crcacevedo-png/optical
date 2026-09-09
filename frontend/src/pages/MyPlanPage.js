@@ -154,6 +154,14 @@ export default function MyPlanPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {usage.plan && (
+              <div className="flex items-center justify-between rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5" data-testid="monthly-cost-row">
+                <span className="text-sm text-slate-600">Costo mensual</span>
+                <span className="text-lg font-heading font-bold text-slate-900" data-testid="monthly-cost-value">
+                  {fmt(usage.monthly_cost ?? usage.plan_monthly_cost ?? 0, usage.plan?.currency)}
+                </span>
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <UsageBar label="Pacientes" icon={Users} count={usage.patients_count} max={usage.max_patients} pct={usage.patients_percent} warn={usage.patients_warning} />
               <UsageBar label="Sucursales" icon={Building2} count={usage.branches_count} max={usage.max_branches} pct={usage.branches_percent} warn={usage.branches_warning} />
