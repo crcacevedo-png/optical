@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   Plus, TrendingUp, TrendingDown, DollarSign, 
-  ArrowUpCircle, ArrowDownCircle, Wallet, Filter, BarChart3, Truck, Download, Ban
+  ArrowUpCircle, ArrowDownCircle, Wallet, Filter, BarChart3, Truck, Download, Ban, FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BranchFilter } from '../components/BranchFilter';
@@ -21,6 +21,7 @@ export default function FinancePage() {
   const { user } = useAuth();
   const [entries, setEntries] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [pl, setPl] = useState(null);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
@@ -80,12 +81,14 @@ export default function FinancePage() {
       if (branchId) params.branch_id = branchId;
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo) params.date_to = dateTo;
-      const [entriesRes, summaryRes] = await Promise.all([
+      const [entriesRes, summaryRes, plRes] = await Promise.all([
         api.get('/api/finance', { params }),
-        api.get('/api/finance/summary', { params })
+        api.get('/api/finance/summary', { params }),
+        api.get('/api/finance/income-statement', { params })
       ]);
       setEntries(entriesRes.data || []);
       setSummary(summaryRes.data);
+      setPl(plRes.data);
     } catch (error) {
       console.error('Error fetching finance data:', error);
     } finally {
@@ -201,6 +204,39 @@ export default function FinancePage() {
       toast.success('Reporte descargado', { id: toastId });
     } catch (error) {
       toast.error('No se pudo generar el reporte', { id: toastId });
+    }
+  };
+
+  const handleExportPL = async (format) => {
+    const toastId = toast.loading('Generando estado de resultados...');
+    try {
+      const params = {};
+      if (branchId) params.branch_id = branchId;
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
+      const ext = format === 'pdf' ? 'pdf' : 'xlsx';
+      const mime = format === 'pdf'
+        ? 'application/pdf'
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      const response = await api.get(`/api/finance/income-statement.${ext}`, { params, responseType: 'blob' });
+      const blob = new Blob([response.data], { type: mime });
+      const url = URL.createObjectURL(blob);
+      if (format === 'pdf') {
+        window.open(url, '_blank');
+      } else {
+        const cd = response.headers?.['content-disposition'] || '';
+        const match = cd.match(/filename="?([^"]+)"?/);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = match ? match[1] : 'estado-resultados.xlsx';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+      toast.success('Listo', { id: toastId });
+    } catch (error) {
+      toast.error('No se pudo generar el estado de resultados', { id: toastId });
     }
   };
 
@@ -479,6 +515,71 @@ export default function FinancePage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Estado de Resultados (P&L, base caja) */}
+      {pl && (
+        <Card className="border-slate-200/80" data-testid="income-statement-card">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <CardTitle className="font-heading text-lg flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-pine-700" /> Estado de Resultados
+                <span className="text-xs font-normal text-slate-400">base caja · {pl.period?.from} a {pl.period?.to}</span>
+              </CardTitle>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="border-emerald-200 text-emerald-800 hover:bg-emerald-50" onClick={() => handleExportPL('xlsx')} data-testid="export-pl-excel-btn">
+                  <Download className="w-4 h-4 mr-1.5" /> Excel
+                </Button>
+                <Button variant="outline" size="sm" className="border-pine-200 text-pine-800 hover:bg-pine-50" onClick={() => handleExportPL('pdf')} data-testid="export-pl-pdf-btn">
+                  <FileText className="w-4 h-4 mr-1.5" /> PDF
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div data-testid="pl-income">
+                <p className="text-xs font-bold uppercase tracking-wider text-green-700 mb-2">Ingresos</p>
+                <div className="space-y-1">
+                  {pl.income.length === 0 ? (
+                    <p className="text-sm text-slate-400">Sin ingresos en el periodo</p>
+                  ) : pl.income.map((r) => (
+                    <div key={r.category} className="flex justify-between text-sm">
+                      <span className="text-slate-600 capitalize">{r.label}</span>
+                      <span className="font-medium text-green-700">{formatCurrency(r.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between text-sm font-bold border-t border-slate-200 mt-2 pt-2">
+                  <span>Total ingresos</span>
+                  <span className="text-green-700" data-testid="pl-total-income">{formatCurrency(pl.total_income)}</span>
+                </div>
+              </div>
+              <div data-testid="pl-expenses">
+                <p className="text-xs font-bold uppercase tracking-wider text-red-700 mb-2">Egresos</p>
+                <div className="space-y-1">
+                  {pl.expenses.length === 0 ? (
+                    <p className="text-sm text-slate-400">Sin egresos en el periodo</p>
+                  ) : pl.expenses.map((r) => (
+                    <div key={r.category} className="flex justify-between text-sm">
+                      <span className="text-slate-600 capitalize">{r.label}</span>
+                      <span className="font-medium text-red-600">{formatCurrency(r.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between text-sm font-bold border-t border-slate-200 mt-2 pt-2">
+                  <span>Total egresos</span>
+                  <span className="text-red-600" data-testid="pl-total-expense">{formatCurrency(pl.total_expense)}</span>
+                </div>
+              </div>
+            </div>
+            <div className={`mt-4 rounded-xl p-4 flex items-center justify-between ${pl.net_profit >= 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`} data-testid="pl-net-profit">
+              <span className="font-heading text-base font-bold text-slate-800">Utilidad neta</span>
+              <span className={`font-heading text-2xl font-bold ${pl.net_profit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatCurrency(pl.net_profit)}</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-2">Base caja: incluye ingresos cobrados y egresos pagados (los egresos a crédito cuentan solo por lo abonado). Excluye movimientos anulados.</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

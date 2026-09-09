@@ -606,6 +606,238 @@ def _render_expenses_xlsx(entries: list, company_name: str, d_from: str, d_to: s
     return buf.getvalue()
 
 
+_INCOME_CATEGORY_LABELS = {
+    'sales': 'Ventas', 'ventas': 'Ventas', 'services': 'Servicios', 'other_income': 'Otros Ingresos',
+}
+
+
+async def _compute_income_statement(user: dict, date_from: Optional[str], date_to: Optional[str], branch_id: Optional[str]) -> dict:
+    """Estado de Resultados (P&L) en BASE CAJA:
+    - Ingresos: entradas type='ingreso' por fecha (ya son base caja: una por pago real).
+    - Egresos de contado: type='egreso' no credito, por fecha, monto total.
+    - Egresos a credito: SOLO los abonos (payments[]) cuya fecha de pago cae en el rango.
+    Excluye anulados (is_voided)."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    month_start = datetime.now(timezone.utc).strftime("%Y-%m-01")
+    d_from = date_from or month_start
+    d_to = date_to or today
+
+    base = {"company_id": ObjectId(user["company_id"]), "is_voided": {"$ne": True}}
+    if branch_id:
+        try:
+            base["branch_id"] = ObjectId(branch_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="branch_id invalido")
+    elif user.get("branch_id"):
+        base["branch_id"] = ObjectId(user["branch_id"])
+
+    income_by_cat: dict = {}
+    async for e in db.finance_entries.find({**base, "type": "ingreso", "date": {"$gte": d_from, "$lte": d_to}}):
+        c = e.get("category") or "other_income"
+        income_by_cat[c] = round(income_by_cat.get(c, 0) + float(e.get("amount", 0) or 0), 2)
+
+    expense_by_cat: dict = {}
+    async for e in db.finance_entries.find({**base, "type": "egreso", "is_credit": {"$ne": True}, "date": {"$gte": d_from, "$lte": d_to}}):
+        c = e.get("category") or "other_expense"
+        expense_by_cat[c] = round(expense_by_cat.get(c, 0) + float(e.get("amount", 0) or 0), 2)
+
+    # Egresos a credito: abonos pagados dentro del rango (base caja)
+    async for e in db.finance_entries.find({**base, "type": "egreso", "is_credit": True}):
+        c = e.get("category") or "other_expense"
+        for p in e.get("payments", []) or []:
+            pd = (p.get("created_at") or "")[:10]
+            if d_from <= pd <= d_to:
+                expense_by_cat[c] = round(expense_by_cat.get(c, 0) + float(p.get("amount", 0) or 0), 2)
+
+    income_rows = [{"category": k, "label": _INCOME_CATEGORY_LABELS.get(k, k), "amount": v}
+                   for k, v in sorted(income_by_cat.items(), key=lambda kv: -kv[1])]
+    expense_rows = [{"category": k, "label": _EXPENSE_CATEGORY_LABELS.get(k, k), "amount": v}
+                    for k, v in sorted(expense_by_cat.items(), key=lambda kv: -kv[1])]
+    total_income = round(sum(income_by_cat.values()), 2)
+    total_expense = round(sum(expense_by_cat.values()), 2)
+    return {
+        "period": {"from": d_from, "to": d_to},
+        "basis": "caja",
+        "income": income_rows,
+        "expenses": expense_rows,
+        "total_income": total_income,
+        "total_expense": total_expense,
+        "net_profit": round(total_income - total_expense, 2),
+    }
+
+
+@router.get("/income-statement")
+async def income_statement(
+    user: dict = Depends(get_current_user),
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    branch_id: Optional[str] = None,
+):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    return await _compute_income_statement(user, date_from, date_to, branch_id)
+
+
+@router.get("/income-statement.xlsx")
+async def income_statement_xlsx(
+    user: dict = Depends(get_current_user),
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    branch_id: Optional[str] = None,
+):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    data = await _compute_income_statement(user, date_from, date_to, branch_id)
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1}) or {}
+    xlsx_bytes = await asyncio.to_thread(_render_pl_xlsx, data, company.get("name", "Cortexia Optical"))
+    await log_audit("FINANCE_INCOME_STATEMENT", actor_id=user["_id"], actor_email=user.get("email"),
+                    metadata={"format": "xlsx", **data["period"]})
+    p = data["period"]
+    filename = f"estado-resultados-{p['from']}-a-{p['to']}.xlsx"
+    return StreamingResponse(
+        io.BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/income-statement.pdf")
+async def income_statement_pdf(
+    user: dict = Depends(get_current_user),
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    branch_id: Optional[str] = None,
+):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    data = await _compute_income_statement(user, date_from, date_to, branch_id)
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1}) or {}
+    pdf_bytes = await asyncio.to_thread(_render_pl_pdf, data, company.get("name", "Cortexia Optical"))
+    await log_audit("FINANCE_INCOME_STATEMENT", actor_id=user["_id"], actor_email=user.get("email"),
+                    metadata={"format": "pdf", **data["period"]})
+    p = data["period"]
+    filename = f"estado-resultados-{p['from']}-a-{p['to']}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes), media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
+
+
+def _render_pl_xlsx(data: dict, company_name: str) -> bytes:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    money = 'Q #,##0.00'
+    green_fill = PatternFill(start_color="ECFDF5", end_color="ECFDF5", fill_type="solid")
+    red_fill = PatternFill(start_color="FEF2F2", end_color="FEF2F2", fill_type="solid")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Estado de Resultados"
+    ws.append([company_name]); ws["A1"].font = Font(bold=True, size=14, color="1B2A49")
+    p = data["period"]
+    ws.append([f"Estado de Resultados (base caja)  |  {p['from']} a {p['to']}"]); ws["A2"].font = Font(size=10, color="666666")
+    ws.append([])
+
+    ws.append(["INGRESOS", ""]); r = ws.max_row
+    ws[f"A{r}"].font = Font(bold=True, color="15803D"); ws[f"A{r}"].fill = green_fill; ws[f"B{r}"].fill = green_fill
+    for row in data["income"]:
+        ws.append([row["label"], row["amount"]]); ws.cell(row=ws.max_row, column=2).number_format = money
+    ws.append(["Total ingresos", data["total_income"]]); r = ws.max_row
+    ws[f"A{r}"].font = Font(bold=True); ws[f"B{r}"].font = Font(bold=True); ws[f"B{r}"].number_format = money
+    ws.append([])
+
+    ws.append(["EGRESOS", ""]); r = ws.max_row
+    ws[f"A{r}"].font = Font(bold=True, color="B91C1C"); ws[f"A{r}"].fill = red_fill; ws[f"B{r}"].fill = red_fill
+    for row in data["expenses"]:
+        ws.append([row["label"], row["amount"]]); ws.cell(row=ws.max_row, column=2).number_format = money
+    ws.append(["Total egresos", data["total_expense"]]); r = ws.max_row
+    ws[f"A{r}"].font = Font(bold=True); ws[f"B{r}"].font = Font(bold=True); ws[f"B{r}"].number_format = money
+    ws.append([])
+
+    ws.append(["UTILIDAD NETA", data["net_profit"]]); r = ws.max_row
+    ws[f"A{r}"].font = Font(bold=True, size=12); ws[f"B{r}"].font = Font(bold=True, size=12); ws[f"B{r}"].number_format = money
+    ws.column_dimensions["A"].width = 30; ws.column_dimensions["B"].width = 18
+
+    buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
+
+
+def _render_pl_pdf(data: dict, company_name: str) -> bytes:
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
+    def _q(v):
+        try:
+            return f"Q {float(v or 0):,.2f}"
+        except (TypeError, ValueError):
+            return "Q 0.00"
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=letter, leftMargin=0.7 * inch, rightMargin=0.7 * inch,
+                            topMargin=0.6 * inch, bottomMargin=0.6 * inch,
+                            title=f"Estado de Resultados - {company_name}")
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('t', parent=styles['Title'], fontSize=16, textColor=colors.HexColor('#0F4C3A'))
+    small = ParagraphStyle('s', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#475569'))
+
+    p = data["period"]
+    story = [
+        Paragraph("Estado de Resultados", title_style),
+        Paragraph(f"<b>{company_name}</b>", styles['Normal']),
+        Paragraph(f"Base caja  |  Periodo: {p['from']} a {p['to']}", small),
+        Paragraph(f"Generado: {datetime.now(timezone.utc).isoformat()[:19].replace('T', ' ')}", small),
+        Spacer(1, 14),
+    ]
+
+    rows = [["Concepto", "Monto"]]
+    style_cmds = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0F4C3A')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#CBD5E1')),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]
+    rows.append(["INGRESOS", ""])
+    hdr_i = len(rows) - 1
+    for row in data["income"]:
+        rows.append([f"   {row['label']}", _q(row["amount"])])
+    rows.append(["Total ingresos", _q(data["total_income"])])
+    tot_i = len(rows) - 1
+    rows.append(["EGRESOS", ""])
+    hdr_e = len(rows) - 1
+    for row in data["expenses"]:
+        rows.append([f"   {row['label']}", _q(row["amount"])])
+    rows.append(["Total egresos", _q(data["total_expense"])])
+    tot_e = len(rows) - 1
+    rows.append(["UTILIDAD NETA", _q(data["net_profit"])])
+    net_i = len(rows) - 1
+
+    style_cmds += [
+        ('BACKGROUND', (0, hdr_i), (-1, hdr_i), colors.HexColor('#ECFDF5')),
+        ('FONTNAME', (0, hdr_i), (-1, hdr_i), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, hdr_e), (-1, hdr_e), colors.HexColor('#FEF2F2')),
+        ('FONTNAME', (0, hdr_e), (-1, hdr_e), 'Helvetica-Bold'),
+        ('FONTNAME', (0, tot_i), (-1, tot_i), 'Helvetica-Bold'),
+        ('FONTNAME', (0, tot_e), (-1, tot_e), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, net_i), (-1, net_i), colors.HexColor('#0F4C3A')),
+        ('TEXTCOLOR', (0, net_i), (-1, net_i), colors.white),
+        ('FONTNAME', (0, net_i), (-1, net_i), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, net_i), (-1, net_i), 12),
+    ]
+    t = Table(rows, colWidths=[3.8 * inch, 2.2 * inch])
+    t.setStyle(TableStyle(style_cmds))
+    story.append(t)
+    doc.build(story)
+    return buf.getvalue()
+
+
 @router.get("/dashboard")
 async def get_finance_dashboard(user: dict = Depends(get_current_user)):
     if user["role"] == "superadmin":

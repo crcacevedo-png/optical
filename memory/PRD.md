@@ -9,6 +9,14 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Estado de Resultados mensual (P&L, base caja) (Jun 2026)
+Vista y exportación del P&L (ingresos por categoría − egresos por categoría = utilidad neta) en Finanzas, usando el rango de fechas y sucursal seleccionados. **Base CAJA** (decisión del usuario): los ingresos ya son base caja (una entrada por pago real; los abonos a cuentas por cobrar generan su propia entrada), los egresos de contado cuentan por su fecha, y **los egresos a crédito cuentan SOLO por los abonos realmente pagados** (payments[] con fecha en el rango), NO por el total devengado. Excluye anulados. Coexiste con `/summary` (que sigue en base devengado para la vista de Movimientos).
+- **Backend** `routes/finance.py`: `_compute_income_statement(...)`; `GET /api/finance/income-statement` (JSON), `/income-statement.xlsx` (`_render_pl_xlsx`, hoja INGRESOS/EGRESOS/UTILIDAD NETA) y `/income-statement.pdf` (`_render_pl_pdf`, reportlab). superadmin 403, branch_id inválido 400. Audit `FINANCE_INCOME_STATEMENT`.
+- **Frontend** `FinancePage.js`: tarjeta `income-statement-card` (ingresos y egresos por categoría, totales, "Utilidad neta" verde/rojo, nota de base caja) + botones "Excel" (`export-pl-excel-btn`) y "PDF" (`export-pl-pdf-btn`). Se refresca con el rango/sucursal actuales.
+- **Arrastre de cuentas (confirmado)**: las **cuentas por cobrar** (ventas con saldo>0) persisten hasta que los abonos dejan el saldo en 0 (o se cancela/revierte la venta); las **cuentas por pagar** (egresos a crédito con saldo>0) persisten en Cuentas por Pagar hasta quedar en 0 (status "pagado") o ser anuladas. Ambas se arrastran entre periodos/turnos; los abonos van reduciendo el saldo. (Comportamiento ya existente, sin cambios.)
+- Verificado: pytest `test_income_statement_iter14.py` 16/16 (base caja: crédito cuenta abonos no total; divergencia con /summary devengado; xlsx/pdf; 403/400) + testing agent iteration_14 100% frontend (tarjeta + 2 exports 200). Datos QA limpiados.
+
+
 ### Reporte de Egresos por Rango a Excel (Jun 2026)
 Exportar a Excel TODOS los egresos entre dos fechas (no solo por turno) para el cierre contable mensual.
 - **Backend** `routes/finance.py`: `GET /api/finance/expenses-report.xlsx?date_from&date_to&branch_id` (admin/vendedor; superadmin 403; branch_id inválido 400). Filtra `type='egreso'` + `is_voided:{$ne:True}` + rango de fechas + sucursal. Excel (`_render_expenses_xlsx`, openpyxl) con 2 hojas: **Resumen** (TOTAL EGRESOS + "Por Categoria" + "Por Metodo de Pago") y **Detalle** (Fecha, Categoria, Proveedor, Descripcion, Metodo, Credito, Pagado, Saldo, Referencia, Monto). Etiquetas ES vía `_EXPENSE_CATEGORY_LABELS`/`_EXP_METHOD_LABELS`. Audit `FINANCE_EXPENSES_REPORT`.
