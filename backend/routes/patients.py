@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional
 import re
 
-from db import db, serialize_doc, calculate_age
+from db import db, serialize_doc, calculate_age, effective_max_patients
 from auth_utils import get_current_user
 from models import PatientCreate, PatientUpdate
 from routes.notifications import create_notification
@@ -13,36 +13,40 @@ router = APIRouter(prefix="/patients", tags=["Pacientes"])
 
 
 async def _check_patient_limit(company_id: str):
-    """Check plan patient limit. Raises 403 if limit reached. Returns (company, plan) or (None, None)."""
+    """Check effective patient limit (override de la óptica o del plan). Raises 403 if reached."""
     company = await db.companies.find_one({"_id": ObjectId(company_id)})
-    if not company or not company.get("plan_id"):
+    if not company:
         return company, None
-    plan = await db.plans.find_one({"_id": company["plan_id"]})
-    if not plan or plan.get("max_patients", 0) <= 0:
+    plan = await db.plans.find_one({"_id": company["plan_id"]}) if company.get("plan_id") else None
+    max_p = effective_max_patients(company, plan)
+    if max_p <= 0:
         return company, plan
     current_count = await db.patients.count_documents({"company_id": ObjectId(company_id), "is_deleted": {"$ne": True}})
-    if current_count >= plan["max_patients"]:
-        raise HTTPException(status_code=403, detail=f"Limite de pacientes alcanzado ({plan['max_patients']}). Actualice su plan para agregar mas.")
+    if current_count >= max_p:
+        raise HTTPException(status_code=403, detail=f"Limite de pacientes alcanzado ({max_p}). Actualice su plan para agregar mas.")
     return company, plan
 
 
 async def _notify_patient_limit(company, plan, company_id: str):
-    """Send notification if company is near or at patient limit."""
-    if not company or not plan or plan.get("max_patients", 0) <= 0:
+    """Send notification if company is near or at effective patient limit."""
+    if not company:
         return
-    max_p = plan["max_patients"]
+    max_p = effective_max_patients(company, plan)
+    if max_p <= 0:
+        return
     new_count = await db.patients.count_documents({"company_id": ObjectId(company_id), "is_deleted": {"$ne": True}})
     pct = new_count / max_p
     cname = company.get("name", "Optica")
+    plan_name = (plan or {}).get("name", "personalizado")
     if pct >= 1.0:
         if not await db.notifications.find_one({"event_type": "limit_reached", "metadata.company_id": company_id, "metadata.resource": "pacientes"}):
             await create_notification("limit_reached", "Limite de pacientes alcanzado",
-                f"{cname} alcanzo el limite de {max_p} pacientes (plan {plan['name']})",
+                f"{cname} alcanzo el limite de {max_p} pacientes (plan {plan_name})",
                 {"company_id": company_id, "company_name": cname, "resource": "pacientes", "current": new_count, "max": max_p})
     elif pct >= 0.8:
         if not await db.notifications.find_one({"event_type": "limit_warning", "metadata.company_id": company_id, "metadata.resource": "pacientes"}):
             await create_notification("limit_warning", "Optica cerca del limite de pacientes",
-                f"{cname} tiene {new_count}/{max_p} pacientes ({round(pct*100)}%) en plan {plan['name']}",
+                f"{cname} tiene {new_count}/{max_p} pacientes ({round(pct*100)}%) en plan {plan_name}",
                 {"company_id": company_id, "company_name": cname, "resource": "pacientes", "current": new_count, "max": max_p})
 
 @router.get("")
@@ -73,7 +77,7 @@ async def list_patients(
         serialize_doc(p)
         p["age"] = calculate_age(p.get("birth_date"))
     
-    return {"patients": patients, "total": total, "limit": limit, "skip": skip}
+    return {"patients": [serialize_doc(p) for p in patients], "total": total, "limit": limit, "skip": skip}
 
 @router.post("")
 async def create_patient(data: PatientCreate, user: dict = Depends(get_current_user)):
@@ -144,7 +148,7 @@ async def get_patient(patient_id: str, user: dict = Depends(get_current_user)):
                 con["professional_name"] = prof["name"]
     patient["consultations"] = consultations
     
-    return patient
+    return serialize_doc(patient)
 
 @router.put("/{patient_id}")
 async def update_patient(patient_id: str, data: PatientUpdate, user: dict = Depends(get_current_user)):

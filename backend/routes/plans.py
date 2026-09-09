@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from bson import ObjectId
 from datetime import datetime, timezone
 
-from db import db, serialize_doc
+from db import db, serialize_doc, effective_max_patients
 from auth_utils import get_current_user
 from models import PlanCreate, PlanUpdate
 from routes.notifications import create_notification
@@ -135,15 +135,19 @@ async def get_plan_usage(company_id: str, user: dict = Depends(get_current_user)
     patients_count = await db.patients.count_documents({"company_id": cid, "is_deleted": {"$ne": True}})
     branches_count = await db.branches.count_documents({"company_id": cid})
     
-    max_patients = plan["max_patients"] if plan else 50
+    max_patients = effective_max_patients(company, plan)
+    if max_patients <= 0 and not plan:
+        max_patients = 50
     max_branches = plan["max_branches"] if plan else 1
     
     return {
-        "plan": plan,
+        "plan": serialize_doc(plan) if plan else None,
         "patients_count": patients_count,
         "branches_count": branches_count,
         "max_patients": max_patients,
         "max_branches": max_branches,
+        "patient_limit_override": company.get("patient_limit_override"),
+        "plan_max_patients": (plan.get("max_patients", 0) if plan else 0),
         "patients_percent": round((patients_count / max_patients * 100), 1) if max_patients > 0 else 0,
         "branches_percent": round((branches_count / max_branches * 100), 1) if max_branches > 0 else 0,
         "patients_warning": max_patients > 0 and patients_count >= max_patients * 0.8,
@@ -163,9 +167,7 @@ async def get_plan_history(company_id: str, user: dict = Depends(get_current_use
         raise HTTPException(status_code=400, detail="company_id invalido")
     
     history = await db.plan_history.find({"company_id": cid}).sort("changed_at", -1).to_list(100)
-    for h in history:
-        serialize_doc(h)
-    return history
+    return [serialize_doc(h) for h in history]
 
 
 

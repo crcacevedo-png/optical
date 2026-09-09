@@ -9,7 +9,19 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
-### Recibo de pago en Punto de Venta (Jun 2026)
+### Límite de pacientes personalizado por óptica (SuperAdmin) (Jun 2026)
+El SuperAdmin puede subir el tope de pacientes de una óptica específica (p. ej. de 50 a 150) SIN cambiar su plan, precio ni módulos. Pensado como beneficio para ópticas que llegaron con código de promoción. Óptica por óptica, a mano; reversible; auditado.
+- **Concepto "límite efectivo"**: helper `db.effective_max_patients(company, plan)` → devuelve `company.patient_limit_override` si está fijado (>0), si no `plan.max_patients`.
+- **Backend**:
+  - `routes/patients.py`: `_check_patient_limit` y `_notify_patient_limit` ahora usan el límite efectivo (el bloqueo 403 y los avisos "cerca del límite / límite alcanzado" respetan el override).
+  - `routes/plans.py` `GET /plans/usage/{id}`: `max_patients` = efectivo; añade `patient_limit_override` y `plan_max_patients` a la respuesta.
+  - `routes/companies.py` `GET /companies`: `max_patients` y `patients_warning` se calculan con el efectivo (el override ya viaja en el doc serializado).
+  - **NUEVO** `PUT /api/companies/{id}/patient-limit` (SuperAdmin, CSRF). Body `{patient_limit_override: int|null}`. Valor >0 fija override; `null`/≤0 hace `$unset` (vuelve al plan). Guarda `patient_limit_updated_at/by`. Audita `COMPANY_PATIENT_LIMIT_SET` / `COMPANY_PATIENT_LIMIT_CLEARED` (old/new/plan_max/effective). Devuelve `{ok, patient_limit_override, effective_max_patients, plan_max_patients}`. 403 para no-superadmin.
+- **Frontend** `AdminOpticasPage.js` (tab Info de la ficha de óptica): sección "Límite de pacientes" con input precargado en **150** (editable a cualquier número), botón "Fijar límite" y, si hay override, badge "Personalizado" + botón "Quitar límite personalizado". Muestra "Actual: N pacientes (personalizado/según su plan)". Actualiza `selectedCompany` y recarga el listado tras guardar. Data-testids: `patient-limit-section`, `patient-limit-input`, `patient-limit-save-btn`, `patient-limit-clear-btn`, `patient-limit-custom-badge`.
+- Config: campo Mongo `companies.patient_limit_override` (int, opcional).
+- Verificado E2E: set 150→efectivo 150 (plan 10000), usage/list reflejan 150+override, clear→vuelve al plan, no-superadmin 403; **enforcement real**: override=1 en óptica con 19 pacientes → crear paciente devuelve 403 "Limite alcanzado (1)", tras quitar override → 200. Frontend: control renderiza, toast, badge "Personalizado", contador 5/150, botón quitar. Datos de prueba limpiados (0 overrides activos).
+
+
 Opción para imprimir/compartir un recibo de pago desde el POS principal (`/sales`).
 - **Formato media carta horizontal** (8.5×5.5 in = 612×396pt, igual que las recetas). Diseño profesional en `_render_sale_receipt_pdf`: banda de encabezado navy (#1B2A49) con **logo de la óptica** a la izquierda, nombre/razón social/NIT/tel/email en blanco; título "RECIBO DE PAGO"; meta (Recibo #, Fecha, Cliente, Atendió); tabla de artículos (PRODUCTO/CANT/PRECIO/TOTAL); bloque "FORMA DE PAGO" a la izquierda y totales a la derecha (Subtotal, Descuento, TOTAL en navy, Pagado, SALDO PENDIENTE en ámbar); pie con "Gracias por su compra" + web.
 - **Logo**: `_get_company_logo_bytes(company)` obtiene el logo desde Object Storage (`logo_storage_path`) o filesystem local (fallback) y se embebe con `ImageReader`. Si no hay logo, se omite sin romper.

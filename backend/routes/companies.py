@@ -3,11 +3,15 @@ from fastapi.responses import FileResponse, Response
 from bson import ObjectId
 from datetime import datetime, timezone
 
-from db import db, serialize_doc, UPLOADS_DIR
+from db import db, serialize_doc, UPLOADS_DIR, effective_max_patients
 from auth_utils import get_current_user, hash_password
 from models import CompanyCreate, CompanyUpdate
 from routes.notifications import create_notification
+from audit import log_audit
 from email_service import queue_email, render_welcome_company
+from fastapi import Request
+from pydantic import BaseModel
+from typing import Optional
 import object_storage as objstore
 import os
 import re
@@ -97,12 +101,13 @@ async def list_companies(
         plan = plan_map.get(c.get("plan_id"))
         if plan:
             c["plan_name"] = plan["name"]
-            c["max_patients"] = plan.get("max_patients", 0)
+            c["max_patients"] = effective_max_patients(c, plan)
             c["max_branches"] = plan.get("max_branches", 0)
-            c["patients_warning"] = plan.get("max_patients", 0) > 0 and c["patients_count"] >= plan["max_patients"] * 0.8
+            c["patients_warning"] = c["max_patients"] > 0 and c["patients_count"] >= c["max_patients"] * 0.8
             c["branches_warning"] = plan.get("max_branches", 0) > 0 and c["branches_count"] >= plan["max_branches"] * 0.8
         else:
             c["plan_name"] = "Sin plan"
+            c["max_patients"] = effective_max_patients(c, None)
 
         # Datos de activacion del admin
         act = admin_activity.get(cid_str)
@@ -189,6 +194,63 @@ async def update_company(company_id: str, data: CompanyUpdate, user: dict = Depe
         raise HTTPException(status_code=400, detail="Sin datos para actualizar")
     await db.companies.update_one({"_id": ObjectId(company_id)}, {"$set": update_data})
     return {"message": "Empresa actualizada"}
+
+
+class PatientLimitUpdate(BaseModel):
+    patient_limit_override: Optional[int] = None
+
+
+@router.put("/{company_id}/patient-limit")
+async def set_patient_limit(company_id: str, data: PatientLimitUpdate, request: Request, user: dict = Depends(get_current_user)):
+    """SuperAdmin fija/quita un límite de pacientes personalizado para una óptica.
+    No cambia el plan ni su precio; solo el tope de pacientes. Reversible + auditado."""
+    if user["role"] != "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    try:
+        oid = ObjectId(company_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="company_id invalido")
+    company = await db.companies.find_one({"_id": oid})
+    if not company:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+
+    old = company.get("patient_limit_override")
+    new_val = data.patient_limit_override
+    if new_val is not None and new_val <= 0:
+        new_val = None  # 0 o negativo => quitar override (volver al plan)
+    if new_val is not None and new_val > 1000000:
+        raise HTTPException(status_code=400, detail="El limite es demasiado alto.")
+
+    now = datetime.now(timezone.utc).isoformat()
+    if new_val is None:
+        await db.companies.update_one(
+            {"_id": oid},
+            {"$unset": {"patient_limit_override": ""},
+             "$set": {"patient_limit_updated_at": now, "patient_limit_updated_by": ObjectId(user["_id"])}},
+        )
+        action = "COMPANY_PATIENT_LIMIT_CLEARED"
+    else:
+        new_val = int(new_val)
+        await db.companies.update_one(
+            {"_id": oid},
+            {"$set": {"patient_limit_override": new_val,
+                      "patient_limit_updated_at": now, "patient_limit_updated_by": ObjectId(user["_id"])}},
+        )
+        action = "COMPANY_PATIENT_LIMIT_SET"
+
+    plan = await db.plans.find_one({"_id": company["plan_id"]}) if company.get("plan_id") else None
+    company["patient_limit_override"] = new_val
+    eff = effective_max_patients(company, plan)
+    plan_max = int((plan or {}).get("max_patients", 0) or 0)
+    await log_audit(
+        action, actor_id=user["_id"], actor_email=user.get("email"), actor_role="superadmin",
+        metadata={"company_id": company_id, "old": old, "new": new_val,
+                  "plan_max_patients": plan_max, "effective": eff},
+        request=request,
+    )
+    return {"ok": True, "patient_limit_override": new_val,
+            "effective_max_patients": eff, "plan_max_patients": plan_max}
+
 
 @router.delete("/{company_id}")
 async def delete_company(company_id: str, user: dict = Depends(get_current_user)):

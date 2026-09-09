@@ -53,3 +53,15 @@ def calculate_age(birth_date_str: str) -> int:
         return today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
     except (ValueError, TypeError):
         return None
+
+
+def effective_max_patients(company, plan) -> int:
+    """Límite efectivo de pacientes: usa el override de la óptica si está fijado
+    (>0); de lo contrario, el max_patients del plan. Devuelve 0 si no hay límite."""
+    if company:
+        ov = company.get("patient_limit_override")
+        if isinstance(ov, int) and ov > 0:
+            return ov
+    if plan:
+        return int(plan.get("max_patients", 0) or 0)
+    return 0

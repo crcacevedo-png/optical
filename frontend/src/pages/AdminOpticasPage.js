@@ -45,6 +45,14 @@ export default function AdminOpticasPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [showEditCompany, setShowEditCompany] = useState(false);
   const [editCompanyForm, setEditCompanyForm] = useState({});
+  const [patientLimitInput, setPatientLimitInput] = useState('150');
+  const [savingLimit, setSavingLimit] = useState(false);
+
+  useEffect(() => {
+    if (selectedCompany) {
+      setPatientLimitInput(String(selectedCompany.patient_limit_override || 150));
+    }
+  }, [selectedCompany?._id, selectedCompany?.patient_limit_override]);
 
   const openEditCompany = () => {
     setEditCompanyForm({
@@ -258,6 +266,35 @@ export default function AdminOpticasPage() {
       }
     } catch (err) {
       toast.error(formatApiErrorDetail(err?.response?.data?.detail));
+    }
+  };
+
+  const handleSavePatientLimit = async (companyId, clear = false) => {
+    const value = clear ? null : parseInt(patientLimitInput, 10);
+    if (!clear && (!Number.isFinite(value) || value <= 0)) {
+      toast.error('Ingresa un numero valido mayor a 0');
+      return;
+    }
+    try {
+      setSavingLimit(true);
+      const { data } = await api.put(`/api/companies/${companyId}/patient-limit`, {
+        patient_limit_override: value,
+      });
+      toast.success(clear
+        ? 'Limite personalizado quitado. La optica vuelve al tope de su plan.'
+        : `Limite de pacientes fijado en ${data.effective_max_patients}.`);
+      if (selectedCompany?._id === companyId) {
+        setSelectedCompany(prev => ({
+          ...prev,
+          patient_limit_override: data.patient_limit_override,
+          max_patients: data.effective_max_patients,
+        }));
+      }
+      loadCompanies();
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err?.response?.data?.detail));
+    } finally {
+      setSavingLimit(false);
     }
   };
 
@@ -491,6 +528,56 @@ export default function AdminOpticasPage() {
                           <Badge className="bg-amber-100 text-amber-800 text-xs">
                             <AlertTriangle className="w-3 h-3 mr-1" /> {selectedCompany.branches_count}/{selectedCompany.max_branches} sucursales
                           </Badge>
+                        )}
+                      </div>
+                    </div>
+                    {/* Limite de pacientes personalizado (solo SuperAdmin) */}
+                    <div className="mt-4 pt-3 border-t" data-testid="patient-limit-section">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Users className="w-3.5 h-3.5 text-slate-400" />
+                        <p className="text-xs font-semibold text-slate-400 uppercase">Limite de pacientes</p>
+                        {selectedCompany.patient_limit_override > 0 && (
+                          <Badge className="bg-emerald-100 text-emerald-800 text-[10px]" data-testid="patient-limit-custom-badge">
+                            Personalizado
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mb-2">
+                        Sube el tope de pacientes de esta optica sin cambiar su plan ni cobrarle.
+                        {' '}Actual: <span className="font-medium text-slate-700">{selectedCompany.max_patients || 0}</span> pacientes
+                        {selectedCompany.patient_limit_override > 0
+                          ? ' (personalizado)'
+                          : ' (segun su plan)'}.
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Input
+                          type="number"
+                          min="1"
+                          value={patientLimitInput}
+                          onChange={(e) => setPatientLimitInput(e.target.value)}
+                          className="w-28 h-9"
+                          data-testid="patient-limit-input"
+                        />
+                        <Button
+                          size="sm"
+                          className="bg-pine-700 hover:bg-pine-800 h-9"
+                          disabled={savingLimit}
+                          onClick={() => handleSavePatientLimit(selectedCompany._id, false)}
+                          data-testid="patient-limit-save-btn"
+                        >
+                          {savingLimit ? 'Guardando...' : 'Fijar limite'}
+                        </Button>
+                        {selectedCompany.patient_limit_override > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-9 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                            disabled={savingLimit}
+                            onClick={() => handleSavePatientLimit(selectedCompany._id, true)}
+                            data-testid="patient-limit-clear-btn"
+                          >
+                            Quitar limite personalizado
+                          </Button>
                         )}
                       </div>
                     </div>
