@@ -9,6 +9,13 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Reporte de Egresos por Rango a Excel (Jun 2026)
+Exportar a Excel TODOS los egresos entre dos fechas (no solo por turno) para el cierre contable mensual.
+- **Backend** `routes/finance.py`: `GET /api/finance/expenses-report.xlsx?date_from&date_to&branch_id` (admin/vendedor; superadmin 403; branch_id inválido 400). Filtra `type='egreso'` + `is_voided:{$ne:True}` + rango de fechas + sucursal. Excel (`_render_expenses_xlsx`, openpyxl) con 2 hojas: **Resumen** (TOTAL EGRESOS + "Por Categoria" + "Por Metodo de Pago") y **Detalle** (Fecha, Categoria, Proveedor, Descripcion, Metodo, Credito, Pagado, Saldo, Referencia, Monto). Etiquetas ES vía `_EXPENSE_CATEGORY_LABELS`/`_EXP_METHOD_LABELS`. Audit `FINANCE_EXPENSES_REPORT`.
+- **Frontend** `FinancePage.js`: `handleExportExpenses()` y botón "Exportar egresos (Excel)" (`export-expenses-btn`) en la barra de filtros de fecha; usa el rango (date_from/date_to) y la sucursal seleccionados.
+- Verificado: pytest `test_expenses_report_iter13.py` 7/7 (2 hojas, columnas, excluye anulado e ingreso, 403/400, regresión purchases-report) + testing agent iteration_13 100% frontend (botón dispara descarga 200 spreadsheet). Datos QA limpiados.
+
+
 ### Exportar Egresos del turno a Excel (Jun 2026)
 Además del PDF de arqueo, se puede descargar los egresos del turno en Excel (conciliación contable).
 - **Backend** `routes/cash_register.py`: `GET /api/cash-register/{register_id}/egresos.xlsx` (`_render_cierre_egresos_xlsx`, openpyxl). Si la caja está ABIERTA recalcula los egresos del turno en vivo con `_compute_close_totals` (excluye anulados); si está CERRADA usa el snapshot `egresos_detail`. Columnas: Fecha, Hora, Descripción, Proveedor, Categoría, Método, Crédito, Monto + filas TOTAL y "En efectivo". 403 superadmin, 400 id inválido, 404 otra empresa. Declarado ANTES de `/{register_id}`. Audit `CASH_REGISTER_EGRESOS_XLSX`.

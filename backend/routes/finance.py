@@ -482,14 +482,138 @@ def _render_purchases_xlsx(entries: list, company_name: str, d_from: str, d_to: 
     return buf.getvalue()
 
 
+_EXPENSE_CATEGORY_LABELS = {
+    'payroll': 'Planilla', 'rent': 'Alquiler', 'utilities': 'Servicios',
+    'suppliers': 'Proveedores', 'marketing': 'Marketing',
+    'maintenance': 'Mantenimiento', 'other_expense': 'Otros Gastos',
+}
+_EXP_METHOD_LABELS = {
+    'cash': 'Efectivo', 'card': 'Tarjeta', 'transfer': 'Transferencia',
+    'check': 'Cheque', 'other': 'Otro',
+}
+
+
+@router.get("/expenses-report.xlsx")
+async def expenses_report_xlsx(
+    user: dict = Depends(get_current_user),
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    branch_id: Optional[str] = None,
+):
+    """Reporte de TODOS los egresos entre dos fechas (cierre contable). Excluye anulados."""
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    month_start = datetime.now(timezone.utc).strftime("%Y-%m-01")
+    d_from = date_from or month_start
+    d_to = date_to or today
+
+    query = {"company_id": ObjectId(user["company_id"]), "type": "egreso",
+             "is_voided": {"$ne": True},
+             "date": {"$gte": d_from, "$lte": d_to}}
+    if branch_id:
+        try:
+            query["branch_id"] = ObjectId(branch_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="branch_id invalido")
+    elif user.get("branch_id"):
+        query["branch_id"] = ObjectId(user["branch_id"])
+
+    entries = await db.finance_entries.find(query).sort("date", -1).to_list(10000)
+    for e in entries:
+        serialize_doc(e)
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1}) or {}
+
+    xlsx_bytes = await asyncio.to_thread(_render_expenses_xlsx, entries, company.get("name", "Cortexia Optical"), d_from, d_to)
+
+    await log_audit("FINANCE_EXPENSES_REPORT", actor_id=user["_id"], actor_email=user.get("email"),
+                    metadata={"date_from": d_from, "date_to": d_to, "count": len(entries)})
+
+    filename = f"egresos-{d_from}-a-{d_to}.xlsx"
+    return StreamingResponse(
+        io.BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _render_expenses_xlsx(entries: list, company_name: str, d_from: str, d_to: str) -> bytes:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="7F1D1D", end_color="7F1D1D", fill_type="solid")
+    money = 'Q #,##0.00'
+
+    by_cat, by_method, total = {}, {}, 0.0
+    for e in entries:
+        amt = float(e.get("amount", 0) or 0)
+        total += amt
+        c = _EXPENSE_CATEGORY_LABELS.get(e.get("category"), e.get("category") or "—")
+        by_cat[c] = round(by_cat.get(c, 0) + amt, 2)
+        m = _EXP_METHOD_LABELS.get(e.get("payment_method"), e.get("payment_method") or "Efectivo")
+        by_method[m] = round(by_method.get(m, 0) + amt, 2)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Resumen"
+    ws.append([company_name]); ws["A1"].font = Font(bold=True, size=14, color="1B2A49")
+    ws.append([f"Egresos  |  {d_from} a {d_to}"]); ws["A2"].font = Font(size=10, color="666666")
+    ws.append([])
+    ws.append(["TOTAL EGRESOS", round(total, 2)])
+    ws["A4"].font = Font(bold=True, size=12); ws["B4"].font = Font(bold=True, size=12); ws["B4"].number_format = money
+    ws.append([])
+    ws.append(["Por Categoria", "Total"])
+    for cell in ws[ws.max_row]:
+        cell.font = header_font; cell.fill = header_fill
+    for name, v in sorted(by_cat.items(), key=lambda kv: -kv[1]):
+        ws.append([name, v]); ws.cell(row=ws.max_row, column=2).number_format = money
+    ws.append([])
+    ws.append(["Por Metodo de Pago", "Total"])
+    for cell in ws[ws.max_row]:
+        cell.font = header_font; cell.fill = header_fill
+    for name, v in sorted(by_method.items(), key=lambda kv: -kv[1]):
+        ws.append([name, v]); ws.cell(row=ws.max_row, column=2).number_format = money
+    ws.column_dimensions["A"].width = 28; ws.column_dimensions["B"].width = 18
+
+    ws2 = wb.create_sheet("Detalle")
+    ws2.append(["Fecha", "Categoria", "Proveedor", "Descripcion", "Metodo", "Credito", "Pagado", "Saldo", "Referencia", "Monto"])
+    for cell in ws2[1]:
+        cell.font = header_font; cell.fill = header_fill
+    for e in entries:
+        is_credit = bool(e.get("is_credit"))
+        ws2.append([
+            e.get("date", ""),
+            _EXPENSE_CATEGORY_LABELS.get(e.get("category"), e.get("category") or ""),
+            e.get("supplier_name", ""),
+            e.get("description", ""),
+            _EXP_METHOD_LABELS.get(e.get("payment_method"), e.get("payment_method") or ""),
+            "Si" if is_credit else "No",
+            (float(e.get("amount_paid", 0) or 0) if is_credit else float(e.get("amount", 0) or 0)),
+            (float(e.get("balance", 0) or 0) if is_credit else 0.0),
+            e.get("reference", ""),
+            float(e.get("amount", 0) or 0),
+        ])
+    for r in range(2, ws2.max_row + 1):
+        for col in (7, 8, 10):
+            ws2.cell(row=r, column=col).number_format = money
+    for col, w in zip("ABCDEFGHIJ", [12, 16, 24, 34, 14, 8, 12, 12, 16, 14]):
+        ws2.column_dimensions[col].width = w
+    ws2.freeze_panes = "A2"
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 @router.get("/dashboard")
 async def get_finance_dashboard(user: dict = Depends(get_current_user)):
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
-    
+
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     month_start = datetime.now(timezone.utc).strftime("%Y-%m-01")
-    
+
     query = {"company_id": ObjectId(user["company_id"]), "is_voided": {"$ne": True}, "date": {"$gte": month_start, "$lte": today}}
     if user.get("branch_id"):
         query["branch_id"] = ObjectId(user["branch_id"])

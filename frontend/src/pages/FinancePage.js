@@ -178,6 +178,32 @@ export default function FinancePage() {
     }
   };
 
+  const handleExportExpenses = async () => {
+    const toastId = toast.loading('Generando reporte de egresos...');
+    try {
+      const params = {};
+      if (branchId) params.branch_id = branchId;
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
+      const response = await api.get('/api/finance/expenses-report.xlsx', { params, responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const cd = response.headers?.['content-disposition'] || '';
+      const match = cd.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : 'egresos.xlsx';
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Reporte descargado', { id: toastId });
+    } catch (error) {
+      toast.error('No se pudo generar el reporte', { id: toastId });
+    }
+  };
+
   const filteredEntries = entries.filter(e => {
     if (activeTab !== 'all' && e.type !== activeTab) return false;
     if (supplierFilter !== 'all' && e.supplier_id !== supplierFilter) return false;
@@ -441,6 +467,15 @@ export default function FinancePage() {
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
                 className="h-8 text-sm w-auto" data-testid="finance-date-to" />
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="sm:ml-auto border-red-200 text-red-700 hover:bg-red-50"
+              onClick={handleExportExpenses}
+              data-testid="export-expenses-btn"
+            >
+              <Download className="w-4 h-4 mr-1.5" /> Exportar egresos (Excel)
+            </Button>
           </div>
         </CardContent>
       </Card>
