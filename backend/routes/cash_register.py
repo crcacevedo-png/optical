@@ -274,6 +274,7 @@ async def _compute_close_totals(company_id: ObjectId, branch_id: ObjectId, opene
         "company_id": company_id,
         "branch_id": branch_id,
         "type": "egreso",
+        "is_voided": {"$ne": True},
         "created_at": {"$gte": opened_at_iso, "$lte": closed_at_iso},
     })
     async for e in egresos_cursor:
@@ -288,6 +289,7 @@ async def _compute_close_totals(company_id: ObjectId, branch_id: ObjectId, opene
         egresos_by_method[method] += out
         egresos_detail.append({
             "entry_id": str(e["_id"]),
+            "created_by": str(e.get("created_by")) if e.get("created_by") else None,
             "description": e.get("description", ""),
             "supplier_name": e.get("supplier_name", ""),
             "category": e.get("category", ""),

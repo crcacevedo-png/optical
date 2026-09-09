@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { api, formatApiErrorDetail } from '../context/AuthContext';
+import { api, formatApiErrorDetail, useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -12,12 +12,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   Plus, TrendingUp, TrendingDown, DollarSign, 
-  ArrowUpCircle, ArrowDownCircle, Wallet, Filter, BarChart3, Truck, Download
+  ArrowUpCircle, ArrowDownCircle, Wallet, Filter, BarChart3, Truck, Download, Ban
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BranchFilter } from '../components/BranchFilter';
 
 export default function FinancePage() {
+  const { user } = useAuth();
   const [entries, setEntries] = useState([]);
   const [summary, setSummary] = useState(null);
   const [suppliers, setSuppliers] = useState([]);
@@ -28,6 +29,9 @@ export default function FinancePage() {
   const [branchId, setBranchId] = useState('');
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 8) + '01');
   const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
+  const [voidTarget, setVoidTarget] = useState(null);
+  const [voidReason, setVoidReason] = useState('');
+  const [voiding, setVoiding] = useState(false);
 
   const [formData, setFormData] = useState({
     type: 'ingreso',
@@ -126,6 +130,28 @@ export default function FinancePage() {
     return `Q ${(amount || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`;
   };
 
+  const canVoid = (entry) =>
+    user && user.role !== 'superadmin' && !entry.is_voided &&
+    (user.role === 'admin' || entry.created_by === user._id);
+
+  const handleVoid = async () => {
+    if (!voidTarget) return;
+    const reason = (voidReason || '').trim();
+    if (!reason) { toast.error('Indica el motivo de la anulación'); return; }
+    try {
+      setVoiding(true);
+      await api.post(`/api/finance/${voidTarget._id}/void`, { reason });
+      toast.success('Movimiento anulado');
+      setVoidTarget(null);
+      setVoidReason('');
+      fetchData();
+    } catch (error) {
+      toast.error(formatApiErrorDetail(error.response?.data?.detail));
+    } finally {
+      setVoiding(false);
+    }
+  };
+
   const handleExportPurchases = async () => {
     const toastId = toast.loading('Generando reporte de compras...');
     try {
@@ -160,15 +186,15 @@ export default function FinancePage() {
 
   // Proveedores que aparecen en los movimientos del periodo (para el filtro)
   const supplierOptions = Object.values(entries.reduce((acc, e) => {
-    if (e.type === 'egreso' && e.supplier_id && e.supplier_name && !acc[e.supplier_id]) {
+    if (e.type === 'egreso' && !e.is_voided && e.supplier_id && e.supplier_name && !acc[e.supplier_id]) {
       acc[e.supplier_id] = { id: e.supplier_id, name: e.supplier_name };
     }
     return acc;
   }, {}));
 
-  // Total pagado por proveedor en el periodo seleccionado
+  // Total pagado por proveedor en el periodo seleccionado (excluye anulados)
   const supplierTotalsMap = entries.reduce((acc, e) => {
-    if (e.type === 'egreso' && e.supplier_name) {
+    if (e.type === 'egreso' && !e.is_voided && e.supplier_name) {
       const key = e.supplier_id || e.supplier_name;
       if (!acc[key]) acc[key] = { name: e.supplier_name, amount: 0 };
       acc[key].amount += e.amount || 0;
@@ -602,12 +628,17 @@ export default function FinancePage() {
                 <TableHead>Proveedor</TableHead>
                 <TableHead>Descripción</TableHead>
                 <TableHead className="text-right">Monto</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredEntries.map((entry) => (
-                <TableRow key={entry._id} className="data-table-row" data-testid={`finance-row-${entry._id}`}>
-                  <TableCell>{entry.date}</TableCell>
+                <TableRow
+                  key={entry._id}
+                  className={`data-table-row ${entry.is_voided ? 'opacity-60' : ''}`}
+                  data-testid={`finance-row-${entry._id}`}
+                >
+                  <TableCell className={entry.is_voided ? 'line-through text-slate-400' : ''}>{entry.date}</TableCell>
                   <TableCell>
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                       entry.type === 'ingreso' 
@@ -618,25 +649,47 @@ export default function FinancePage() {
                       {entry.type === 'ingreso' ? 'Ingreso' : 'Egreso'}
                     </span>
                   </TableCell>
-                  <TableCell className="capitalize">{entry.category?.replace('_', ' ')}</TableCell>
+                  <TableCell className={`capitalize ${entry.is_voided ? 'line-through text-slate-400' : ''}`}>{entry.category?.replace('_', ' ')}</TableCell>
                   <TableCell className="text-slate-600">{entry.supplier_name || '—'}</TableCell>
-                  <TableCell>{entry.description}
-                    {entry.is_credit && entry.balance > 0 && (
+                  <TableCell className={entry.is_voided ? 'line-through text-slate-400' : ''}>{entry.description}
+                    {entry.is_credit && entry.balance > 0 && !entry.is_voided && (
                       <span className="ml-2 inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700" data-testid={`credit-badge-${entry._id}`}>
                         Crédito · saldo {formatCurrency(entry.balance)}
                       </span>
                     )}
+                    {entry.is_voided && (
+                      <span
+                        className="ml-2 inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-200 text-slate-600"
+                        title={entry.void_reason ? `Motivo: ${entry.void_reason}` : 'Anulado'}
+                        data-testid={`voided-badge-${entry._id}`}
+                      >
+                        Anulado{entry.voided_by_name ? ` · ${entry.voided_by_name}` : ''}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className={`text-right font-medium ${
-                    entry.type === 'ingreso' ? 'text-green-600' : 'text-red-600'
+                    entry.is_voided ? 'line-through text-slate-400' : (entry.type === 'ingreso' ? 'text-green-600' : 'text-red-600')
                   }`}>
                     {entry.type === 'ingreso' ? '+' : '-'}{formatCurrency(entry.amount)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {canVoid(entry) && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => { setVoidTarget(entry); setVoidReason(''); }}
+                        data-testid={`void-btn-${entry._id}`}
+                      >
+                        <Ban className="w-4 h-4 mr-1" /> Anular
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
               {filteredEntries.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                     <Wallet className="w-12 h-12 mx-auto mb-2 opacity-30" />
                     <p>No hay movimientos registrados</p>
                   </TableCell>
@@ -646,6 +699,50 @@ export default function FinancePage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Diálogo de anulación */}
+      <Dialog open={!!voidTarget} onOpenChange={(o) => { if (!o) { setVoidTarget(null); setVoidReason(''); } }}>
+        <DialogContent className="sm:max-w-md" data-testid="void-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-heading flex items-center gap-2">
+              <Ban className="w-5 h-5 text-red-600" /> Anular movimiento
+            </DialogTitle>
+          </DialogHeader>
+          {voidTarget && (
+            <div className="space-y-3">
+              <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 text-sm">
+                <p><span className="text-slate-500">Tipo:</span> {voidTarget.type === 'ingreso' ? 'Ingreso' : 'Egreso'}</p>
+                <p><span className="text-slate-500">Monto:</span> {formatCurrency(voidTarget.amount)}</p>
+                {voidTarget.description && <p><span className="text-slate-500">Descripción:</span> {voidTarget.description}</p>}
+              </div>
+              <p className="text-sm text-slate-600">
+                El movimiento quedará marcado como <strong>Anulado</strong> (visible en el historial) y dejará de contar en los totales, cuentas por pagar y en la caja. No se puede deshacer.
+              </p>
+              <div>
+                <Label>Motivo de la anulación *</Label>
+                <Input
+                  value={voidReason}
+                  onChange={(e) => setVoidReason(e.target.value)}
+                  placeholder="Ej. Monto equivocado / duplicado"
+                  autoFocus
+                  data-testid="void-reason-input"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" onClick={() => { setVoidTarget(null); setVoidReason(''); }}>Cancelar</Button>
+                <Button
+                  className="bg-red-600 hover:bg-red-700"
+                  onClick={handleVoid}
+                  disabled={voiding}
+                  data-testid="void-confirm-btn"
+                >
+                  {voiding ? 'Anulando...' : 'Anular movimiento'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

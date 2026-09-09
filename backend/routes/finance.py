@@ -9,6 +9,8 @@ import asyncio
 from db import db, serialize_doc
 from auth_utils import get_current_user
 from models import FinanceEntryCreate
+from audit import log_audit
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/finance", tags=["Finanzas"])
 
@@ -125,6 +127,50 @@ async def create_finance_entry(data: FinanceEntryCreate, user: dict = Depends(ge
     return {"_id": str(result.inserted_id), "message": "Entrada registrada"}
 
 
+class VoidRequest(BaseModel):
+    reason: str
+
+
+@router.post("/{entry_id}/void")
+async def void_finance_entry(entry_id: str, data: VoidRequest, user: dict = Depends(get_current_user)):
+    """Anula (soft-void) un movimiento financiero. Queda visible tachado en el
+    historial y deja de contar en totales, cuentas por pagar y caja. Solo el
+    administrador o quien lo registro pueden anular."""
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    try:
+        oid = ObjectId(entry_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="entry_id invalido")
+    entry = await db.finance_entries.find_one({"_id": oid})
+    if not entry or str(entry["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+    is_admin = user["role"] == "admin"
+    is_creator = str(entry.get("created_by")) == user["_id"]
+    if not (is_admin or is_creator):
+        raise HTTPException(status_code=403, detail="Solo el administrador o quien lo registro puede anular este movimiento.")
+    if entry.get("is_voided"):
+        raise HTTPException(status_code=400, detail="El movimiento ya esta anulado.")
+    reason = (data.reason or "").strip()
+    if not reason:
+        raise HTTPException(status_code=400, detail="Indica el motivo de la anulacion.")
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.finance_entries.update_one(
+        {"_id": oid},
+        {"$set": {
+            "is_voided": True,
+            "voided_at": now_iso,
+            "voided_by": ObjectId(user["_id"]),
+            "voided_by_name": user.get("name", ""),
+            "void_reason": reason,
+        }},
+    )
+    await log_audit("FINANCE_ENTRY_VOIDED", actor_id=user["_id"], actor_email=user.get("email"),
+                    metadata={"entry_id": entry_id, "type": entry.get("type"),
+                              "amount": entry.get("amount"), "reason": reason})
+    return {"ok": True, "id": entry_id, "message": "Movimiento anulado"}
+
+
 @router.get("/payables")
 async def list_payables(
     user: dict = Depends(get_current_user),
@@ -140,6 +186,7 @@ async def list_payables(
         "type": "egreso",
         "is_credit": True,
         "balance": {"$gt": 0},
+        "is_voided": {"$ne": True},
     }
     if branch_id:
         try:
@@ -207,6 +254,7 @@ async def payables_alerts(
         "type": "egreso",
         "is_credit": True,
         "balance": {"$gt": 0},
+        "is_voided": {"$ne": True},
         "due_date": {"$exists": True, "$ne": None},
     }
     if branch_id:
@@ -253,7 +301,7 @@ async def add_payable_payment(
         oid = ObjectId(entry_id)
     except Exception:
         raise HTTPException(status_code=400, detail="entry_id invalido")
-    entry = await db.finance_entries.find_one({"_id": oid, "type": "egreso", "is_credit": True})
+    entry = await db.finance_entries.find_one({"_id": oid, "type": "egreso", "is_credit": True, "is_voided": {"$ne": True}})
     if not entry or str(entry["company_id"]) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Egreso no encontrado")
 
@@ -290,7 +338,7 @@ async def get_finance_summary(
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     month_start = datetime.now(timezone.utc).strftime("%Y-%m-01")
     
-    query = {"company_id": ObjectId(user["company_id"])}
+    query = {"company_id": ObjectId(user["company_id"]), "is_voided": {"$ne": True}}
     if branch_id:
         try:
             query["branch_id"] = ObjectId(branch_id)
@@ -339,6 +387,7 @@ async def purchases_report_xlsx(
     d_to = date_to or today
 
     query = {"company_id": ObjectId(user["company_id"]), "type": "egreso",
+             "is_voided": {"$ne": True},
              "supplier_id": {"$exists": True, "$ne": None},
              "date": {"$gte": d_from, "$lte": d_to}}
     if branch_id:
@@ -441,7 +490,7 @@ async def get_finance_dashboard(user: dict = Depends(get_current_user)):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     month_start = datetime.now(timezone.utc).strftime("%Y-%m-01")
     
-    query = {"company_id": ObjectId(user["company_id"]), "date": {"$gte": month_start, "$lte": today}}
+    query = {"company_id": ObjectId(user["company_id"]), "is_voided": {"$ne": True}, "date": {"$gte": month_start, "$lte": today}}
     if user.get("branch_id"):
         query["branch_id"] = ObjectId(user["branch_id"])
     

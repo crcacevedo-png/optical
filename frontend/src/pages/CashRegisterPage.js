@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { api, formatApiErrorDetail } from '../context/AuthContext';
+import { api, formatApiErrorDetail, useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import {
   Landmark, LockOpen, Lock, DollarSign, CreditCard, Smartphone, HandCoins,
   Banknote, ClipboardList, TrendingUp, AlertTriangle, CheckCircle2, RefreshCw,
-  MinusCircle, Printer
+  MinusCircle, Printer, Ban
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -67,6 +67,7 @@ function MethodTile({ method, amount, testId }) {
 }
 
 export default function CashRegisterPage() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState(null);
   const [history, setHistory] = useState([]);
@@ -85,6 +86,9 @@ export default function CashRegisterPage() {
   const [showEgreso, setShowEgreso] = useState(false);
   const [egresoForm, setEgresoForm] = useState({ amount: '', description: '', category: '', payment_method: 'cash', supplier_id: '' });
   const [egresoSubmitting, setEgresoSubmitting] = useState(false);
+  const [voidTarget, setVoidTarget] = useState(null);
+  const [voidReason, setVoidReason] = useState('');
+  const [voiding, setVoiding] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -213,6 +217,28 @@ export default function CashRegisterPage() {
     }
   };
 
+  const canVoidEgreso = (e) =>
+    user && user.role !== 'superadmin' &&
+    (user.role === 'admin' || (e.created_by && e.created_by === user._id));
+
+  const handleVoidEgreso = async () => {
+    if (!voidTarget) return;
+    const reason = (voidReason || '').trim();
+    if (!reason) { toast.error('Indica el motivo de la anulacion'); return; }
+    try {
+      setVoiding(true);
+      await api.post(`/api/finance/${voidTarget.entry_id}/void`, { reason });
+      toast.success('Egreso anulado');
+      setVoidTarget(null);
+      setVoidReason('');
+      load();
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail));
+    } finally {
+      setVoiding(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64" data-testid="cash-loading">
@@ -324,6 +350,58 @@ export default function CashRegisterPage() {
             <p className="font-heading text-xl font-bold text-slate-900">{fmt(shiftPreview.expected_cash)}</p>
           </div>
         </div>
+      )}
+
+      {/* Egresos del turno (en vivo, con anular) */}
+      {isOpen && shiftPreview && (shiftPreview.egresos_detail || []).length > 0 && (
+        <Card className="border-red-200/70" data-testid="shift-egresos-list">
+          <CardHeader>
+            <CardTitle className="font-heading text-lg flex items-center gap-2">
+              <MinusCircle className="w-5 h-5 text-red-600" /> Egresos del turno
+              <Badge className="bg-red-100 text-red-700">{shiftPreview.egresos_count} · {fmt(shiftPreview.egresos_total)}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-red-50 text-xs text-red-800">
+                    <th className="text-left p-2.5 font-semibold">Hora</th>
+                    <th className="text-left p-2.5 font-semibold">Descripcion</th>
+                    <th className="text-left p-2.5 font-semibold">Proveedor</th>
+                    <th className="text-left p-2.5 font-semibold">Metodo</th>
+                    <th className="text-right p-2.5 font-semibold">Monto</th>
+                    <th className="text-right p-2.5 font-semibold">Accion</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shiftPreview.egresos_detail.map((e, i) => (
+                    <tr key={e.entry_id || i} className="border-t border-slate-100" data-testid={`shift-egreso-row-${i}`}>
+                      <td className="p-2.5 text-slate-500">{(e.created_at || '').slice(11, 16)}</td>
+                      <td className="p-2.5">{e.description || '—'}{e.is_credit ? ' (crédito)' : ''}</td>
+                      <td className="p-2.5 text-slate-600">{e.supplier_name || '—'}</td>
+                      <td className="p-2.5">{METHOD_META[e.method]?.label || e.method}</td>
+                      <td className="p-2.5 text-right font-bold text-red-600">- {fmt(e.amount)}</td>
+                      <td className="p-2.5 text-right">
+                        {canVoidEgreso(e) && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => { setVoidTarget(e); setVoidReason(''); }}
+                            data-testid={`shift-egreso-void-${i}`}
+                          >
+                            <Ban className="w-4 h-4 mr-1" /> Anular
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* History */}
@@ -518,6 +596,50 @@ export default function CashRegisterPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Void Egreso Dialog */}
+      <Dialog open={!!voidTarget} onOpenChange={(o) => { if (!o) { setVoidTarget(null); setVoidReason(''); } }}>
+        <DialogContent className="sm:max-w-md" data-testid="shift-void-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-heading flex items-center gap-2">
+              <Ban className="w-5 h-5 text-red-600" /> Anular egreso
+            </DialogTitle>
+          </DialogHeader>
+          {voidTarget && (
+            <div className="space-y-3">
+              <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 text-sm">
+                <p><span className="text-slate-500">Monto:</span> {fmt(voidTarget.amount)}</p>
+                <p><span className="text-slate-500">Metodo:</span> {METHOD_META[voidTarget.method]?.label || voidTarget.method}</p>
+                {voidTarget.description && <p><span className="text-slate-500">Descripcion:</span> {voidTarget.description}</p>}
+              </div>
+              <p className="text-sm text-slate-600">
+                El egreso quedará <strong>anulado</strong> y dejará de restar del efectivo esperado del turno. No se puede deshacer.
+              </p>
+              <div>
+                <Label>Motivo de la anulacion *</Label>
+                <Input
+                  value={voidReason}
+                  onChange={(e) => setVoidReason(e.target.value)}
+                  placeholder="Ej. Monto equivocado / duplicado"
+                  autoFocus
+                  data-testid="shift-void-reason"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" onClick={() => { setVoidTarget(null); setVoidReason(''); }}>Cancelar</Button>
+                <Button
+                  className="bg-red-600 hover:bg-red-700"
+                  onClick={handleVoidEgreso}
+                  disabled={voiding}
+                  data-testid="shift-void-confirm"
+                >
+                  {voiding ? 'Anulando...' : 'Anular egreso'}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

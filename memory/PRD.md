@@ -9,6 +9,16 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Anular egreso/movimiento (soft-void) (Jun 2026)
+Se puede ANULAR un movimiento financiero mal registrado (decisión del usuario: anular, no editar ni eliminar). Aplica a egresos e ingresos manuales.
+- **Regla**: el movimiento anulado queda VISIBLE tachado en el historial (auditable, con badge "Anulado" + responsable) y DEJA DE CONTAR en totales, cuentas por pagar y en la caja. Motivo obligatorio. Irreversible.
+- **Permisos**: puede anular el **admin** (cualquier movimiento de su óptica) o el **vendedor que lo creó** (created_by == user). Superadmin 403.
+- **Backend** `routes/finance.py`: `POST /api/finance/{entry_id}/void` (body `{reason}`) → valida oid (400), existencia+tenant (404), autorización admin|creador (403), no-doble-anulación (400), motivo no vacío (400); setea `is_voided/voided_at/voided_by/voided_by_name/void_reason`; audita `FINANCE_ENTRY_VOIDED`. Exclusión `is_voided:{$ne:True}` añadida a `list_payables`, `payables/alerts`, `add_payable_payment` (find), `summary`, `purchases-report.xlsx` y `dashboard`. `GET /api/finance` SÍ sigue devolviendo los anulados (con el flag) para mostrarlos tachados.
+- **Backend** `routes/cash_register.py`: `_compute_close_totals` filtra egresos `is_voided:{$ne:True}` (el arqueo ya no cuenta anulados) y `egresos_detail` incluye `created_by`.
+- **Frontend**: (Finanzas `FinancePage.js`) columna "Acciones" con botón "Anular" (`void-btn-{id}`), filas anuladas tachadas + `voided-badge-{id}`, diálogo `void-dialog` (`void-reason-input`, `void-confirm-btn`); los totales por proveedor y el filtro excluyen anulados. (Caja `CashRegisterPage.js`) tarjeta "Egresos del turno" en vivo (`shift-egresos-list`) con botón Anular por fila (`shift-egreso-void-{i}`) y diálogo `shift-void-dialog`; al anular, el egreso desaparece y el Efectivo esperado se recalcula. El botón solo aparece si el usuario puede anular (admin o creador).
+- Verificado: curl E2E de todos los edge cases (200/400 motivo vacío/400 doble/403 vendedor ajeno/403 superadmin/400 id inválido; caja expected 50→100 al anular; summary expense 50→0; listado muestra is_voided). Testing agent iteration_11: 100% frontend en Finanzas + Caja + permisos vendedor/admin. Datos QA limpiados.
+
+
 ### Egreso desde Caja + Detalle de Egresos en PDF (Jun 2026)
 Dos features sobre la pantalla de Caja (`/cash-register`), continuación de la integración de egresos en caja:
 - **Egreso desde Caja**: botón "Registrar egreso" (`register-egreso-btn`, visible solo con caja abierta) abre el diálogo `egreso-dialog` (monto, categoría, método de pago seleccionable —efectivo/tarjeta/transferencia/cheque/otro—, proveedor opcional/obligatorio solo si categoría=Proveedores, descripción). Usa el mismo `POST /api/finance` (type=egreso). Tras registrar, refresca un **resumen del turno en vivo** (`shift-summary`: Recaudado, Egresos, Fondo inicial, Efectivo esperado) que se carga con `GET /current/preview` cuando la caja está abierta. Data-testids: `register-egreso-btn`, `egreso-dialog`, `egreso-amount`, `egreso-category`, `egreso-method`, `egreso-supplier`, `egreso-description`, `egreso-submit`, `shift-summary`, `shift-egresos`, `shift-expected-cash`.
