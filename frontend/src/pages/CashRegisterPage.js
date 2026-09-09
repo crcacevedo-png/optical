@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import {
   Landmark, LockOpen, Lock, DollarSign, CreditCard, Smartphone, HandCoins,
   Banknote, ClipboardList, TrendingUp, AlertTriangle, CheckCircle2, RefreshCw,
-  MinusCircle, Printer, Ban
+  MinusCircle, Printer, Ban, Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -217,6 +217,23 @@ export default function CashRegisterPage() {
     }
   };
 
+  const downloadEgresosExcel = async (id) => {
+    if (!id) return;
+    try {
+      const res = await api.get(`/api/cash-register/${id}/egresos.xlsx`, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const cd = res.headers?.['content-disposition'] || '';
+      const m = cd.match(/filename="?([^"]+)"?/);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = m ? m[1] : 'egresos-turno.xlsx';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail));
+    }
+  };
+
   const canVoidEgreso = (e) =>
     user && user.role !== 'superadmin' &&
     (user.role === 'admin' || (e.created_by && e.created_by === user._id));
@@ -356,10 +373,21 @@ export default function CashRegisterPage() {
       {isOpen && shiftPreview && (shiftPreview.egresos_detail || []).length > 0 && (
         <Card className="border-red-200/70" data-testid="shift-egresos-list">
           <CardHeader>
-            <CardTitle className="font-heading text-lg flex items-center gap-2">
-              <MinusCircle className="w-5 h-5 text-red-600" /> Egresos del turno
-              <Badge className="bg-red-100 text-red-700">{shiftPreview.egresos_count} · {fmt(shiftPreview.egresos_total)}</Badge>
-            </CardTitle>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="font-heading text-lg flex items-center gap-2">
+                <MinusCircle className="w-5 h-5 text-red-600" /> Egresos del turno
+                <Badge className="bg-red-100 text-red-700">{shiftPreview.egresos_count} · {fmt(shiftPreview.egresos_total)}</Badge>
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+                onClick={() => downloadEgresosExcel(current?._id || shiftPreview?._id)}
+                data-testid="shift-egresos-excel-btn"
+              >
+                <Download className="w-4 h-4 mr-1.5" /> Excel
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -740,7 +768,7 @@ export default function CashRegisterPage() {
           {detail && (
             <div className="space-y-5">
               {detail.closed_at && (
-                <div className="flex justify-end -mt-2">
+                <div className="flex justify-end gap-2 -mt-2">
                   <Button
                     variant="outline"
                     size="sm"
@@ -749,6 +777,15 @@ export default function CashRegisterPage() {
                     data-testid="print-cierre-btn"
                   >
                     <Printer className="w-4 h-4 mr-1.5" /> Imprimir cierre (PDF)
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+                    onClick={() => downloadEgresosExcel(detail._id)}
+                    data-testid="detail-egresos-excel-btn"
+                  >
+                    <Download className="w-4 h-4 mr-1.5" /> Egresos (Excel)
                   </Button>
                 </div>
               )}

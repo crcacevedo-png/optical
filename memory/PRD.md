@@ -9,6 +9,14 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Exportar Egresos del turno a Excel (Jun 2026)
+Además del PDF de arqueo, se puede descargar los egresos del turno en Excel (conciliación contable).
+- **Backend** `routes/cash_register.py`: `GET /api/cash-register/{register_id}/egresos.xlsx` (`_render_cierre_egresos_xlsx`, openpyxl). Si la caja está ABIERTA recalcula los egresos del turno en vivo con `_compute_close_totals` (excluye anulados); si está CERRADA usa el snapshot `egresos_detail`. Columnas: Fecha, Hora, Descripción, Proveedor, Categoría, Método, Crédito, Monto + filas TOTAL y "En efectivo". 403 superadmin, 400 id inválido, 404 otra empresa. Declarado ANTES de `/{register_id}`. Audit `CASH_REGISTER_EGRESOS_XLSX`.
+- **Frontend** `CashRegisterPage.js`: `downloadEgresosExcel(id)`; botón "Excel" (`shift-egresos-excel-btn`) en la tarjeta "Egresos del turno" (caja abierta, usa `current._id`) y botón "Egresos (Excel)" (`detail-egresos-excel-btn`) junto a "Imprimir cierre (PDF)" en el modal de detalle (cierre cerrado, usa `detail._id`).
+- Verificado: pytest `test_egresos_xlsx_iter12.py` 9/9 (open recalcula + closed snapshot, excluye anulados, 403/400/404, TOTAL/efectivo correctos) + testing agent iteration_12 100% frontend (ambos botones disparan descarga 200). Datos QA limpiados.
+- Endurecido el silenciador del overlay dev benigno "ResizeObserver loop" en `index.js` (además de silenciar el error, oculta el overlay de webpack-dev-server que bloqueaba clics en el preview; solo dev, no afecta producción).
+
+
 ### Anular egreso/movimiento (soft-void) (Jun 2026)
 Se puede ANULAR un movimiento financiero mal registrado (decisión del usuario: anular, no editar ni eliminar). Aplica a egresos e ingresos manuales.
 - **Regla**: el movimiento anulado queda VISIBLE tachado en el historial (auditable, con badge "Anulado" + responsable) y DEJA DE CONTAR en totales, cuentas por pagar y en la caja. Motivo obligatorio. Irreversible.

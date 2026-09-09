@@ -888,6 +888,101 @@ async def cash_register_single_pdf(register_id: str, user: dict = Depends(get_cu
     )
 
 
+def _render_cierre_egresos_xlsx(reg: dict, egresos: list, company_name: str, branch_name: Optional[str]) -> bytes:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="7F1D1D", end_color="7F1D1D", fill_type="solid")
+    money = 'Q #,##0.00'
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Egresos del turno"
+    ws.append([company_name])
+    ws["A1"].font = Font(bold=True, size=14, color="1B2A49")
+    opened = (reg.get("opened_at") or "")[:16].replace("T", " ")
+    closed = (reg.get("closed_at") or "")[:16].replace("T", " ") if reg.get("closed_at") else "En curso"
+    sub = f"Egresos del turno  |  Apertura {opened}  ->  Cierre {closed}"
+    if branch_name:
+        sub += f"  |  {branch_name}"
+    ws.append([sub])
+    ws["A2"].font = Font(size=10, color="666666")
+    ws.append([])
+    ws.append(["Fecha", "Hora", "Descripcion", "Proveedor", "Categoria", "Metodo", "Credito", "Monto"])
+    for cell in ws[4]:
+        cell.font = header_font
+        cell.fill = header_fill
+
+    for e in egresos:
+        ca = e.get("created_at") or ""
+        ws.append([
+            ca[:10], ca[11:16],
+            e.get("description", ""), e.get("supplier_name", ""),
+            e.get("category", ""), _METHOD_LABELS.get(e.get("method"), e.get("method") or ""),
+            "Si" if e.get("is_credit") else "No",
+            float(e.get("amount", 0) or 0),
+        ])
+
+    total = sum(float(e.get("amount", 0) or 0) for e in egresos)
+    total_cash = sum(float(e.get("amount", 0) or 0) for e in egresos if (e.get("method") or "cash") == "cash")
+    ws.append(["", "", "", "", "", "", "TOTAL", total])
+    ws.append(["", "", "", "", "", "", "En efectivo", total_cash])
+    for r in (ws.max_row - 1, ws.max_row):
+        for cell in ws[r]:
+            cell.font = Font(bold=True)
+    for r in range(5, ws.max_row + 1):
+        ws.cell(row=r, column=8).number_format = money
+    for col, w in zip("ABCDEFGH", [12, 8, 36, 24, 16, 14, 10, 16]):
+        ws.column_dimensions[col].width = w
+    ws.freeze_panes = "A5"
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+@router.get("/{register_id}/egresos.xlsx")
+async def cash_register_egresos_xlsx(register_id: str, user: dict = Depends(get_current_user)):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    try:
+        oid = ObjectId(register_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="register_id invalido")
+    reg = await db.cash_registers.find_one({"_id": oid})
+    if not reg or str(reg["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Caja no encontrada")
+
+    branch_oid = reg.get("branch_id")
+    if reg.get("status") == "open":
+        totals = await _compute_close_totals(
+            reg["company_id"], branch_oid, reg["opened_at"], datetime.now(timezone.utc).isoformat()
+        )
+        egresos = totals["egresos_detail"]
+    else:
+        egresos = reg.get("egresos_detail") or []
+
+    _serialize(reg)
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1})
+    company_name = (company or {}).get("name", "Optica")
+    branch_name = None
+    if branch_oid:
+        b = await db.branches.find_one({"_id": branch_oid}, {"name": 1})
+        branch_name = (b or {}).get("name")
+
+    xlsx_bytes = await asyncio.to_thread(_render_cierre_egresos_xlsx, reg, egresos, company_name, branch_name)
+
+    await log_audit("CASH_REGISTER_EGRESOS_XLSX", actor_id=user["_id"], actor_email=user.get("email"),
+                    metadata={"register_id": register_id, "count": len(egresos)})
+
+    filename = f"egresos_turno_{(reg.get('closed_at') or reg.get('opened_at') or '')[:10]}.xlsx"
+    return StreamingResponse(
+        io.BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
 @router.get("/{register_id}")
 async def get_register(register_id: str, user: dict = Depends(get_current_user)):
     if user["role"] == "superadmin":
