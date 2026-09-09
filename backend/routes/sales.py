@@ -1,7 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Request
+from fastapi.responses import StreamingResponse
 from bson import ObjectId
 from datetime import datetime, timezone
 from typing import Optional
+import io
+import asyncio
 
 from db import db, serialize_doc
 from auth_utils import get_current_user
@@ -274,6 +277,149 @@ async def get_sale(sale_id: str, user: dict = Depends(get_current_user)):
         if patient:
             sale["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
     return sale
+
+
+@router.get("/{sale_id}/receipt.pdf")
+async def sale_receipt_pdf(sale_id: str, user: dict = Depends(get_current_user)):
+    """Recibo de pago 80mm (impresora termica / compartir)."""
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    try:
+        oid = ObjectId(sale_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="sale_id invalido") from exc
+    sale = await db.sales.find_one({"_id": oid})
+    if not sale or str(sale["company_id"]) != user["company_id"]:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}) or {}
+
+    patient_name = sale.get("patient_name_override") or "Consumidor final"
+    if sale.get("patient_id"):
+        p = await db.patients.find_one({"_id": sale["patient_id"]}, {"first_name": 1, "last_name": 1})
+        if p:
+            patient_name = f"{p.get('first_name','')} {p.get('last_name','')}".strip() or patient_name
+
+    seller_name = ""
+    if sale.get("created_by"):
+        u = await db.users.find_one({"_id": sale["created_by"]}, {"name": 1})
+        if u:
+            seller_name = u.get("name", "")
+
+    pdf_bytes = await asyncio.to_thread(_render_sale_receipt_pdf, sale, company, patient_name, seller_name)
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes), media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename=recibo_{sale_id[-8:]}.pdf"},
+    )
+
+
+def _render_sale_receipt_pdf(sale: dict, company: dict, patient_name: str, seller_name: str) -> bytes:
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+
+    width = 80 * mm
+    lines_items = len(sale.get("items") or [])
+    lines_pay = len(sale.get("payments") or [])
+    height = (70 + 7 * lines_items + 5 * lines_pay + 30) * mm
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(width, height))
+
+    y = height - 8 * mm
+    c.setFont("Helvetica-Bold", 10)
+    c.drawCentredString(width / 2, y, str(company.get("name") or "Cortexia Optical"))
+    y -= 4 * mm
+    c.setFont("Helvetica", 7)
+    if company.get("legal_name"):
+        c.drawCentredString(width / 2, y, str(company.get("legal_name"))[:44])
+        y -= 3 * mm
+    if company.get("tax_id"):
+        c.drawCentredString(width / 2, y, f"NIT: {company.get('tax_id')}")
+        y -= 3 * mm
+    if company.get("phone"):
+        c.drawCentredString(width / 2, y, f"Tel: {company.get('phone')}")
+        y -= 3 * mm
+    if company.get("address"):
+        c.drawCentredString(width / 2, y, str(company.get("address"))[:44])
+        y -= 3 * mm
+    y -= 2 * mm
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(width / 2, y, "RECIBO DE PAGO")
+    y -= 3 * mm
+    c.line(4 * mm, y, width - 4 * mm, y)
+    y -= 3.5 * mm
+    c.setFont("Helvetica", 7)
+    date_str = (sale.get("created_at") or "")[:19].replace("T", " ")
+    c.drawString(4 * mm, y, f"Recibo: {str(sale['_id'])[-8:].upper()}")
+    c.drawRightString(width - 4 * mm, y, date_str)
+    y -= 3.5 * mm
+    c.drawString(4 * mm, y, f"Cliente: {patient_name[:35]}")
+    y -= 3.5 * mm
+    if seller_name:
+        c.drawString(4 * mm, y, f"Atendio: {seller_name[:35]}")
+        y -= 3.5 * mm
+    c.line(4 * mm, y, width - 4 * mm, y)
+    y -= 3.5 * mm
+    c.setFont("Helvetica-Bold", 7)
+    c.drawString(4 * mm, y, "Producto")
+    c.drawRightString(width - 4 * mm, y, "Total")
+    y -= 3.5 * mm
+    c.setFont("Helvetica", 7)
+    for it in (sale.get("items") or []):
+        name = str(it.get("name", ""))[:32]
+        qty = int(it.get("quantity", 0) or 0)
+        price = float(it.get("price", it.get("unit_price", 0)) or 0)
+        line_total = float(it.get("total", it.get("subtotal", qty * price)) or 0)
+        c.drawString(4 * mm, y, name)
+        c.drawRightString(width - 4 * mm, y, f"Q {line_total:.2f}")
+        y -= 3 * mm
+        c.drawString(6 * mm, y, f"  {qty} x Q {price:.2f}")
+        y -= 3.5 * mm
+    y -= 1 * mm
+    c.line(4 * mm, y, width - 4 * mm, y)
+    y -= 3.5 * mm
+    c.setFont("Helvetica", 7)
+    c.drawString(4 * mm, y, "Subtotal")
+    c.drawRightString(width - 4 * mm, y, f"Q {float(sale.get('subtotal', 0) or 0):.2f}")
+    y -= 3 * mm
+    if float(sale.get("discount", 0) or 0) > 0:
+        c.drawString(4 * mm, y, "Descuento")
+        c.drawRightString(width - 4 * mm, y, f"-Q {float(sale.get('discount', 0)):.2f}")
+        y -= 3 * mm
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(4 * mm, y, "TOTAL")
+    c.drawRightString(width - 4 * mm, y, f"Q {float(sale.get('total', 0) or 0):.2f}")
+    y -= 4 * mm
+    c.setFont("Helvetica", 7)
+    method_labels = {"cash": "Efectivo", "card": "Tarjeta", "transfer": "Transf.", "check": "Cheque", "other": "Otro"}
+    for p in (sale.get("payments") or []):
+        m = method_labels.get(p.get("method"), p.get("method", ""))
+        c.drawString(4 * mm, y, f"Pago {m}")
+        c.drawRightString(width - 4 * mm, y, f"Q {float(p.get('amount', 0) or 0):.2f}")
+        y -= 3 * mm
+    c.setFont("Helvetica", 7)
+    c.drawString(4 * mm, y, "Pagado")
+    c.drawRightString(width - 4 * mm, y, f"Q {float(sale.get('amount_paid', 0) or 0):.2f}")
+    y -= 3 * mm
+    if float(sale.get("balance", 0) or 0) > 0.01:
+        c.setFont("Helvetica-Bold", 8)
+        c.setFillColor(colors.HexColor("#d97706"))
+        c.drawString(4 * mm, y, "SALDO PENDIENTE")
+        c.drawRightString(width - 4 * mm, y, f"Q {float(sale.get('balance', 0)):.2f}")
+        c.setFillColor(colors.black)
+        y -= 3.5 * mm
+    y -= 2 * mm
+    c.line(4 * mm, y, width - 4 * mm, y)
+    y -= 3.5 * mm
+    c.setFont("Helvetica", 6)
+    c.drawCentredString(width / 2, y, "Gracias por su compra")
+    y -= 3 * mm
+    c.drawCentredString(width / 2, y, "www.cortexiaoptical.com")
+
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
 
 @router.post("/{sale_id}/payment")
 async def add_payment(

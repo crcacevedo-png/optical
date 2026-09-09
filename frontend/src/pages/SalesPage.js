@@ -12,7 +12,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import {
-  Plus, ShoppingCart, Trash2, User, Receipt, Eye, HandCoins
+  Plus, ShoppingCart, Trash2, User, Receipt, Eye, HandCoins, Printer
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BranchFilter } from '../components/BranchFilter';
@@ -34,6 +34,8 @@ export default function SalesPage() {
   const [paymentSale, setPaymentSale] = useState(null);
   const [saleToDelete, setSaleToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [receiptSale, setReceiptSale] = useState(null);
+  const [printingId, setPrintingId] = useState(null);
 
   const [cart, setCart] = useState([]);
   const [saleForm, setSaleForm] = useState({
@@ -123,6 +125,22 @@ export default function SalesPage() {
   const discount = parseFloat(saleForm.discount) || 0;
   const total = subtotal - discount;
 
+  const printReceipt = async (saleId) => {
+    if (!saleId) return;
+    try {
+      setPrintingId(saleId);
+      const res = await api.get(`/api/sales/${saleId}/receipt.pdf`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+    } catch (error) {
+      console.error('No se pudo generar el recibo:', error);
+      toast.error('No se pudo generar el recibo de pago');
+    } finally {
+      setPrintingId(null);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (cart.length === 0) {
@@ -135,7 +153,7 @@ export default function SalesPage() {
         .filter((p) => Number(p.amount) > 0)
         .map((p) => ({ method: p.method, amount: Number(p.amount), note: p.note || '' }));
 
-      await api.post('/api/sales', {
+      const { data } = await api.post('/api/sales', {
         patient_id: saleForm.patient_id || null,
         items: cart,
         subtotal,
@@ -155,6 +173,7 @@ export default function SalesPage() {
       setCart([]);
       setSaleForm({ patient_id: '', discount: 0, notes: '' });
       setPayments([{ method: 'cash', amount: 0, note: '' }]);
+      setReceiptSale({ _id: data._id, total, balance: Math.max(0, total - paidSum) });
       fetchData();
     } catch (error) {
       toast.error(formatApiErrorDetail(error.response?.data?.detail));
@@ -409,6 +428,17 @@ export default function SalesPage() {
                       <Button variant="ghost" size="icon" onClick={() => setDetailSale(sale)} data-testid={`view-sale-${sale._id}`}>
                         <Eye className="w-4 h-4 text-slate-500" />
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => printReceipt(sale._id)}
+                        disabled={printingId === sale._id}
+                        className="text-slate-400 hover:text-pine-700 hover:bg-pine-50"
+                        data-testid={`print-receipt-${sale._id}`}
+                        title="Imprimir recibo de pago"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </Button>
                       {isAdmin && (
                         <Button
                           variant="ghost"
@@ -573,6 +603,18 @@ export default function SalesPage() {
                 </Button>
               )}
 
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-pine-200 text-pine-700 hover:bg-pine-50 hover:text-pine-800"
+                onClick={() => printReceipt(detailSale._id)}
+                disabled={printingId === detailSale._id}
+                data-testid="detail-print-receipt-btn"
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                {printingId === detailSale._id ? 'Generando…' : 'Imprimir recibo de pago'}
+              </Button>
+
               {isAdmin && (
                 <Button
                   type="button"
@@ -591,6 +633,52 @@ export default function SalesPage() {
                   <p className="mt-1 text-slate-600">{detailSale.notes}</p>
                 </div>
               )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Post-sale receipt prompt */}
+      <Dialog open={!!receiptSale} onOpenChange={(o) => !o && setReceiptSale(null)}>
+        <DialogContent className="sm:max-w-sm" data-testid="sale-receipt-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-heading flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-emerald-600" /> Venta registrada
+            </DialogTitle>
+          </DialogHeader>
+          {receiptSale && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-slate-50 border border-slate-200 p-4 text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Total</span>
+                  <span className="font-semibold">{formatCurrency(receiptSale.total)}</span>
+                </div>
+                {receiptSale.balance > 0 && (
+                  <div className="flex justify-between text-amber-600 font-medium">
+                    <span>Saldo pendiente</span>
+                    <span>{formatCurrency(receiptSale.balance)}</span>
+                  </div>
+                )}
+              </div>
+              <Button
+                type="button"
+                className="w-full bg-pine-900 hover:bg-pine-700"
+                onClick={() => printReceipt(receiptSale._id)}
+                disabled={printingId === receiptSale._id}
+                data-testid="sale-receipt-print-btn"
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                {printingId === receiptSale._id ? 'Generando…' : 'Imprimir recibo de pago'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => setReceiptSale(null)}
+                data-testid="sale-receipt-close-btn"
+              >
+                Cerrar
+              </Button>
             </div>
           )}
         </DialogContent>

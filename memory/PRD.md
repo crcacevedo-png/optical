@@ -9,7 +9,13 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
-### Solicitudes de cuenta: guard, alta de cuenta, aviso y estados (Jun 2026)
+### Recibo de pago en Punto de Venta (Jun 2026)
+Opción para imprimir/compartir un recibo de pago desde el POS principal (`/sales`), replicando el ticket 80mm ya existente en Jornadas.
+- **Backend** `routes/sales.py`: `GET /api/sales/{sale_id}/receipt.pdf` (admin/vendedor de la óptica; superadmin 403; venta ajena/inexistente 404). Renderiza ticket térmico 80mm en hilo (`asyncio.to_thread`) con `_render_sale_receipt_pdf`: encabezado de empresa (nombre, razón social, NIT, tel, dirección), "RECIBO DE PAGO", nº de recibo (últimos 8), fecha, cliente (o "Consumidor final"), vendedor, items (cant x precio), subtotal, descuento, TOTAL, pagos por método, Pagado y SALDO PENDIENTE (ámbar si >0). Multi-tenant por `company_id`. Devuelto inline (`recibo_XXXX.pdf`).
+- **Frontend** `SalesPage.js`: helper `printReceipt(saleId)` descarga el PDF como blob y lo abre en pestaña nueva. Botón "Imprimir recibo de pago" en 3 lugares: (1) diálogo post-venta "Venta registrada" (aparece tras completar la venta, muestra total + saldo), (2) diálogo de Detalle de Venta, (3) ícono Printer por fila en el Historial de Ventas. Data-testids: `sale-receipt-dialog`, `sale-receipt-print-btn`, `sale-receipt-close-btn`, `detail-print-receipt-btn`, `print-receipt-{id}`.
+- Verificado: curl E2E (200 admin con %PDF 2.2KB, 403 superadmin, 404 inexistente), extracción de texto del PDF (encabezado/items/pagos correctos) y screenshot del frontend (17 íconos en historial + botón visible en detalle).
+
+
 Cuatro mejoras sobre el módulo de Solicitudes (leads), todas verificadas por API + navegador:
 - **Guard de ruta admin**: nuevo `components/RequireSuperAdmin.jsx` (usa `useAuth().user.role`); envuelve `/admin/leads` y `/admin/correos` en App.js. Un no-superadmin es redirigido a `/dashboard` (antes solo veía toast + datos vacíos). Verificado: admin@cortexia.gt → redirigido.
 - **Abrir cuenta desde una solicitud** (alta real): `POST /api/leads/{id}/create-account` (superadmin) crea empresa + usuario admin REUTILIZANDO el flujo existente (`hash_password`, mismos campos que `POST /api/companies`, `render_welcome_company` + `queue_email`). Genera contraseña temporal fuerte (`secrets`) si no se pasa una, la devuelve para compartir, encola el correo de bienvenida con credenciales, marca la solicitud `cuenta_creada` + `company_id`, y hace rollback de la empresa si el correo ya existe como usuario (409). Verificado E2E: la cuenta creada **inicia sesión correctamente**. 409 si ya fue convertida. NO se escribió auth nuevo (se reutilizó el flujo vetado existente). UI: botón "Abrir cuenta" + diálogo con datos precargados y contraseña opcional; pantalla de éxito con la contraseña temporal (copiar).
