@@ -15,6 +15,7 @@ La suscripcion recurrente usa el SDK nativo de Stripe (emergentintegrations no s
 """
 import os
 import hmac
+import logging
 import asyncio
 from pathlib import Path
 from datetime import datetime, timezone
@@ -29,6 +30,8 @@ from bson import ObjectId
 from db import db, serialize_doc
 from auth_utils import get_current_user
 from audit import log_audit
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/billing", tags=["Facturacion"])
 cron_router = APIRouter(prefix="/cron", tags=["Cron"])
@@ -71,15 +74,31 @@ def _init_stripe():
 
 
 def _stripe_configured() -> bool:
-    """True solo si hay una llave secreta real de Stripe (no el placeholder compartido)."""
+    """True solo si hay una llave de servidor real de Stripe (no el placeholder compartido).
+
+    Acepta tanto llaves SECRETAS clasicas (`sk_...`) como llaves RESTRINGIDAS (`rk_...`).
+    Ambas funcionan con el SDK; la publicable (`pk_...`) NO sirve del lado del servidor.
+    """
     k = _resolve_stripe_key()
-    return k.startswith("sk_") and k != _STRIPE_PLACEHOLDER
+    ok = k.startswith(("sk_", "rk_")) and k != _STRIPE_PLACEHOLDER
+    if not ok:
+        prefix = (k[:3] + "…") if k else "(vacio)"
+        logger.warning(
+            "Stripe no configurado: llave efectiva prefix=%s len=%d (se espera 'sk_...' o 'rk_...'; "
+            "la publicable 'pk_' NO sirve del lado del servidor)",
+            prefix, len(k),
+        )
+    return ok
 
 
 def _not_configured_error():
     return HTTPException(
         status_code=503,
-        detail="Stripe aun no esta configurado. Agrega tu llave secreta de Stripe como STRIPE_SECRET_KEY en Manage -> Secrets y vuelve a desplegar.",
+        detail=(
+            "Stripe aun no esta configurado. En Manage -> Secrets, STRIPE_API_KEY debe ser tu "
+            "llave de SERVIDOR: secreta ('sk_...') o restringida ('rk_...'). NO uses la publicable "
+            "('pk_'), y sin comillas ni espacios. Guarda y vuelve a desplegar."
+        ),
     )
 
 
