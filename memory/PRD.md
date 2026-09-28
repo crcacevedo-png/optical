@@ -22,6 +22,15 @@ Sistema automático de cobros de la membresía (Stripe, USD): detecta pagos fall
 - **Nota**: se probó sembrando estados en Mongo porque Stripe usa placeholder en preview; el flujo real se valida en producción con el cron diario `sync-subs`. Fases 2/3 (gracia configurable, historial de comprobantes, prórrogas, FEL/SAT) pendientes.
 
 
+### Rentabilidad por productos + separación Flujo de caja vs Margen (Jun 2026)
+Hallazgo (confirmado por code review): la "Utilidad neta" del módulo Finanzas se calculaba en BASE CAJA (cobros − pagos) sin descontar el costo de la mercadería vendida (COGS), y se confundía con margen. Fase 1 implementada:
+- **`sales.py`**: cada línea de venta ahora **fotografía el costo** (`unit_cost` + `cost_source`) del producto al momento de vender (no cambia si el costo se edita después). Ítems sin producto de inventario → `cost_source="sin_costo"`. Solo aplica a ventas NUEVAS (históricas quedan sin costo).
+- **`finance.py`**: nuevo `GET /api/finance/profitability` (admin) → base DEVENGADO por fecha de venta: `revenue_with_cost`, `cogs`, `gross_margin` (+%), `revenue_without_cost`/`items_without_cost` (transparencia), y `by_product` (unidades, ingreso, costo, margen, %). Excluye ventas `cancelada`.
+- **UI**: `FinancePage` renombra "Utilidad"/"Utilidad neta" (caja) → **"Flujo de caja"/"Flujo de caja neto"** y agrega la tarjeta **"Rentabilidad por productos"** (`profitability-card`: KPIs + tabla por producto + aviso de ítems sin costo). `DashboardPage` y `ReportsPage` renombran a "Flujo de caja". `reports.py` (Excel) etiqueta explícito devengado vs base caja.
+- **No existe endpoint de edición de venta** (solo crear/eliminar), así que no hay hueco de costo no capturado. Ventas eliminadas se borran en duro.
+- **Verificado**: testing agent iteration_16 100% (backend 4/4 + frontend 10/10): venta nueva Ray-Ban (precio 850, costo 450, x2) → ingreso 1700, COGS 900, margen 800 (47.1%); superadmin 403; etiquetas renombradas; limpieza de datos QA. Fases 2/3 (descuentos globales prorrateados al margen, costo manual en ítems sin producto, margen histórico estimado) pendientes.
+
+
 ### Guía de usuario (PDF): sección de suscripción y cobros (Jun 2026)
 `routes/user_guide.py`: nueva subsección admin **"3.7 Mi Plan, suscripción y cobros"** (membresía USD, suscribirse/checkout, cambio de plan inmediato con prorrateo, Portal de Stripe para tarjeta/facturas/cancelar, y flujo de impago: gracia 3 días → suspensión/muro de pago → reactivación automática; cortesía exenta) + entrada en la Tabla de Contenidos. Verificado con build directo (`_build_pdf`) y endpoint `GET /api/docs/user-guide.pdf` (200, PDF válido). Caché en memoria (TTL 5 min) se limpia al reiniciar/redeploy.
 
