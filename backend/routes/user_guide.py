@@ -226,18 +226,19 @@ def _toc(story, styles):
         ("3.4", "Caja y finanzas", "8"),
         ("3.5", "Reportes y auditoria", "10"),
         ("3.6", "Seguridad y sesiones activas", "11"),
-        ("4", "Guia para el Vendedor", "12"),
-        ("4.1", "Registro de pacientes", "12"),
-        ("4.2", "Cotizaciones y ventas", "13"),
-        ("4.3", "Manejo de caja diaria", "14"),
-        ("4.4", "Agenda y citas", "15"),
-        ("5", "Guia para el Doctor / Optometrista", "16"),
-        ("5.1", "Consultas oftalmologicas", "16"),
-        ("5.2", "Recetas de anteojos, contacto y medicas", "17"),
-        ("5.3", "Historial clinico del paciente", "18"),
-        ("6", "Modulo especial: Jornadas", "19"),
-        ("7", "Buenas practicas y consejos", "20"),
-        ("8", "Soporte y contacto", "21"),
+        ("3.7", "Mi Plan, suscripcion y cobros", "12"),
+        ("4", "Guia para el Vendedor", "13"),
+        ("4.1", "Registro de pacientes", "13"),
+        ("4.2", "Cotizaciones y ventas", "14"),
+        ("4.3", "Manejo de caja diaria", "15"),
+        ("4.4", "Agenda y citas", "16"),
+        ("5", "Guia para el Doctor / Optometrista", "17"),
+        ("5.1", "Consultas oftalmologicas", "17"),
+        ("5.2", "Recetas de anteojos, contacto y medicas", "18"),
+        ("5.3", "Historial clinico del paciente", "19"),
+        ("6", "Modulo especial: Jornadas", "20"),
+        ("7", "Buenas practicas y consejos", "21"),
+        ("8", "Soporte y contacto", "22"),
     ]
     rows = []
     for num, title, page in items:
@@ -550,6 +551,50 @@ def _admin_section(story, styles):
         "Debe tener 8+ caracteres, mayus/minus/numero.",
         "Al cambiarla, TODAS las sesiones se cierran automaticamente por seguridad.",
     ], styles))
+    story.append(PageBreak())
+
+    story.append(Paragraph("3.7 Mi Plan, suscripcion y cobros", styles["H2"]))
+    story.append(Paragraph(
+        "En <b>Mi Plan</b> (menu lateral) ves tu plan actual, tu uso y limites (pacientes, "
+        "usuarios, sucursales) y el costo de tu membresia. La membresia de Cortexia se cobra "
+        "en <b>USD</b>; la operacion de tu optica sigue en quetzales.",
+        styles["Body"]))
+    story.append(Paragraph("<b>Suscribirte o cambiar de plan</b>", styles["H3"]))
+    story.append(_bullets([
+        "Elige el plan y el ciclo (<b>mensual</b> o <b>anual</b>) y confirma.",
+        "La <b>primera vez</b> pasas por el <b>checkout seguro de Stripe</b> (tarjeta). Al completarlo, "
+        "tu plan queda activo automaticamente.",
+        "Si <b>ya tienes una suscripcion activa</b> y cambias de plan, el cambio es <b>inmediato y con "
+        "prorrateo</b>: se acredita lo no usado del plan anterior y solo se cobra la diferencia en tu "
+        "proxima factura, <b>sin volver a pasar por el checkout</b>.",
+    ], styles))
+    story.append(Paragraph("<b>Gestionar tu suscripcion (Portal de Stripe)</b>", styles["H3"]))
+    story.append(_bullets([
+        "El boton <b>Gestionar suscripcion</b> abre el Portal de Stripe.",
+        "Ahi puedes <b>actualizar tu tarjeta</b>, ver y descargar tus <b>facturas</b> y <b>cancelar</b> la suscripcion.",
+        "El <b>cambio de plan NO se hace en el portal</b>: se hace desde <b>Mi Plan</b> en Cortexia.",
+    ], styles))
+    story.append(Paragraph("<b>Que pasa si un pago falla</b>", styles["H3"]))
+    story.append(Paragraph(
+        "Cortexia te da un <b>periodo de gracia</b> antes de suspender el acceso, para que nunca "
+        "pierdas la operacion por un cobro fallido de un dia:",
+        styles["Body"]))
+    story.append(_bullets([
+        "<b>Dia 0</b>: te avisamos (en la app y por correo) e inicia una <b>gracia de 3 dias</b>. Tu optica "
+        "<b>sigue operando normal</b>, con un aviso visible.",
+        "<b>Dias 1-2</b>: recordatorios para que regularices tu pago.",
+        "<b>Dia 3 sin pago</b>: la cuenta se <b>suspende</b> (muro de pago). El <b>administrador</b> solo ve la "
+        "pantalla para pagar o actualizar su tarjeta; el resto del equipo ve <i>\"cuenta suspendida, "
+        "contacta a tu administrador\"</i>.",
+        "<b>Reactivacion automatica</b>: en cuanto el pago se confirma, tu optica recupera el acceso "
+        "completo sin que tengas que hacer nada mas.",
+    ], styles))
+    story.append(_tip_box(
+        "Para evitar suspensiones, manten tu tarjeta al dia desde <b>Gestionar suscripcion</b>. "
+        "Si esta por vencer, actualizala antes del proximo cobro. Las cuentas marcadas como "
+        "<b>cortesia</b> estan exentas de cobro y de suspension.",
+        styles, color=BRAND_AMBER, title="Evita suspensiones"
+    ))
     story.append(PageBreak())
 
 

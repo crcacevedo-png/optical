@@ -22,6 +22,10 @@ Sistema automático de cobros de la membresía (Stripe, USD): detecta pagos fall
 - **Nota**: se probó sembrando estados en Mongo porque Stripe usa placeholder en preview; el flujo real se valida en producción con el cron diario `sync-subs`. Fases 2/3 (gracia configurable, historial de comprobantes, prórrogas, FEL/SAT) pendientes.
 
 
+### Guía de usuario (PDF): sección de suscripción y cobros (Jun 2026)
+`routes/user_guide.py`: nueva subsección admin **"3.7 Mi Plan, suscripción y cobros"** (membresía USD, suscribirse/checkout, cambio de plan inmediato con prorrateo, Portal de Stripe para tarjeta/facturas/cancelar, y flujo de impago: gracia 3 días → suspensión/muro de pago → reactivación automática; cortesía exenta) + entrada en la Tabla de Contenidos. Verificado con build directo (`_build_pdf`) y endpoint `GET /api/docs/user-guide.pdf` (200, PDF válido). Caché en memoria (TTL 5 min) se limpia al reiniciar/redeploy.
+
+
 ### Cambio de plan en el lugar con prorrateo — fix doble cobro (Jun 2026)
 El cambio de plan in-app creaba una SEGUNDA suscripción en Stripe y dejaba la anterior activa (doble cobro + suscripción huérfana). Fix en `routes/billing.py`: si la empresa ya tiene `stripe_subscription_id`, `POST /api/billing/checkout` ahora llama a `_modify_subscription_plan()` → `stripe.Subscription.modify(sub_id, items=[{id, price}], proration_behavior="create_prorations")` sobre la MISMA suscripción, actualiza plan_id/billing_cycle de inmediato, registra `payment_transactions(mode="subscription_change")` + `plan_history`, y devuelve `{"changed": true, ...}` (sin checkout, sin redirección). La primera suscripción (sin sub activa) sigue usando Stripe Checkout. Frontend `MyPlanPage.js` maneja `{changed:true}` con toast de éxito + refresco. El Customer Portal del usuario tiene deshabilitado el cambio de plan a propósito (se hace desde Cortexia). Validación E2E del `modify` solo posible en producción (Stripe placeholder en preview).
 
