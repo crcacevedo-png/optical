@@ -129,6 +129,11 @@ export default function MyPlanPage() {
       });
       if (data.checkout_url) {
         window.location.href = data.checkout_url;
+      } else if (data.changed) {
+        toast.success(`Plan actualizado a ${data.plan_name}. Se aplicó el prorrateo en tu próxima factura.`);
+        setProcessingId(null);
+        await load();
+        await checkAuth();
       }
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail));

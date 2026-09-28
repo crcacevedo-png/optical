@@ -183,6 +183,29 @@ def _ensure_customer(existing_customer_id: Optional[str], company_name: str,
     return c.id
 
 
+def _modify_subscription_plan(sub_id: str, price_id: str):
+    """Cambia el plan de una suscripcion ACTIVA existente (prorrateo justo) sin checkout.
+    Devuelve True si se modifico; False si la suscripcion no es modificable (hay que ir a checkout)."""
+    sub = stripe.Subscription.retrieve(sub_id)
+    if sub.get("status") not in ("active", "trialing", "past_due"):
+        return False
+    items = (sub.get("items") or {}).get("data") or []
+    if not items:
+        return False
+    current_item = items[0]
+    if current_item.get("price", {}).get("id") == price_id:
+        # Ya esta en ese precio: nada que cambiar.
+        return True
+    stripe.Subscription.modify(
+        sub_id,
+        items=[{"id": current_item["id"], "price": price_id}],
+        proration_behavior="create_prorations",
+        metadata=sub.get("metadata") or {},
+    )
+    return True
+
+
+
 def _create_subscription_session(customer_id: str, price_id: str,
                                  success_url: str, cancel_url: str, metadata: dict):
     # Parametros fixed_by_ui de Stripe Checkout Studio (hosted). automatic_tax off,
@@ -232,9 +255,79 @@ async def create_checkout(data: CheckoutRequest, request: Request, user: dict = 
         raise HTTPException(status_code=400, detail="Este plan es gratuito. El superadmin lo asigna sin cobro.")
 
     currency = (plan.get("currency") or "usd").lower()
-    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1, "stripe_customer_id": 1})
+    company = await db.companies.find_one(
+        {"_id": ObjectId(user["company_id"])},
+        {"name": 1, "stripe_customer_id": 1, "stripe_subscription_id": 1, "plan_id": 1, "billing_cycle": 1},
+    )
     company_name = (company or {}).get("name", "Optica")
     existing_customer = (company or {}).get("stripe_customer_id")
+    existing_sub = (company or {}).get("stripe_subscription_id")
+
+    # Cambio de plan EN EL LUGAR (prorrateo) si ya hay una suscripcion activa: se modifica
+    # la suscripcion existente en vez de crear una nueva (evita doble cobro y suscripciones huerfanas).
+    if existing_sub:
+        def _work_modify():
+            price_id = _ensure_product_and_price(data.plan_id, plan.get("name", "Plan"), currency, amount_cents, interval)
+            modified = _modify_subscription_plan(existing_sub, price_id)
+            return price_id, modified
+
+        try:
+            price_id, modified = await asyncio.to_thread(_work_modify)
+        except stripe.error.StripeError as e:
+            detail = getattr(e, "user_message", None) or str(e)
+            raise HTTPException(status_code=502, detail=f"Error de Stripe: {detail}")
+
+        if modified:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            old_plan_id = company.get("plan_id")
+            old_plan_name = None
+            if old_plan_id and old_plan_id != plan_oid:
+                old = await db.plans.find_one({"_id": old_plan_id}, {"name": 1})
+                old_plan_name = old.get("name") if old else None
+            await db.companies.update_one(
+                {"_id": ObjectId(user["company_id"])},
+                {"$set": {
+                    "plan_id": plan_oid,
+                    "billing_cycle": data.billing_cycle,
+                    "subscription_status": "active",
+                    "billing_state": "active",
+                    "updated_at": now_iso,
+                }},
+            )
+            await db.payment_transactions.insert_one({
+                "session_id": f"change_{existing_sub}_{int(datetime.now(timezone.utc).timestamp())}",
+                "mode": "subscription_change",
+                "company_id": ObjectId(user["company_id"]),
+                "plan_id": plan_oid,
+                "plan_name": plan.get("name", ""),
+                "billing_cycle": data.billing_cycle,
+                "user_id": ObjectId(user["_id"]),
+                "user_email": user.get("email", ""),
+                "amount": round(amount_cents / 100.0, 2),
+                "currency": currency,
+                "stripe_customer_id": existing_customer,
+                "stripe_subscription_id": existing_sub,
+                "stripe_price_id": price_id,
+                "status": "completed",
+                "payment_status": "paid",
+                "paid_at": now_iso,
+                "created_at": now_iso,
+                "updated_at": now_iso,
+            })
+            if old_plan_id and old_plan_id != plan_oid:
+                await db.plan_history.insert_one({
+                    "company_id": ObjectId(user["company_id"]),
+                    "company_name": company_name,
+                    "old_plan_id": old_plan_id,
+                    "old_plan_name": old_plan_name,
+                    "new_plan_id": plan_oid,
+                    "new_plan_name": plan.get("name", ""),
+                    "changed_by_name": user.get("name") or user.get("email", ""),
+                    "reason": "plan_change_stripe_proration",
+                    "changed_at": now_iso,
+                })
+            return {"changed": True, "plan_name": plan.get("name", ""), "billing_cycle": data.billing_cycle}
+        # Si no se pudo modificar (suscripcion cancelada/incompleta), cae al flujo de checkout normal.
 
     origin = data.origin_url.rstrip("/")
     success_url = f"{origin}/my-plan?session_id={{CHECKOUT_SESSION_ID}}&status=success"
