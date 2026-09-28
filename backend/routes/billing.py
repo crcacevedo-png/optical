@@ -478,7 +478,8 @@ async def account_status(request: Request, user: dict = Depends(get_current_user
         _init_stripe()
         if _stripe_configured():
             try:
-                await process_company(company, datetime.now(timezone.utc))
+                # Timeout para que un Stripe lento no cuelgue la carga del muro de pago.
+                await asyncio.wait_for(process_company(company, datetime.now(timezone.utc)), timeout=8)
                 company = await db.companies.find_one({"_id": cid})
             except Exception:
                 pass

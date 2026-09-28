@@ -5,8 +5,11 @@ import bcrypt
 import jwt
 import os
 import re
+import logging
 
 from db import db
+
+logger = logging.getLogger(__name__)
 
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
@@ -132,8 +135,8 @@ async def get_current_user(request: Request) -> dict:
                     raise HTTPException(status_code=402, detail="cuenta_suspendida")
             except HTTPException:
                 raise
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("get_current_user: verificacion de company (active/billing) fallo: %s", e)
         # Revocacion de tokens emitidos antes del ultimo cambio de password
         token_iat = payload.get("iat", 0)
         pw_changed_at = user.get("password_changed_at", 0)
