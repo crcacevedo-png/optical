@@ -170,12 +170,33 @@ async def create_sale(data: SaleCreate, user: dict = Depends(get_current_user)):
     # Metodo principal para displays legacy (el primero registrado)
     primary_method = payments[0]["method"] if payments else "cash"
 
+    # ─── Snapshot del COSTO unitario por item (para COGS / margen exacto, de aqui en adelante) ───
+    # Se fotografia el cost_price vigente del producto al momento de vender; asi el margen no
+    # cambia si el costo del producto se edita despues. Items sin producto de inventario quedan
+    # marcados como "sin_costo" (no se puede calcular su margen).
+    product_ids = [ObjectId(it["product_id"]) for it in data.items if it.get("product_id")]
+    cost_map = {}
+    if product_ids:
+        async for p in db.products.find({"_id": {"$in": product_ids}}, {"cost_price": 1}):
+            cost_map[str(p["_id"])] = round(float(p.get("cost_price") or 0), 2)
+    enriched_items = []
+    for it in data.items:
+        item = dict(it)
+        pid = it.get("product_id")
+        if pid and str(pid) in cost_map:
+            item["unit_cost"] = cost_map[str(pid)]
+            item["cost_source"] = "product"
+        else:
+            item["unit_cost"] = None
+            item["cost_source"] = "sin_costo"
+        enriched_items.append(item)
+
     sale_doc = {
         "company_id": ObjectId(user["company_id"]),
         "branch_id": branch_id,
         "patient_id": ObjectId(data.patient_id) if data.patient_id else None,
         "patient_name_override": data.patient_name_override,
-        "items": data.items,
+        "items": enriched_items,
         "subtotal": data.subtotal, "discount": data.discount, "tax": data.tax, "total": data.total,
         "payment_method": primary_method,
         "payments": payments,

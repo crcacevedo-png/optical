@@ -132,7 +132,7 @@ export default function DashboardPage() {
       bgColor: 'bg-red-50'
     },
     {
-      title: 'Utilidad',
+      title: 'Flujo de caja',
       value: formatCurrency(data?.profit),
       icon: DollarSign,
       color: data?.profit >= 0 ? 'text-green-600' : 'text-red-600',

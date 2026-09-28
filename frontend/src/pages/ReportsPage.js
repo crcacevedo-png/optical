@@ -127,7 +127,7 @@ export default function ReportsPage() {
   const financeChartData = [
     { name: 'Ingresos', value: financeSummary?.income || 0, color: '#10B981' },
     { name: 'Egresos', value: financeSummary?.expense || 0, color: '#EF4444' },
-    { name: 'Utilidad', value: financeSummary?.profit || 0, color: '#3B82F6' }
+    { name: 'Flujo de caja', value: financeSummary?.profit || 0, color: '#3B82F6' }
   ];
 
   if (loading) {
@@ -258,7 +258,7 @@ export default function ReportsPage() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Utilidad</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Flujo de caja</p>
                 <p className={`font-heading text-2xl font-bold mt-1 ${
                   (financeSummary?.profit || 0) >= 0 ? 'text-green-600' : 'text-red-600'
                 }`}>

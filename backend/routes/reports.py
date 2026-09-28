@@ -248,12 +248,12 @@ async def export_reports_excel(
     for cell in ws1[4]:
         cell.font = header_font
         cell.fill = header_fill
-    ws1.append(["Total Ventas", f"Q {total_sales:,.2f}"])
+    ws1.append(["Total Ventas (devengado)", f"Q {total_sales:,.2f}"])
     ws1.append(["No. Transacciones", len(sales)])
     ws1.append(["Promedio por Venta", f"Q {(total_sales / len(sales) if sales else 0):,.2f}"])
-    ws1.append(["Ingresos", f"Q {income:,.2f}"])
-    ws1.append(["Egresos", f"Q {expense:,.2f}"])
-    ws1.append(["Utilidad", f"Q {income - expense:,.2f}"])
+    ws1.append(["Ingresos cobrados (base caja)", f"Q {income:,.2f}"])
+    ws1.append(["Egresos pagados (base caja)", f"Q {expense:,.2f}"])
+    ws1.append(["Flujo de caja neto (base caja)", f"Q {income - expense:,.2f}"])
     ws1.append([])
     
     # Payment methods breakdown

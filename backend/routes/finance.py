@@ -678,6 +678,90 @@ async def income_statement(
     return await _compute_income_statement(user, date_from, date_to, branch_id)
 
 
+@router.get("/profitability")
+async def profitability(
+    user: dict = Depends(get_current_user),
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    branch_id: Optional[str] = None,
+):
+    """Rentabilidad por productos vendidos (BASE DEVENGADO, por fecha de venta):
+    margen = ingreso de venta − COGS (costo fotografiado en la venta). Distinto del
+    flujo de caja neto (cobros − pagos). Solo cuenta ventas no canceladas y con costo
+    registrado; los items sin costo se reportan aparte (no se puede calcular su margen)."""
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    month_start = datetime.now(timezone.utc).strftime("%Y-%m-01")
+    d_from = date_from or month_start
+    d_to = date_to or today
+
+    q = {"company_id": ObjectId(user["company_id"]), "status": {"$ne": "cancelada"},
+         "created_at": {"$gte": f"{d_from}T00:00:00", "$lte": f"{d_to}T23:59:59.999999"}}
+    if branch_id:
+        try:
+            q["branch_id"] = ObjectId(branch_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="branch_id invalido")
+    elif user.get("branch_id"):
+        q["branch_id"] = ObjectId(user["branch_id"])
+
+    revenue_with_cost = 0.0   # ingreso de items con costo conocido
+    cogs = 0.0                # costo de la mercaderia vendida
+    revenue_without_cost = 0.0
+    items_without_cost = 0
+    by_product: dict = {}
+
+    async for s in db.sales.find(q):
+        for it in s.get("items", []) or []:
+            qty = float(it.get("quantity") or 1)
+            price = float(it.get("price") or 0)
+            line_rev = float(it.get("total")) if it.get("total") is not None else round(price * qty, 2)
+            name = it.get("name") or "Item"
+            pid = it.get("product_id")
+            key = str(pid) if pid else f"manual::{name}"
+            b = by_product.setdefault(key, {
+                "product_id": str(pid) if pid else None, "name": name,
+                "units": 0.0, "revenue": 0.0, "cogs": 0.0, "margin": 0.0, "has_cost": True,
+            })
+            b["units"] += qty
+            b["revenue"] = round(b["revenue"] + line_rev, 2)
+            uc = it.get("unit_cost")
+            if uc is None:
+                revenue_without_cost += line_rev
+                items_without_cost += 1
+                b["has_cost"] = False
+            else:
+                line_cost = round(float(uc) * qty, 2)
+                cogs += line_cost
+                revenue_with_cost += line_rev
+                b["cogs"] = round(b["cogs"] + line_cost, 2)
+                b["margin"] = round(b["margin"] + (line_rev - line_cost), 2)
+
+    gross_margin = round(revenue_with_cost - cogs, 2)
+    margin_pct = round((gross_margin / revenue_with_cost * 100), 1) if revenue_with_cost > 0 else 0.0
+
+    products = []
+    for b in by_product.values():
+        b["revenue"] = round(b["revenue"], 2)
+        b["margin_pct"] = round((b["margin"] / b["revenue"] * 100), 1) if (b["has_cost"] and b["revenue"] > 0) else None
+        products.append(b)
+    products.sort(key=lambda x: (x["margin"] if x["has_cost"] else -1), reverse=True)
+
+    return {
+        "period": {"from": d_from, "to": d_to},
+        "basis": "devengado",
+        "revenue_with_cost": round(revenue_with_cost, 2),
+        "cogs": round(cogs, 2),
+        "gross_margin": gross_margin,
+        "gross_margin_pct": margin_pct,
+        "revenue_without_cost": round(revenue_without_cost, 2),
+        "items_without_cost": items_without_cost,
+        "by_product": products,
+    }
+
+
 @router.get("/income-statement.xlsx")
 async def income_statement_xlsx(
     user: dict = Depends(get_current_user),

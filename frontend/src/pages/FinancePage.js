@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   Plus, TrendingUp, TrendingDown, DollarSign, 
-  ArrowUpCircle, ArrowDownCircle, Wallet, Filter, BarChart3, Truck, Download, Ban, FileText
+  ArrowUpCircle, ArrowDownCircle, Wallet, Filter, BarChart3, Truck, Download, Ban, FileText, Percent, Package, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BranchFilter } from '../components/BranchFilter';
@@ -22,6 +22,7 @@ export default function FinancePage() {
   const [entries, setEntries] = useState([]);
   const [summary, setSummary] = useState(null);
   const [pl, setPl] = useState(null);
+  const [prof, setProf] = useState(null);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
@@ -81,14 +82,16 @@ export default function FinancePage() {
       if (branchId) params.branch_id = branchId;
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo) params.date_to = dateTo;
-      const [entriesRes, summaryRes, plRes] = await Promise.all([
+      const [entriesRes, summaryRes, plRes, profRes] = await Promise.all([
         api.get('/api/finance', { params }),
         api.get('/api/finance/summary', { params }),
-        api.get('/api/finance/income-statement', { params })
+        api.get('/api/finance/income-statement', { params }),
+        api.get('/api/finance/profitability', { params })
       ]);
       setEntries(entriesRes.data || []);
       setSummary(summaryRes.data);
       setPl(plRes.data);
+      setProf(profRes.data);
     } catch (error) {
       console.error('Error fetching finance data:', error);
     } finally {
@@ -573,10 +576,81 @@ export default function FinancePage() {
               </div>
             </div>
             <div className={`mt-4 rounded-xl p-4 flex items-center justify-between ${pl.net_profit >= 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`} data-testid="pl-net-profit">
-              <span className="font-heading text-base font-bold text-slate-800">Utilidad neta</span>
+              <span className="font-heading text-base font-bold text-slate-800">Flujo de caja neto</span>
               <span className={`font-heading text-2xl font-bold ${pl.net_profit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatCurrency(pl.net_profit)}</span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-2">Base caja: incluye ingresos cobrados y egresos pagados (los egresos a crédito cuentan solo por lo abonado). Excluye movimientos anulados.</p>
+            <p className="text-[11px] text-slate-400 mt-2">Base caja (cobros − pagos): incluye ingresos cobrados y egresos pagados (los egresos a crédito cuentan solo por lo abonado). Excluye anulados. <b>No</b> descuenta el costo de la mercadería vendida — para eso mira la Rentabilidad por productos abajo.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Rentabilidad por productos vendidos (margen, base devengado) */}
+      {prof && (
+        <Card className="border-slate-200/80" data-testid="profitability-card">
+          <CardHeader>
+            <CardTitle className="font-heading text-lg flex items-center gap-2">
+              <Percent className="w-5 h-5 text-pine-700" /> Rentabilidad por productos
+              <span className="text-xs font-normal text-slate-400">margen · devengado · {prof.period?.from} a {prof.period?.to}</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="rounded-xl p-4 bg-slate-50 border border-slate-200" data-testid="prof-revenue">
+                <p className="text-xs font-medium text-slate-500">Ingreso por ventas (con costo)</p>
+                <p className="font-heading text-xl font-bold text-slate-800 mt-1">{formatCurrency(prof.revenue_with_cost)}</p>
+              </div>
+              <div className="rounded-xl p-4 bg-amber-50 border border-amber-200" data-testid="prof-cogs">
+                <p className="text-xs font-medium text-amber-800">Costo de lo vendido (COGS)</p>
+                <p className="font-heading text-xl font-bold text-amber-700 mt-1">{formatCurrency(prof.cogs)}</p>
+              </div>
+              <div className={`rounded-xl p-4 border ${prof.gross_margin >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`} data-testid="prof-gross-margin">
+                <p className={`text-xs font-medium ${prof.gross_margin >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>Utilidad bruta / margen</p>
+                <p className={`font-heading text-xl font-bold mt-1 ${prof.gross_margin >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {formatCurrency(prof.gross_margin)} <span className="text-sm font-semibold">({prof.gross_margin_pct}%)</span>
+                </p>
+              </div>
+            </div>
+
+            {prof.items_without_cost > 0 && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-600" data-testid="prof-no-cost-note">
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <span>{prof.items_without_cost} ítem(s) vendidos por {formatCurrency(prof.revenue_without_cost)} <b>sin costo registrado</b> (ventas anteriores a esta función o ítems sin producto de inventario) — no cuentan en el margen. El margen aplica a las ventas nuevas.</span>
+              </div>
+            )}
+
+            {prof.by_product && prof.by_product.length > 0 && (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-sm" data-testid="prof-by-product-table">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-wide text-slate-500 border-b border-slate-200">
+                      <th className="py-2 pr-2">Producto</th>
+                      <th className="py-2 px-2 text-right">Unid.</th>
+                      <th className="py-2 px-2 text-right">Ingreso</th>
+                      <th className="py-2 px-2 text-right">Costo</th>
+                      <th className="py-2 px-2 text-right">Margen</th>
+                      <th className="py-2 pl-2 text-right">%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {prof.by_product.slice(0, 25).map((p, i) => (
+                      <tr key={p.product_id || `m-${i}`} className="border-b border-slate-100" data-testid={`prof-product-row-${i}`}>
+                        <td className="py-2 pr-2 text-slate-700 flex items-center gap-1.5">
+                          <Package className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate max-w-[220px]">{p.name}</span>
+                          {!p.has_cost && <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">sin costo</span>}
+                        </td>
+                        <td className="py-2 px-2 text-right text-slate-600">{p.units}</td>
+                        <td className="py-2 px-2 text-right text-slate-700">{formatCurrency(p.revenue)}</td>
+                        <td className="py-2 px-2 text-right text-amber-700">{p.has_cost ? formatCurrency(p.cogs) : '—'}</td>
+                        <td className={`py-2 px-2 text-right font-semibold ${!p.has_cost ? 'text-slate-400' : (p.margin >= 0 ? 'text-emerald-700' : 'text-red-600')}`}>{p.has_cost ? formatCurrency(p.margin) : '—'}</td>
+                        <td className="py-2 pl-2 text-right text-slate-500">{p.margin_pct != null ? `${p.margin_pct}%` : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="text-[11px] text-slate-400 mt-2">Base devengado (por fecha de venta): margen = ingreso de la venta − costo de la mercadería vendida (costo fotografiado al momento de vender). Es distinto del flujo de caja neto de arriba.</p>
           </CardContent>
         </Card>
       )}
@@ -617,7 +691,7 @@ export default function FinancePage() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className={`text-sm font-medium ${summary?.profit >= 0 ? 'text-blue-800' : 'text-amber-800'}`}>Utilidad</p>
+                <p className={`text-sm font-medium ${summary?.profit >= 0 ? 'text-blue-800' : 'text-amber-800'}`}>Flujo de caja</p>
                 <p className={`font-heading text-2xl font-bold mt-1 ${summary?.profit >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>
                   {formatCurrency(summary?.profit)}
                 </p>
