@@ -27,6 +27,7 @@ import stripe
 from bson import ObjectId
 
 from db import db, effective_monthly_cost
+from billing_utils import _plan_amount_cents
 from email_service import (
     queue_email, render_payment_failed, render_grace_reminder,
     render_suspension_notice, render_payment_restored,
@@ -253,7 +254,6 @@ async def _check_amount(company: dict, sub, base_update: dict):
     if not plan:
         return
     try:
-        from routes.billing import _plan_amount_cents
         cycle = company.get("billing_cycle") or "monthly"
         expected_cents, _interval = _plan_amount_cents(plan, cycle)
     except Exception:
@@ -401,7 +401,6 @@ async def process_company(company: dict, now: datetime | None = None) -> str:
             plan = await db.plans.find_one({"_id": company["plan_id"]}, {"name": 1, "currency": 1, "price_monthly": 1, "price_yearly": 1, "price": 1})
             if plan:
                 plan_name = plan.get("name", "tu plan")
-                from routes.billing import _plan_amount_cents
                 cents, _iv = _plan_amount_cents(plan, company.get("billing_cycle") or "monthly")
                 sym = "$" if (plan.get("currency") or "USD").upper() == "USD" else (plan.get("currency") or "").upper()
                 amount_str = f"{sym} {cents / 100:.2f}"

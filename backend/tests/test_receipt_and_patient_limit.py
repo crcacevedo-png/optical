@@ -11,10 +11,7 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 assert BASE_URL, "REACT_APP_BACKEND_URL not set"
 
-SUPERADMIN_EMAIL = "superadmin@cortexia.com"
-SUPERADMIN_PASSWORD = "Montecristo2026"
-ADMIN_EMAIL = "admin@cortexia.gt"
-ADMIN_PASSWORD = "DemoAdmin2026!"
+from _credentials import ADMIN_EMAIL, ADMIN_PASSWORD, SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD  # noqa: E402
 
 
 def _login(email: str, password: str) -> requests.Session:

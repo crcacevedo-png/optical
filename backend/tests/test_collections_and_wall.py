@@ -23,10 +23,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or "https://eyecare-erp.preview.emergentagent.com").rstrip("/")
 COMPANY_ID = "69cac742cf7c7911e1282501"
 
-SUPERADMIN_EMAIL = "superadmin@cortexia.com"
-SUPERADMIN_PASSWORD = "Montecristo2026"
-ADMIN_EMAIL = "admin@cortexia.gt"
-ADMIN_PASSWORD = "DemoAdmin2026!"
+from _credentials import ADMIN_EMAIL, ADMIN_PASSWORD, SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD  # noqa: E402
 
 
 def _login(email, password):

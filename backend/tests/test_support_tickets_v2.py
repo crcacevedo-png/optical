@@ -169,13 +169,13 @@ class TestReadAndUnread:
         tid = cr.json()["_id"]
         g = sess["admin"].get(f"{BASE_URL}/api/support-tickets/{tid}")
         assert g.status_code == 200
-        assert g.json().get("unread") is False
+        assert not g.json().get("unread")
 
     def test_superadmin_unread_true_initially(self, sess, ticket_id):
         # Después del upload por admin, updated_at avanzó, superadmin no ha leído
         g = sess["superadmin"].get(f"{BASE_URL}/api/support-tickets/{ticket_id}")
         assert g.status_code == 200
-        assert g.json().get("unread") is True
+        assert g.json().get("unread")
 
     def test_superadmin_mark_as_read(self, sess, ticket_id):
         r = sess["superadmin"].post(f"{BASE_URL}/api/support-tickets/{ticket_id}/read")
@@ -184,7 +184,7 @@ class TestReadAndUnread:
 
     def test_superadmin_unread_false_after_read(self, sess, ticket_id):
         g = sess["superadmin"].get(f"{BASE_URL}/api/support-tickets/{ticket_id}")
-        assert g.json().get("unread") is False
+        assert not g.json().get("unread")
 
     def test_creator_reply_makes_super_unread_again(self, sess, ticket_id):
         rep = sess["admin"].post(
@@ -193,12 +193,12 @@ class TestReadAndUnread:
         )
         assert rep.status_code == 200
         g = sess["superadmin"].get(f"{BASE_URL}/api/support-tickets/{ticket_id}")
-        assert g.json().get("unread") is True
+        assert g.json().get("unread")
 
     def test_reply_updates_own_read_marker(self, sess, ticket_id):
         # El propio creador no se debe ver a si mismo como unread despues de responder
         g = sess["admin"].get(f"{BASE_URL}/api/support-tickets/{ticket_id}")
-        assert g.json().get("unread") is False
+        assert not g.json().get("unread")
 
     def test_read_forbidden_for_third_user(self, sess, ticket_id):
         r = sess["vendedor"].post(f"{BASE_URL}/api/support-tickets/{ticket_id}/read")

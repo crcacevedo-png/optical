@@ -30,6 +30,7 @@ from bson import ObjectId
 from db import db, serialize_doc
 from auth_utils import get_current_user
 from audit import log_audit
+from billing_utils import _plan_amount_cents
 
 logger = logging.getLogger(__name__)
 
@@ -100,20 +101,6 @@ def _not_configured_error():
             "('pk_'), y sin comillas ni espacios. Guarda y vuelve a desplegar."
         ),
     )
-
-
-def _plan_amount_cents(plan: dict, cycle: str) -> tuple[int, str]:
-    """Devuelve (unit_amount_en_centavos, intervalo). Anual = price_yearly o mensual x10."""
-    if cycle == "yearly":
-        amt = plan.get("price_yearly")
-        if amt is None:
-            base = float(plan.get("price_monthly") or plan.get("price", 0) or 0)
-            amt = base * 10
-        return int(round(float(amt) * 100)), "year"
-    amt = plan.get("price_monthly")
-    if amt is None:
-        amt = float(plan.get("price", 0) or 0)
-    return int(round(float(amt) * 100)), "month"
 
 
 def _lookup_key(plan_id: str, cycle: str) -> str:

@@ -174,7 +174,7 @@ class TestReactivateEndpoint:
         r = superadmin_session.post(f"{BASE_URL}/api/companies/{cid}/reactivate")
         assert r.status_code == 200, f"Reactivate failed: {r.text}"
         body = r.json()
-        assert body["ok"] is True
+        assert body["ok"]
         assert body["admin_email"] == TestReactivateEndpoint._admin_email
 
     def test_3_mongo_state_after_reactivate(self):
@@ -182,13 +182,13 @@ class TestReactivateEndpoint:
         async def _check():
             from db import db
             company = await db.companies.find_one({"_id": ObjectId(cid)})
-            assert company["is_active"] is True
+            assert company["is_active"]
             assert "reactivated_at" in company
             assert "reactivated_by" in company
             assert "deactivated_reason" not in company
             assert "deactivated_at" not in company
             admin = await db.users.find_one({"company_id": ObjectId(cid), "role": "admin"})
-            assert admin["is_active"] is True
+            assert admin["is_active"]
             assert "deactivated_by_activation_expiry_at" not in admin
             # welcome_tips_sent_at + reminder_7d + reminder_2d unset
             assert "welcome_tips_sent_at" not in admin
@@ -200,7 +200,7 @@ class TestReactivateEndpoint:
                 sort=[("created_at", -1)]
             )
             assert reset is not None, "Debe crearse password_reset con source='reactivation'"
-            assert reset["used"] is False
+            assert not reset["used"]
             # expires 24h from created_at (con margen)
             delta = reset["expires_at"] - reset["created_at"]
             assert timedelta(hours=23) <= delta <= timedelta(hours=25)

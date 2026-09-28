@@ -16,12 +16,7 @@ from pypdf import PdfReader
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 
-ADMIN_EMAIL = "admin@cortexia.gt"
-ADMIN_PASSWORD = "DemoAdmin2026!"
-VENDEDOR_EMAIL = "vendedor@cortexia.gt"
-VENDEDOR_PASSWORD = "DemoUser2026!"
-SUPERADMIN_EMAIL = "superadmin@cortexia.com"
-SUPERADMIN_PASSWORD = "Montecristo2026"
+from _credentials import ADMIN_EMAIL, ADMIN_PASSWORD, VENDEDOR_EMAIL, VENDEDOR_PASSWORD, SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD  # noqa: E402
 
 
 def _login(email, password):

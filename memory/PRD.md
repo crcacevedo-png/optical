@@ -22,6 +22,14 @@ Sistema automático de cobros de la membresía (Stripe, USD): detecta pagos fall
 - **Nota**: se probó sembrando estados en Mongo porque Stripe usa placeholder en preview; el flujo real se valida en producción con el cron diario `sync-subs`. Fases 2/3 (gracia configurable, historial de comprobantes, prórrogas, FEL/SAT) pendientes.
 
 
+### Code quality pass: import circular + higiene de tests (Jun 2026)
+- **Import circular resuelto**: se extrajo la función pura `_plan_amount_cents` a `backend/billing_utils.py`; `dunning.py` ya NO importa `routes.billing` (rompe el ciclo dunning↔billing). Verificado: imports OK + 18/18 tests del motor de cobros.
+- **Secretos hardcodeados en tests**: los 5 archivos señalados (test_receipt_and_patient_limit, test_profitability_iter16, test_collections_and_wall, test_caja_egresos_iter9/10) ahora importan credenciales de `tests/_credentials.py` (basado en env vars, patrón ya usado en el repo).
+- **Comparaciones `is` en tests**: convertidas a asserts truthy/falsy en los archivos señalados.
+- **Variables indefinidas (#4)**: pyflakes NO encontró nombres indefinidos reales en backend (falso positivo del reporte).
+- **Diferidos a propósito** (refactors amplios y riesgosos sobre código en producción ya probado; se harían incrementalmente con re-testing): refactor de `login()`/`get_current_user()` (auth crítico), split de componentes de 300-1000 líneas, deps de hooks React en masa, y simplificación del motor de dunning recién probado.
+
+
 ### Rentabilidad por productos + separación Flujo de caja vs Margen (Jun 2026)
 Hallazgo (confirmado por code review): la "Utilidad neta" del módulo Finanzas se calculaba en BASE CAJA (cobros − pagos) sin descontar el costo de la mercadería vendida (COGS), y se confundía con margen. Fase 1 implementada:
 - **`sales.py`**: cada línea de venta ahora **fotografía el costo** (`unit_cost` + `cost_source`) del producto al momento de vender (no cambia si el costo se edita después). Ítems sin producto de inventario → `cost_source="sin_costo"`. Solo aplica a ventas NUEVAS (históricas quedan sin costo).
