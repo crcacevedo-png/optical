@@ -36,21 +36,34 @@ cron_router = APIRouter(prefix="/cron", tags=["Cron"])
 
 _ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 
+# Nombres de variable candidatos, en orden de prioridad. STRIPE_SECRET_KEY va primero
+# porque la plataforma NO lo rellena con el default del sandbox; STRIPE_API_KEY queda como
+# respaldo (compatibilidad). El placeholder `sk_test_emergent` siempre se ignora.
+_STRIPE_KEY_ENV_NAMES = ("STRIPE_SECRET_KEY", "STRIPE_API_KEY")
+_STRIPE_PLACEHOLDER = "sk_test_emergent"
+
 
 def _resolve_stripe_key() -> str:
-    """Llave secreta efectiva de Stripe.
+    """Llave secreta efectiva de Stripe (BYOK, SDK nativo).
 
-    La plataforma inyecta el placeholder del sandbox (`sk_test_emergent`) en el entorno
-    del proceso; para BYOK en PREVIEW la llave real vive en `backend/.env`, que
-    `load_dotenv(override=False)` no aplica por encima del valor inyectado. Por eso, si
-    el entorno solo trae el placeholder (o nada), preferimos una llave real del `.env`.
+    Emergent inyecta el placeholder del sandbox (`sk_test_emergent`) en el entorno del
+    proceso bajo `STRIPE_API_KEY`, tanto en preview como en producción, y ese valor puede
+    opacar la llave real. Por eso: (1) buscamos una llave REAL en el entorno bajo cualquiera
+    de los nombres candidatos (ignorando el placeholder); (2) como respaldo de PREVIEW,
+    leemos `backend/.env` (que `load_dotenv(override=False)` no aplica por encima del valor
+    inyectado). Si nada es real, devolvemos el placeholder para que `_stripe_configured()`
+    lo detecte como "no configurado".
     """
-    env_key = (os.environ.get("STRIPE_API_KEY") or "").strip()
-    if not env_key or env_key == "sk_test_emergent":
-        file_key = (dotenv_values(_ENV_PATH).get("STRIPE_API_KEY") or "").strip()
-        if file_key and file_key != "sk_test_emergent":
-            return file_key
-    return env_key
+    for name in _STRIPE_KEY_ENV_NAMES:
+        v = (os.environ.get(name) or "").strip()
+        if v and v != _STRIPE_PLACEHOLDER:
+            return v
+    file_env = dotenv_values(_ENV_PATH)
+    for name in _STRIPE_KEY_ENV_NAMES:
+        v = (file_env.get(name) or "").strip()
+        if v and v != _STRIPE_PLACEHOLDER:
+            return v
+    return (os.environ.get("STRIPE_API_KEY") or "").strip()
 
 
 def _init_stripe():
@@ -60,13 +73,13 @@ def _init_stripe():
 def _stripe_configured() -> bool:
     """True solo si hay una llave secreta real de Stripe (no el placeholder compartido)."""
     k = _resolve_stripe_key()
-    return k.startswith("sk_") and k != "sk_test_emergent"
+    return k.startswith("sk_") and k != _STRIPE_PLACEHOLDER
 
 
 def _not_configured_error():
     return HTTPException(
         status_code=503,
-        detail="Stripe aun no esta configurado. Agrega tu llave secreta de Stripe (STRIPE_API_KEY) en Manage -> Secrets.",
+        detail="Stripe aun no esta configurado. Agrega tu llave secreta de Stripe como STRIPE_SECRET_KEY en Manage -> Secrets y vuelve a desplegar.",
     )
 
 
