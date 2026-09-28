@@ -6,12 +6,14 @@ import { NotificationBell } from './NotificationBell';
 import { OfflineIndicator } from './OfflineIndicator';
 import { ChangeMyPasswordDialog } from './ChangeMyPasswordDialog';
 import { ReactivationFeedbackDialog } from './retention/ReactivationFeedbackDialog';
+import { BillingGraceBanner, SuspendedInlineBanner } from './BillingBanner';
+import { PaymentWall } from './PaymentWall';
 import { Button } from '../components/ui/button';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { 
   LayoutDashboard, Users, Calendar, FileText, Package, 
   ShoppingCart, DollarSign, Building2, UserCog, BarChart3,
-  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone, Key, ShieldAlert, Rocket, Activity, HandCoins, LifeBuoy, Tent, Sparkles, Mail, UserPlus, Banknote
+  Glasses, LogOut, Menu, X, ChevronDown, ClipboardList, Store, Eye, Settings, Truck, CreditCard, Megaphone, Key, ShieldAlert, Rocket, Activity, HandCoins, LifeBuoy, Tent, Sparkles, Mail, UserPlus, Banknote, Wallet
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -38,6 +40,9 @@ export default function MainLayout() {
 
   const isAdmin = user?.role === 'admin';
 
+  const billingState = user?.billing?.state || 'active';
+  const billingSuspended = billingState === 'suspended' && !user?.billing?.is_exempt && !isSuperAdmin;
+
   const planModules = user?.plan_modules || [];
   const hasPlanInfo = user?.plan_name !== undefined;
   const hasModule = (mod) => !hasPlanInfo || planModules.includes(mod);
@@ -60,6 +65,7 @@ export default function MainLayout() {
     { path: '/admin/opticas', icon: Store, label: 'Opticas' },
     { path: '/admin/retencion', icon: Sparkles, label: 'Retencion' },
     { path: '/admin/planes', icon: CreditCard, label: 'Planes' },
+    { path: '/admin/cobros', icon: Wallet, label: 'Cobros' },
     { path: '/admin/comunicacion', icon: Megaphone, label: 'Comunicacion' },
     { path: '/admin/soporte', icon: LifeBuoy, label: 'Soporte' },
     { path: '/admin/audit', icon: ShieldAlert, label: 'Auditoria' },
@@ -285,7 +291,17 @@ export default function MainLayout() {
             <NotificationBell />
             <GlobalSearch />
           </div>
-          <Outlet />
+          {billingSuspended && !isAdmin && !isSuperAdmin ? (
+            <PaymentWall />
+          ) : billingSuspended && isAdmin && location.pathname !== '/my-plan' ? (
+            <PaymentWall />
+          ) : (
+            <>
+              {billingState === 'grace' && <BillingGraceBanner billing={user?.billing} isAdmin={isAdmin} />}
+              {billingSuspended && isAdmin && location.pathname === '/my-plan' && <SuspendedInlineBanner />}
+              <Outlet />
+            </>
+          )}
         </div>
       </main>
       <ChangeMyPasswordDialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog} />

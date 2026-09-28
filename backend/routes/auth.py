@@ -14,6 +14,7 @@ from rate_limiter import limiter
 from audit import log_audit
 from email_service import queue_email, render_password_reset, render_security_alert
 from routes.settings import get_role_permissions
+from dunning import build_billing_snapshot
 import jwt
 import secrets
 
@@ -200,12 +201,16 @@ async def login(data: UserLogin, response: Response, request: Request):
         try:
             company = await db.companies.find_one(
                 {"_id": ObjectId(company_id)},
-                {"plan_id": 1, "needs_reactivation_feedback": 1}
+                {"plan_id": 1, "needs_reactivation_feedback": 1, "billing_state": 1,
+                 "grace_until": 1, "suspended_at": 1, "suspended_reason": 1,
+                 "subscription_status": 1, "stripe_customer_id": 1, "is_courtesy": 1,
+                 "amount_mismatch": 1}
             )
             if company:
                 # Flag para dialogo de feedback post-reactivacion (solo admins)
                 if user["role"] == "admin" and company.get("needs_reactivation_feedback"):
                     result["needs_reactivation_feedback"] = True
+                result["billing"] = build_billing_snapshot(company)
                 if company.get("plan_id"):
                     plan = await db.plans.find_one({"_id": company["plan_id"]})
                     if plan:
@@ -295,12 +300,16 @@ async def get_me(user: dict = Depends(get_current_user)):
         try:
             company = await db.companies.find_one(
                 {"_id": ObjectId(user["company_id"])},
-                {"plan_id": 1, "needs_reactivation_feedback": 1}
+                {"plan_id": 1, "needs_reactivation_feedback": 1, "billing_state": 1,
+                 "grace_until": 1, "suspended_at": 1, "suspended_reason": 1,
+                 "subscription_status": 1, "stripe_customer_id": 1, "is_courtesy": 1,
+                 "amount_mismatch": 1}
             )
             if company:
                 # Flag para dialogo de feedback post-reactivacion (solo admins)
                 if user["role"] == "admin" and company.get("needs_reactivation_feedback"):
                     user["needs_reactivation_feedback"] = True
+                user["billing"] = build_billing_snapshot(company)
                 if company.get("plan_id"):
                     plan = await db.plans.find_one({"_id": company["plan_id"]})
                     if plan:

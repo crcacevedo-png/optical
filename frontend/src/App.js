@@ -42,6 +42,7 @@ import RetentionDashboard from './pages/RetentionDashboard';
 import EmailQueuePage from './pages/EmailQueuePage';
 import PublicLeadFormPage from './pages/PublicLeadFormPage';
 import LeadsAdminPage from './pages/LeadsAdminPage';
+import CollectionsPage from './pages/CollectionsPage';
 import './App.css';
 
 function App() {
@@ -82,6 +83,7 @@ function App() {
             <Route path="admin/opticas" element={<AdminOpticasPage />} />
             <Route path="admin/retencion" element={<RetentionDashboard />} />
             <Route path="admin/planes" element={<PlansPage />} />
+            <Route path="admin/cobros" element={<RequireSuperAdmin><CollectionsPage /></RequireSuperAdmin>} />
             <Route path="admin/dashboard" element={<SuperAdminDashboard />} />
             <Route path="admin/comunicacion" element={<AnnouncementsPage />} />
             <Route path="admin/audit" element={<AuditLogPage />} />

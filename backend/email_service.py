@@ -594,3 +594,93 @@ def render_support_ticket(*, ticket_id: str, subject: str, message: str, categor
       {_button("Abrir el ticket", detail_url, BRAND_DARK)}
     """
     return _wrapper(content, f"Nuevo ticket: {subject[:60]}")
+
+
+def render_payment_failed(admin_name: str, company_name: str, plan_name: str, amount_str: str,
+                          grace_days: int, grace_until_str: str, pay_link: str) -> str:
+    """Aviso al admin (dia 0) cuando falla el cobro de la membresia. Inicia periodo de gracia."""
+    admin_name, company_name, plan_name = _e(admin_name), _e(company_name), _e(plan_name)
+    amount_str, grace_until_str = _e(amount_str), _e(grace_until_str)
+    content = f"""
+      <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{admin_name}</strong>,</p>
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+        No pudimos procesar el pago de la membresia de <strong style="color:{BRAND_DARK};">{company_name}</strong>
+        ({plan_name}{f' · {amount_str}' if amount_str else ''}).
+      </p>
+      <div style="background-color:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:16px 20px;margin:24px 0;">
+        <p style="color:#92400E;font-size:13px;margin:0 0 6px 0;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">Periodo de gracia</p>
+        <p style="color:#0F172A;font-size:15px;margin:0;line-height:1.6;">
+          Tu optica <strong>sigue funcionando normalmente</strong>, pero tienes hasta el
+          <strong style="color:#B45309;">{grace_until_str}</strong> ({grace_days} dias) para regularizar el pago.
+          Pasado ese plazo, la cuenta se <strong>suspendera</strong> hasta que se complete el pago.
+        </p>
+      </div>
+      {_button("Actualizar mi pago", pay_link, BRAND_EMERALD)}
+      <p style="color:{TEXT_MUTED};font-size:13px;line-height:1.6;margin:16px 0 0 0;">
+        Si ya actualizaste tu tarjeta, ignora este mensaje: reactivaremos todo automaticamente en cuanto el banco confirme el cobro.
+      </p>
+    """
+    return _wrapper(content, "Tu pago no se pudo procesar")
+
+
+def render_grace_reminder(admin_name: str, company_name: str, days_remaining: int,
+                          grace_until_str: str, pay_link: str) -> str:
+    """Recordatorio durante el periodo de gracia (dias 1 y 2)."""
+    admin_name, company_name, grace_until_str = _e(admin_name), _e(company_name), _e(grace_until_str)
+    content = f"""
+      <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{admin_name}</strong>,</p>
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+        Seguimos sin poder procesar el pago de la membresia de <strong style="color:{BRAND_DARK};">{company_name}</strong>.
+      </p>
+      <div style="background-color:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:16px 20px;margin:24px 0;">
+        <p style="color:#991B1B;font-size:14px;margin:0;line-height:1.6;">
+          Te queda{'n' if days_remaining != 1 else ''} <strong style="color:#DC2626;">{days_remaining} dia{'s' if days_remaining != 1 else ''}</strong>
+          (hasta el <strong>{grace_until_str}</strong>) para regularizar antes de que la cuenta se suspenda.
+        </p>
+      </div>
+      {_button("Regularizar mi pago ahora", pay_link, BRAND_EMERALD)}
+    """
+    return _wrapper(content, "Recordatorio: regulariza tu pago")
+
+
+def render_suspension_notice(admin_name: str, company_name: str, pay_link: str, reason: str) -> str:
+    """Aviso al admin cuando la cuenta queda suspendida (muro de pago)."""
+    admin_name, company_name, reason = _e(admin_name), _e(company_name), _e(reason)
+    content = f"""
+      <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{admin_name}</strong>,</p>
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+        La cuenta de <strong style="color:{BRAND_DARK};">{company_name}</strong> ha sido
+        <strong style="color:{BRAND_RED};">suspendida</strong> por {reason}.
+      </p>
+      <div style="background-color:#FEF2F2;border-left:4px solid {BRAND_RED};border-radius:6px;padding:16px 20px;margin:20px 0;">
+        <p style="color:#7F1D1D;font-size:14px;margin:0;line-height:1.6;">
+          Mientras la cuenta este suspendida, tu equipo no podra operar. Para reactivarla al instante,
+          actualiza tu metodo de pago o completa el pago pendiente.
+        </p>
+      </div>
+      {_button("Pagar y reactivar mi cuenta", pay_link, BRAND_RED)}
+      <p style="color:{TEXT_MUTED};font-size:13px;line-height:1.6;margin:16px 0 0 0;">
+        La reactivacion es automatica: en cuanto el pago se confirme, tu optica recupera el acceso completo.
+      </p>
+    """
+    return _wrapper(content, "Tu cuenta fue suspendida")
+
+
+def render_payment_restored(admin_name: str, company_name: str, plan_name: str) -> str:
+    """Aviso al admin cuando el pago se regulariza y la cuenta se reactiva."""
+    admin_name, company_name, plan_name = _e(admin_name), _e(company_name), _e(plan_name)
+    _, _, app_url = _get_config()
+    content = f"""
+      <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{admin_name}</strong>,</p>
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+        Buenas noticias: recibimos tu pago y la cuenta de
+        <strong style="color:{BRAND_DARK};">{company_name}</strong> quedo <strong style="color:{BRAND_EMERALD};">reactivada</strong>{f' con el plan {plan_name}' if plan_name else ''}.
+      </p>
+      <div style="background-color:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:16px 20px;margin:24px 0;">
+        <p style="color:#065F46;font-size:14px;margin:0;line-height:1.6;">
+          Tu equipo ya puede operar con normalidad. Gracias por seguir con Cortexia Optical.
+        </p>
+      </div>
+      {_button("Ingresar a mi cuenta", app_url, BRAND_EMERALD)}
+    """
+    return _wrapper(content, "Tu cuenta fue reactivada")

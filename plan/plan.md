@@ -1,76 +1,68 @@
-# Plan: Revisión completa de la Guía de Usuario (PDF)
+# Control de Cobros y Suspensión por Impago — Cortexia Optical
 
-## Decisiones ya tomadas
-- **Alcance:** revisión completa de toda la guía (las 8 secciones), no solo Caja/Finanzas.
-- **Inicio rápido:** opción **A** — se dejan los 8 pasos tal como están; solo se actualiza la guía
-  que se descarga en el Paso 1. No se agregan ni se quitan pasos.
+Sistema automático de gestión de cobros para las membresías de las ópticas: detecta pagos fallidos en Stripe, da 3 días de gracia con avisos, suspende el acceso si no se regulariza y reactiva solo cuando se paga. Incluye alertas al superadmin y a la óptica, más un panel de cobros para el superadmin.
 
-## Objetivo
-Dejar la Guía de Usuario al día con todas las funciones actuales, revisándola sección por sección,
-corrigiendo lo desactualizado y agregando lo que falte. La guía se sigue usando también como
-material comercial (enlace público para prospectos), así que debe quedar completa y coherente.
+## Para quién es
+- **Superadmin (dueño de la plataforma):** supervisa el estado de cobro de todas las ópticas, recibe alertas y actúa sobre morosos.
+- **Admin de cada óptica:** recibe avisos de impago y regulariza su pago desde la app.
+- **Vendedores y otros roles de la óptica:** solo se ven afectados por el bloqueo; no participan del cobro.
+- Las cuentas marcadas como **cortesía** quedan siempre exentas (sin costo ni suspensión).
 
-## Revisión sección por sección
+## Funcionalidades y experiencia
+1. **Detección automática de impago.** El sistema reconoce cuando Stripe marca un pago como fallido y arranca el reloj de gracia.
+2. **Periodo de gracia de 3 días** desde el fallo del pago. Durante la gracia la óptica sigue operando con normalidad, pero ve avisos claros de que debe regularizar.
+3. **Recordatorios escalonados a la óptica** (in-app + correo): al fallar el pago, durante los días de gracia y al momento del bloqueo.
+4. **Suspensión con "muro de pago".** Al terminar la gracia sin pago, la cuenta se suspende: el **admin** solo puede entrar a una pantalla que muestra su estado de cuenta y el enlace para pagar/actualizar su tarjeta; el resto de la app queda bloqueado. Los demás usuarios de esa óptica ven un aviso de "cuenta suspendida, contacta a tu administrador".
+5. **Reactivación automática.** En cuanto el pago se regulariza (Stripe confirma el cobro), la cuenta recupera su plan y el acceso completo, sin intervención manual.
+6. **Alertas al superadmin** (in-app + correo) cuando una óptica cae en impago y cuando se suspende.
+7. **Panel de Cobros del superadmin.** Un tablero para ver de un vistazo: renovaciones próximas, pagos fallidos / en gracia (con días restantes), cuentas suspendidas, e ingresos mensuales en riesgo. Desde ahí se abre la ficha de cada óptica.
+8. **Verificación de monto vs. plan contratado.** El sistema compara lo que Stripe está cobrando contra el precio vigente del plan de esa óptica (mensual/anual). Si no coinciden, marca la cuenta y avisa al superadmin (sin suspender por esta causa).
 
-### 1. Introducción / Módulos
-- Agregar a la tabla de módulos **"Cuentas por Pagar"** y **"Estado de Resultados"**.
-- Verificar que la descripción de cada módulo siga siendo exacta.
+## Flujo de uso
+**Impago (óptica):**
+Pago falla en Stripe → **Día 0:** aviso al admin y al superadmin + banner de gracia con cuenta regresiva de 3 días (sigue operando) → **Días 1–2:** recordatorios de gracia → **Día 3 sin pago:** suspensión + muro de pago → el admin paga o actualiza su tarjeta → **reactivación automática** y recuperación del plan.
 
-### 2. Antes de empezar (Primer ingreso)
-- Confirmar que el texto coincide con el Inicio rápido real (8 pasos, Paso 1 = descargar la guía).
-- Ajustar cualquier redacción que ya no aplique. Sin cambios de fondo.
+**Superadmin:**
+Entra al panel de Cobros → ve quién está por renovar, quién falló, quién está en gracia (y cuántos días le quedan), quién está suspendido y qué cuentas tienen discrepancia de monto → abre la ficha de la óptica para más detalle.
 
-### 3. Administrador
-- **3.3 Inventario y proveedores:** aclarar que un proveedor puede vincularse tanto a productos
-  como a los egresos/compras de Finanzas.
-- **3.4 Caja y finanzas (la actualización más grande):**
-  - Egresos integrados en el arqueo: los egresos **en efectivo** se restan del "efectivo esperado".
-  - **Resumen del turno en vivo** (recaudado, egresos, efectivo esperado).
-  - Botón **"Registrar egreso" desde la propia pantalla de Caja** (con método de pago y proveedor).
-  - **"Imprimir cierre (PDF)"** y **"Descargar egresos del turno (Excel)"**.
-  - Egresos con **proveedor** (obligatorio en categoría Proveedores); filtro y total por proveedor.
-  - **Egresos a crédito → Cuentas por Pagar**: abonos parciales y recordatorios de vencimiento.
-  - **Anular un movimiento** (ingreso/egreso) con motivo: queda tachado y auditable, deja de contar;
-    lo puede anular el administrador o quien lo registró.
-  - **Reportes a Excel:** compras por proveedor y **egresos por rango de fechas**.
-  - **Estado de Resultados (P&L):** en pantalla y exportable a **Excel y PDF**; explicar la **base caja**
-    (los egresos a crédito cuentan solo por lo abonado) y su diferencia con la utilidad bruta.
-  - Aclarar el **arrastre** de cuentas por cobrar/pagar entre periodos.
-- **3.5 Reportes y auditoría:** sumar los reportes nuevos de Finanzas (compras, egresos por rango,
-  Estado de Resultados) y mencionar que las anulaciones quedan registradas en Auditoría.
-- **3.6 Seguridad y sesiones:** revisar que siga vigente. Sin cambios previstos.
+**Verificación de monto:**
+El sistema revisa periódicamente que el cargo activo de cada suscripción coincida con el precio del plan contratado; ante una diferencia, marca la cuenta y notifica al superadmin.
 
-### 4. Vendedor
-- **4.2 Cotizaciones y ventas:** mencionar **"Imprimir recibo"** y **"Compartir por WhatsApp"** del comprobante.
-- **4.3 Manejo de caja diaria:** actualizar con el botón "Registrar egreso" desde Caja, el resumen del
-  turno en vivo, "Imprimir cierre (PDF)" y "Descargar egresos (Excel)", y aclarar que solo los egresos
-  en efectivo afectan el efectivo esperado.
-- **4.4 Agenda y citas:** revisar; se conserva.
+## Sensación de UI/UX
+- Consistente con la estética actual (Shadcn UI, azul navy de Cortexia).
+- Código de color claro: **verde** = al día, **ámbar** = en gracia / por renovar, **rojo** = vencido / suspendido.
+- Durante la gracia, banners visibles pero no bloqueantes; al suspender, un muro de pago simple y directo con un único llamado a la acción ("Pagar ahora").
+- Panel de cobros tipo tablero: tarjetas de indicadores arriba + listas filtrables abajo.
 
-### 5. Doctor / Optometrista
-- Revisar recetas (5.2): confirmar y, si aplica, documentar recetas de **lentes de contacto**,
-  lensometría y nomenclatura OD/OS si están en el producto.
-- **5.1 y 5.3** se conservan salvo ajustes menores de exactitud.
+## Fases de implementación
 
-### 6. Jornadas
-- Añadir mención al **modo offline** (captura sin internet y sincronización posterior), si aplica.
-- Verificar que caja/inventario/POS aislados y liquidación final sigan descritos correctamente.
+**Fase 1 — MVP (se construye ahora)**
+- Detección de impago vía Stripe y gracia de 3 días desde el fallo.
+- Recordatorios a la óptica (in-app + correo) al fallar, durante la gracia y al bloquear.
+- Suspensión con muro de pago (admin ve estado + enlace de pago; otros usuarios ven aviso).
+- Reactivación automática al regularizar el pago.
+- Alertas al superadmin (in-app + correo) en fallo y en suspensión.
+- Panel de Cobros del superadmin: renovaciones próximas, fallidos/en gracia con días restantes, suspendidos e ingresos en riesgo.
+- Verificación de que el monto cobrado corresponde al plan contratado + alerta de discrepancia.
 
-### 7. Buenas prácticas
-- Agregar 1–2 consejos alineados a lo nuevo (p. ej. "anula en vez de borrar" para mantener trazabilidad;
-  "revisa Cuentas por Pagar y sus vencimientos").
+**Fase 2**
+- Periodo de gracia y cadencia de recordatorios **configurables** por el superadmin (días y textos de los mensajes).
+- Historial de pagos y comprobantes por óptica (descargables).
+- Recordatorios **proactivos antes** del vencimiento (tarjeta por expirar, próximo cargo).
+- Reportes de recuperación de pagos y de bajas por impago (churn).
 
-### 8. Soporte
-- Verificar datos de contacto y horario. Sin cambios previstos.
+**Fase 3**
+- Gestión avanzada: prórrogas manuales del superadmin, pagos parciales, cupones/descuentos.
+- Enganche con facturación fiscal de Guatemala (FEL/SAT) al momento del cobro.
+- Multi-moneda y ajuste fino de los reintentos de cobro.
 
-## Supuestos (se toman así salvo que indiques lo contrario)
-- Se mantiene el idioma **español** y el estilo/diseño actual del PDF; solo cambia el contenido.
-- Se conserva la numeración general de secciones; los agregados entran dentro de las secciones existentes.
-- **No** se agrega un callout separado de "Novedades recientes"; lo nuevo se integra de forma natural
-  en cada sección (avísame si prefieres el callout).
-- Donde una función esté en duda de existir (p. ej. lentes de contacto, modo offline en Jornadas),
-  se verifica primero y solo se documenta si está realmente en el producto.
-
-## Fuera de alcance
-- Cambios en los pasos del Inicio rápido (opción A: se dejan igual).
-- Traducciones a otros idiomas y rediseño visual del PDF.
+## Supuestos
+- Todas las cuentas de pago usan Stripe; **cortesía = exenta** (sin cobro ni suspensión).
+- La gracia de 3 días la controla la plataforma desde que Stripe marca el pago como fallido, independientemente de la ventana de reintentos propia de Stripe; si Stripe recupera el pago más tarde, la cuenta se reactiva sola.
+- "Bloquear" significa **suspender**: el admin de la óptica solo accede al muro de pago (estado + enlace); vendedores y otros roles quedan sin operar y ven "cuenta suspendida, contacta a tu administrador".
+- La **cancelación voluntaria** de la suscripción (al llegar a fin de periodo) también lleva a suspensión, no a un plan gratuito; no hay uso gratuito para cuentas que dejan de pagar (salvo cortesía).
+- Recordatorios durante la gracia: uno al fallar (día 0), uno en cada día de gracia (días 1 y 2) y uno al suspender (día 3). Ajustable si se prefieren menos correos.
+- La reactivación es automática al confirmarse el pago; el superadmin no necesita intervenir (podrá hacerlo manualmente solo en casos especiales, en fases posteriores).
+- La verificación de monto compara el cargo activo de Stripe contra el precio vigente del plan (mensual/anual); una discrepancia se marca y se avisa, pero **no** suspende por sí sola.
+- Las membresías se siguen cobrando en **USD** (la operación de la óptica permanece en Quetzales), como ya está definido.
+- Las alertas usan los canales ya existentes de la plataforma (avisos in-app + correos).

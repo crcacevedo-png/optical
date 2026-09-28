@@ -388,6 +388,7 @@ async def startup():
     await db.companies.create_index([("is_active", 1)])
     await db.companies.create_index([("plan_id", 1)])
     await db.companies.create_index("email")
+    await db.companies.create_index([("billing_state", 1)])
 
     # --- Patients ---
     await db.patients.create_index([("company_id", 1), ("last_name", 1)])

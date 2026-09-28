@@ -360,6 +360,12 @@ async def _apply_paid(session_id: str, session=None) -> None:
             "last_payment_at": now_iso,
             "stripe_subscription_id": sub_id,
             "subscription_status": "active",
+            "billing_state": "active",
+            "payment_failed_at": None,
+            "grace_until": None,
+            "suspended_at": None,
+            "suspended_reason": None,
+            "last_dunning_stage": None,
             "updated_at": now_iso,
         }},
     )
@@ -432,47 +438,13 @@ def _cron_authorized(request: Request) -> bool:
 
 
 async def _sync_subscriptions_job() -> None:
-    """Recorre las empresas con suscripcion en Stripe y sincroniza su estado:
-    activa/trial -> mantiene el plan; cancelada/impaga -> baja a Free."""
+    """Sincronizacion diaria: delega en el motor de cobros (dunning) que aplica
+    gracia, suspension, reactivacion, recordatorios y verificacion de monto."""
     _init_stripe()
     if not _stripe_configured():
         return
-    free_plan = await db.plans.find_one({"name": "Free"}, {"_id": 1})
-    free_id = free_plan["_id"] if free_plan else None
-
-    cursor = db.companies.find(
-        {"stripe_subscription_id": {"$exists": True, "$ne": None}},
-        {"stripe_subscription_id": 1, "plan_id": 1, "name": 1},
-    )
-    async for c in cursor:
-        sub_id = c.get("stripe_subscription_id")
-        try:
-            sub = await asyncio.to_thread(lambda sid=sub_id: stripe.Subscription.retrieve(sid))
-        except stripe.error.StripeError:
-            continue
-        status = sub.get("status")
-        now_iso = datetime.now(timezone.utc).isoformat()
-        update = {"subscription_status": status, "updated_at": now_iso}
-
-        if status in ("active", "trialing"):
-            cps = sub.get("current_period_start")
-            if cps:
-                update["last_payment_at"] = datetime.fromtimestamp(cps, timezone.utc).isoformat()
-        elif status in ("canceled", "unpaid", "incomplete_expired"):
-            if free_id and c.get("plan_id") != free_id:
-                update["plan_id"] = free_id
-                await db.plan_history.insert_one({
-                    "company_id": c["_id"],
-                    "company_name": c.get("name", ""),
-                    "old_plan_id": c.get("plan_id"),
-                    "new_plan_id": free_id,
-                    "new_plan_name": "Free",
-                    "changed_by_name": "Sistema (impago/cancelacion)",
-                    "reason": f"subscription_{status}",
-                    "changed_at": now_iso,
-                })
-        # past_due / incomplete: se mantiene el plan (periodo de gracia), solo se marca el estado
-        await db.companies.update_one({"_id": c["_id"]}, {"$set": update})
+    from dunning import run_dunning_cycle
+    await run_dunning_cycle()
 
 
 @cron_router.post("/sync-subscriptions")
@@ -482,3 +454,57 @@ async def cron_sync_subscriptions(request: Request):
         raise HTTPException(status_code=401, detail="Unauthorized")
     asyncio.create_task(_sync_subscriptions_job())
     return {"ok": True}
+
+
+# ─── Estado de cuenta / muro de pago (para banners y wall del frontend) ───────
+
+@router.get("/account-status")
+async def account_status(request: Request, user: dict = Depends(get_current_user)):
+    """Estado de facturacion de la empresa del usuario (para banner de gracia / muro de pago).
+    Si la cuenta esta en gracia o suspendida, revalida EN VIVO con Stripe para reactivar
+    de inmediato cuando el admin regulariza desde el Billing Portal (sin esperar al cron)."""
+    from dunning import build_billing_snapshot, process_company
+
+    if user["role"] == "superadmin" or not user.get("company_id"):
+        return {"state": "active", "is_exempt": True, "role": user["role"]}
+
+    cid = ObjectId(user["company_id"])
+    company = await db.companies.find_one({"_id": cid})
+    if not company:
+        return {"state": "active", "role": user["role"]}
+
+    state = company.get("billing_state") or "active"
+    if state in ("grace", "suspended") and company.get("stripe_subscription_id"):
+        _init_stripe()
+        if _stripe_configured():
+            try:
+                await process_company(company, datetime.now(timezone.utc))
+                company = await db.companies.find_one({"_id": cid})
+            except Exception:
+                pass
+
+    snap = build_billing_snapshot(company)
+    snap["role"] = user["role"]
+
+    # Datos del plan para pintar el muro
+    plan = None
+    if company.get("plan_id"):
+        plan = await db.plans.find_one({"_id": company["plan_id"]}, {"name": 1, "currency": 1, "price_monthly": 1, "price_yearly": 1, "price": 1})
+    if plan:
+        cents, _iv = _plan_amount_cents(plan, company.get("billing_cycle") or "monthly")
+        snap["plan_name"] = plan.get("name")
+        snap["amount"] = round(cents / 100.0, 2)
+        snap["currency"] = (plan.get("currency") or "USD").upper()
+    snap["billing_cycle"] = company.get("billing_cycle") or "monthly"
+    return snap
+
+
+# ─── Panel de Cobros (SuperAdmin) ─────────────────────────────────────────────
+
+@router.get("/admin/collections")
+async def admin_collections(days_ahead: int = 7, user: dict = Depends(get_current_user)):
+    if user["role"] != "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    days_ahead = max(1, min(int(days_ahead or 7), 60))
+    from dunning import build_collections_panel
+    return await build_collections_panel(days_ahead)

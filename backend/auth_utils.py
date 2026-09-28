@@ -12,6 +12,15 @@ JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
+# Prefijos permitidos cuando la cuenta esta SUSPENDIDA (muro de pago): el admin solo
+# puede autenticarse, ver planes y pagar. Todo lo demas devuelve 402 -> el frontend
+# muestra el muro de pago (admin) o el aviso "cuenta suspendida" (resto de roles).
+_BILLING_WALL_ALLOWED = ("/api/auth/", "/api/billing/", "/api/plans")
+
+
+def _billing_wall_allowed(path: str) -> bool:
+    return any(path.startswith(p) for p in _BILLING_WALL_ALLOWED)
+
 def get_jwt_secret() -> str:
     return os.environ["JWT_SECRET"]
 
@@ -110,10 +119,17 @@ async def get_current_user(request: Request) -> dict:
         if user.get("company_id") and user.get("role") != "superadmin":
             try:
                 company = await db.companies.find_one(
-                    {"_id": ObjectId(user["company_id"])}, {"is_active": 1}
+                    {"_id": ObjectId(user["company_id"])},
+                    {"is_active": 1, "billing_state": 1, "is_courtesy": 1},
                 )
                 if company and company.get("is_active") is False:
                     raise HTTPException(status_code=401, detail="Optica desactivada. Contacta al equipo de Cortexia.")
+                # Muro de pago: si la optica esta SUSPENDIDA por impago, se bloquea toda la
+                # operacion excepto auth/billing/planes (para que el admin pueda pagar).
+                if (company and company.get("billing_state") == "suspended"
+                        and not company.get("is_courtesy")
+                        and not _billing_wall_allowed(request.url.path)):
+                    raise HTTPException(status_code=402, detail="cuenta_suspendida")
             except HTTPException:
                 raise
             except Exception:

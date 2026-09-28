@@ -4,7 +4,7 @@ import { api, formatApiErrorDetail, useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { CreditCard, CheckCircle2, Zap, Package, Users, Building2, TrendingUp, XCircle, Clock, ShieldCheck, ArrowRight } from 'lucide-react';
+import { CreditCard, CheckCircle2, Zap, Package, Users, Building2, TrendingUp, XCircle, Clock, ShieldCheck, ArrowRight, AlertTriangle, Lock, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 
 const fmt = (n, cur = 'USD') => {
@@ -19,7 +19,7 @@ const CYCLE_META = {
 };
 
 export default function MyPlanPage() {
-  const { user } = useAuth();
+  const { user, checkAuth } = useAuth();
   const [params, setParams] = useSearchParams();
   const [plans, setPlans] = useState([]);
   const [usage, setUsage] = useState(null);
@@ -28,6 +28,20 @@ export default function MyPlanPage() {
   const [cycle, setCycle] = useState('monthly');
   const [processingId, setProcessingId] = useState(null);
   const [pollingSession, setPollingSession] = useState(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  const billing = user?.billing || null;
+
+  const openPortal = async () => {
+    try {
+      setPortalLoading(true);
+      const { data } = await api.post('/api/billing/portal', { origin_url: window.location.origin });
+      if (data.url) window.location.href = data.url;
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail));
+      setPortalLoading(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -77,6 +91,7 @@ export default function MyPlanPage() {
           setParams(params, { replace: true });
           setPollingSession(null);
           load();
+          checkAuth();
         } else if (data.payment_status === 'failed' || data.payment_status === 'expired') {
           clearInterval(iv);
           toast.error('El pago no se completo. Intenta nuevamente.');
@@ -91,7 +106,7 @@ export default function MyPlanPage() {
       }
     }, 2000);
     return () => clearInterval(iv);
-  }, [pollingSession, params, setParams, load]);
+  }, [pollingSession, params, setParams, load, checkAuth]);
 
   const priceFor = (plan) => {
     const key = cycle === 'yearly' ? 'price_yearly' : 'price_monthly';
@@ -138,6 +153,32 @@ export default function MyPlanPage() {
         </p>
       </div>
 
+      {/* Estado de facturacion (gracia / suspension) */}
+      {billing && billing.state && billing.state !== 'active' && (
+        <Card
+          className={billing.state === 'suspended' ? 'border-red-300 bg-red-50/60' : 'border-amber-300 bg-amber-50/60'}
+          data-testid="billing-status-alert"
+        >
+          <CardContent className="p-4 flex items-start gap-3">
+            {billing.state === 'suspended'
+              ? <Lock className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              : <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />}
+            <div className="text-sm text-slate-700 flex-1">
+              <p className={`font-semibold mb-1 ${billing.state === 'suspended' ? 'text-red-900' : 'text-amber-900'}`}>
+                {billing.state === 'suspended'
+                  ? 'Cuenta suspendida por falta de pago'
+                  : `Pago pendiente${billing.days_remaining != null ? ` — ${billing.days_remaining} día(s) de gracia` : ''}`}
+              </p>
+              <p>
+                {billing.state === 'suspended'
+                  ? 'Actualiza tu método de pago o elige un plan para reactivar el acceso de inmediato.'
+                  : 'Tu último pago no se pudo procesar. Regulariza antes de que termine el periodo de gracia.'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Current plan + usage */}
       {usage && (
         <Card className="border-slate-200/80" data-testid="current-plan-card">
@@ -162,6 +203,18 @@ export default function MyPlanPage() {
                   {fmt(usage.monthly_cost ?? usage.plan_monthly_cost ?? 0, usage.plan?.currency)}
                 </span>
               </div>
+            )}
+            {billing?.has_subscription && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openPortal}
+                disabled={portalLoading}
+                className="w-full sm:w-auto"
+                data-testid="manage-subscription-btn"
+              >
+                <Settings className="w-4 h-4 mr-1.5" /> {portalLoading ? 'Abriendo...' : 'Gestionar suscripción'}
+              </Button>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <UsageBar label="Pacientes" icon={Users} count={usage.patients_count} max={usage.max_patients} pct={usage.patients_percent} warn={usage.patients_warning} />
