@@ -391,7 +391,7 @@ class PlanCreate(BaseModel):
     price: float = 0
     price_monthly: Optional[float] = None
     price_yearly: Optional[float] = None
-    currency: str = "GTQ"
+    currency: str = "USD"
     max_branches: int = 1
     max_patients: int = 50
     modules: List[str] = []

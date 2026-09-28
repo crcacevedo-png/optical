@@ -9,6 +9,13 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Membresía cobrada en USD (Jun 2026)
+La moneda de cobro de la MEMBRESÍA (planes de suscripción) pasó de GTQ a **USD**. La moneda OPERATIVA de cada óptica (ventas, POS, caja, finanzas, reportes) **sigue en Quetzales (Q)** — sin cambios. Decisión del usuario: solo se cambió la moneda; los montos de cada plan los ajusta el superadmin en el panel de Planes. Anual = 10× mensual (2 meses gratis), sin cambios.
+- **Backend**: `models.py` `PlanCreate.currency` default `GTQ`→`USD`; `server.py` planes seed con `currency: "USD"` + **migración idempotente al arranque** que convierte planes sin moneda o en GTQ → USD (no toca otras monedas); `billing.py` `_plan_amount` default de moneda `gtq`→`usd` (moneda enviada a Stripe Checkout); `plans.py` stats_summary default `GTQ`→`USD`. Fix lint: `my-transactions` ahora retorna `[serialize_doc(t) ...]`.
+- **Frontend**: `MyPlanPage.js` `fmt` mapea USD→`$` (default USD); `PlansPage.js` helper `curSymbol` (USD→$, GTQ→Q) usado en tarjetas de plan, MRR/ARR por plan y StatCards (MRR/ARR/Ingresos 30d en `$`), label del form "Precio (USD/mes)"; `AdminOpticasPage.js` dropdown de plan y "Costo mensual actual" en `$`; `SuperAdminDashboard.js` KPI MRR y tooltip de Revenue en `$`.
+- Verificado: `GET /api/plans` y `/api/plans/stats/summary` devuelven `currency: USD` (Free/Basic/Enterprise); migración aplicada (3 planes en USD); frontend compila. Números de precio sin cambios (los edita el superadmin).
+
+
 ### Revisión completa de la Guía de Usuario PDF (Jun 2026)
 Revisión sección por sección de la guía (`routes/user_guide.py`) para dejarla al día con todas las funciones actuales (también sirve como material comercial vía enlace público). Sin rediseño visual ni cambios en los pasos del Inicio rápido (opción A: se dejan los 8 pasos). Solo contenido. Antes de documentar, se verificó en el código que cada función exista.
 - **§1 Módulos**: agregados "Cuentas por Pagar" y "Estado de Resultados" a la tabla de módulos.

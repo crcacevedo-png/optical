@@ -640,6 +640,7 @@ async def startup():
             {
                 "name": "Free",
                 "price": 0,
+                "currency": "USD",
                 "max_branches": 1,
                 "max_patients": 50,
                 "modules": [],
@@ -649,6 +650,7 @@ async def startup():
             {
                 "name": "Basic",
                 "price": 299,
+                "currency": "USD",
                 "max_branches": 3,
                 "max_patients": 500,
                 "modules": ["inventario", "ventas", "jornadas"],
@@ -658,6 +660,7 @@ async def startup():
             {
                 "name": "Enterprise",
                 "price": 799,
+                "currency": "USD",
                 "max_branches": 0,
                 "max_patients": 0,
                 "modules": ["inventario", "ventas", "proveedores", "finanzas", "jornadas"],
@@ -674,6 +677,15 @@ async def startup():
                 {"$set": {"plan_id": free_plan["_id"]}}
             )
         logger.info("Default plans seeded")
+
+    # Migracion idempotente: la membresia se cobra en USD.
+    # Convierte planes sin moneda o en GTQ a USD (no toca planes ya en otra moneda).
+    _cur_migration = await db.plans.update_many(
+        {"$or": [{"currency": {"$exists": False}}, {"currency": {"$in": ["GTQ", "gtq"]}}]},
+        {"$set": {"currency": "USD"}},
+    )
+    if _cur_migration.modified_count:
+        logger.info(f"Plan currency migration: {_cur_migration.modified_count} plan(s) set to USD")
 
     # ═══════════════════════════════════════════════════════════════════
     # Object Storage init (multi-pod safe uploads)

@@ -549,7 +549,7 @@ export default function AdminOpticasPage() {
                           <SelectContent>
                             {plans.map(p => (
                               <SelectItem key={p._id} value={p._id} data-testid={`plan-option-${p._id}`}>
-                                {p.name} - Q{p.price}/mes
+                                {p.name} - ${p.price}/mes
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -581,7 +581,7 @@ export default function AdminOpticasPage() {
                           </div>
                           <p className="text-xs text-slate-500 mt-1">
                             Sin costo mensual (Q0), sin cambiar el plan ni los modulos.
-                            {' '}Costo mensual actual: <span className="font-medium text-slate-700">Q{(selectedCompany.monthly_cost ?? 0).toFixed(2)}</span>
+                            {' '}Costo mensual actual: <span className="font-medium text-slate-700">${(selectedCompany.monthly_cost ?? 0).toFixed(2)}</span>
                             {selectedCompany.is_courtesy ? ' (cortesia)' : ''}.
                           </p>
                         </div>

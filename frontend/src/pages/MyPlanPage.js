@@ -7,8 +7,9 @@ import { Badge } from '../components/ui/badge';
 import { CreditCard, CheckCircle2, Zap, Package, Users, Building2, TrendingUp, XCircle, Clock, ShieldCheck, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
-const fmt = (n, cur = 'GTQ') => {
-  const symbol = (cur || 'GTQ').toUpperCase() === 'GTQ' ? 'Q' : cur.toUpperCase();
+const fmt = (n, cur = 'USD') => {
+  const c = (cur || 'USD').toUpperCase();
+  const symbol = c === 'GTQ' ? 'Q' : (c === 'USD' ? '$' : c);
   return `${symbol} ${(Number(n) || 0).toFixed(2)}`;
 };
 

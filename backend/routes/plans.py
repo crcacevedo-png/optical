@@ -217,7 +217,7 @@ async def plans_stats_summary(user: dict = Depends(get_current_user)):
                 "plan_name": plan_doc.get("name", "Sin plan"),
                 "price_monthly": float(plan_doc.get("price_monthly") or plan_doc.get("price", 0) or 0),
                 "price_yearly": float(plan_doc.get("price_yearly") or (plan_doc.get("price", 0) or 0) * 10),
-                "currency": (plan_doc.get("currency") or "GTQ").upper(),
+                "currency": (plan_doc.get("currency") or "USD").upper(),
                 "companies_monthly": 0,
                 "companies_yearly": 0,
                 "companies_courtesy": 0,

@@ -50,7 +50,7 @@ def _plan_amount(plan: dict, cycle: str) -> tuple[float, str]:
         base = float(plan.get("price", 0) or 0)
         amount = base * 10 if cycle == "yearly" else base
     amount = float(amount)
-    currency = (plan.get("currency") or "gtq").lower()
+    currency = (plan.get("currency") or "usd").lower()
     return amount, currency
 
 
@@ -221,7 +221,7 @@ async def my_transactions(user: dict = Depends(get_current_user), limit: int = 2
             t["plan_id"] = str(t["plan_id"])
         if isinstance(t.get("user_id"), ObjectId):
             t["user_id"] = str(t["user_id"])
-    return txs
+    return [serialize_doc(t) for t in txs]
 
 
 # ─── Webhook Stripe (path exacto que emergentintegrations espera) ─────────

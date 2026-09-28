@@ -52,7 +52,7 @@ export default function SuperAdminDashboard() {
       {/* === ROW 1: Revenue & Key KPIs === */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard icon={DollarSign} iconBg="bg-emerald-50" iconColor="text-emerald-600"
-          value={`Q${estimated_revenue.toLocaleString()}`} label="MRR" testid="kpi-mrr" />
+          value={`$${estimated_revenue.toLocaleString()}`} label="MRR" testid="kpi-mrr" />
         <KpiCard icon={Building2} iconBg="bg-blue-50" iconColor="text-blue-600"
           value={totals.companies} label="Opticas activas" testid="kpi-companies"
           badge={new_companies_month > 0 ? `+${new_companies_month}` : null} />
@@ -138,7 +138,7 @@ export default function SuperAdminDashboard() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `Q${v}`} />
                   <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={80} />
-                  <Tooltip formatter={(v) => [`Q${v.toLocaleString()}`, 'Revenue']} />
+                  <Tooltip formatter={(v) => [`$${v.toLocaleString()}`, 'Revenue']} />
                   <Bar dataKey="value" fill="#F59E0B" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
