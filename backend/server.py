@@ -70,9 +70,8 @@ api_router.include_router(security_reports.router)
 api_router.include_router(user_guide.router)
 api_router.include_router(email_queue_admin.router)
 api_router.include_router(leads.router)
-# Webhook Stripe: se registra a nivel raiz (no dentro de /api) porque el path
-# ya incluye /api/webhook/stripe segun la libreria emergentintegrations.
-app.include_router(billing.webhook_router)
+api_router.include_router(billing.cron_router)
+# Cron de la plataforma (Bearer WEBHOOK_CRON_SECRET) va bajo /api/cron/* via api_router.
 
 # Global search
 @api_router.get("/search")
@@ -223,7 +222,7 @@ async def cors_middleware(request: Request, call_next):
         # y endpoints que reciben reportes del navegador (no pueden usar X-CSRF-Token porque
         # el propio navegador los envia sin intervencion de JS).
         _CSRF_EXEMPT_PATHS = (
-            "/api/webhook/stripe",
+            "/api/cron/",
             "/api/security/csp-report",
         )
         is_exempt = any(path.startswith(p) for p in _CSRF_EXEMPT_PATHS)
