@@ -9,6 +9,11 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Fix overlay "Script error." (cross-origin) en dev/preview (Jun 2026)
+El overlay rojo "Uncaught runtime errors: Script error." que aparecía en el navegador es un error ENMASCARADO por CORS proveniente de un script cross-origin (barra de preview de Emergent / extensiones del navegador / widgets de terceros), NO del bundle de la app. Se confirmó: en un navegador limpio (headless) la app carga sin overlay y el único log es el 401 esperado de `/api/auth/me` antes del login. No ocurre en producción (ese overlay es solo de dev).
+- **Frontend** `src/index.js`: se generalizó el manejador global (mismo patrón ya usado para el error benigno "ResizeObserver loop") para que también detenga el overlay ante "Script error." cross-origin. Detección segura: `message` contiene "Script error", `error` es null y sin `filename`/`lineno` — condiciones exclusivas de errores cross-origin no accionables. Los errores reales del bundle (que sí traen message/filename/lineno/objeto error) NO se suprimen.
+
+
 ### Membresía cobrada en USD (Jun 2026)
 La moneda de cobro de la MEMBRESÍA (planes de suscripción) pasó de GTQ a **USD**. La moneda OPERATIVA de cada óptica (ventas, POS, caja, finanzas, reportes) **sigue en Quetzales (Q)** — sin cambios. Decisión del usuario: solo se cambió la moneda; los montos de cada plan los ajusta el superadmin en el panel de Planes. Anual = 10× mensual (2 meses gratis), sin cambios.
 - **Backend**: `models.py` `PlanCreate.currency` default `GTQ`→`USD`; `server.py` planes seed con `currency: "USD"` + **migración idempotente al arranque** que convierte planes sin moneda o en GTQ → USD (no toca otras monedas); `billing.py` `_plan_amount` default de moneda `gtq`→`usd` (moneda enviada a Stripe Checkout); `plans.py` stats_summary default `GTQ`→`USD`. Fix lint: `my-transactions` ahora retorna `[serialize_doc(t) ...]`.
