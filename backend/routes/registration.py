@@ -12,28 +12,35 @@ Flujo:
 Reglas anti-abuso: rate-limit, honeypot (`website`), consentimiento obligatorio.
 La creacion real de la cuenta ocurre SOLO al hacer clic en el enlace de verificacion.
 """
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel, EmailStr
 from pymongo import ReturnDocument
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import os
 import re
+import hmac
+import asyncio
 import logging
 import secrets
 
-from db import db
-from auth_utils import get_real_ip, hash_password, validate_password_strength
+from db import db, serialize_doc
+from auth_utils import get_real_ip, hash_password, validate_password_strength, get_current_user
 from audit import log_audit
 from rate_limiter import limiter
 from routes.notifications import create_notification
-from email_service import queue_email, render_verify_registration, render_welcome_self_service
+from email_service import (
+    queue_email, render_verify_registration, render_welcome_self_service,
+    render_registration_reminder,
+)
 
 router = APIRouter(prefix="/registration", tags=["Registro (autoservicio)"])
+cron_router = APIRouter(prefix="/cron", tags=["Cron"])
 
 logger = logging.getLogger(__name__)
 
 VERIFY_TOKEN_HOURS = int(os.environ.get("REGISTRATION_VERIFY_HOURS", "48"))
+REMINDER_AFTER_HOURS = int(os.environ.get("REGISTRATION_REMINDER_HOURS", "24"))
 DEFAULT_FREE_PATIENT_LIMIT = 50
 
 CONSENT_TEXT = (
@@ -358,3 +365,146 @@ async def verify_registration(request: Request, data: VerifyRequest):
             {"_id": reg["_id"]}, {"$set": {"verified": False}, "$unset": {"verified_at": ""}})
         logger.error(f"Fallo la provision de la cuenta para {email}: {e}")
         raise HTTPException(status_code=500, detail="No se pudo activar la cuenta. Intenta de nuevo en un momento.")
+
+
+# ─────────────────────────── PANEL SUPERADMIN ───────────────────────────
+def _reg_status(reg: dict, now: datetime) -> str:
+    if reg.get("verified"):
+        return "verificada"
+    exp = _to_aware(reg.get("expires_at"))
+    if isinstance(exp, datetime) and exp < now:
+        return "expirada"
+    return "pendiente"
+
+
+def _reg_row(reg: dict, now: datetime) -> dict:
+    exp = _to_aware(reg.get("expires_at"))
+    return {
+        "id": str(reg["_id"]),
+        "name": reg.get("name"),
+        "optica_name": reg.get("optica_name"),
+        "email": reg.get("email"),
+        "whatsapp": reg.get("whatsapp"),
+        "location": reg.get("location"),
+        "promo_code": reg.get("promo_code"),
+        "patient_limit": reg.get("patient_limit"),
+        "source": reg.get("source"),
+        "status": _reg_status(reg, now),
+        "created_at": reg.get("created_at"),
+        "expires_at": exp.isoformat() if isinstance(exp, datetime) else None,
+        "verified_at": reg.get("verified_at"),
+        "reminder_sent_at": reg.get("reminder_sent_at"),
+        "resend_count": reg.get("resend_count", 0),
+        "company_id": str(reg["company_id"]) if reg.get("company_id") else None,
+    }
+
+
+@router.get("/admin/list")
+async def admin_list_registrations(
+    user: dict = Depends(get_current_user),
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+):
+    if user.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    q: dict = {}
+    if search:
+        rx = {"$regex": re.escape(search), "$options": "i"}
+        q["$or"] = [{"name": rx}, {"email": rx}, {"optica_name": rx}, {"whatsapp": rx}]
+    docs = await db.pending_registrations.find(q).sort("created_at", -1).limit(500).to_list(500)
+    now = datetime.now(timezone.utc)
+    rows = [_reg_row(d, now) for d in docs]
+    if status and status != "all":
+        rows = [r for r in rows if r["status"] == status]
+    stats = {
+        "total": len(docs),
+        "verificada": sum(1 for d in docs if _reg_status(d, now) == "verificada"),
+        "pendiente": sum(1 for d in docs if _reg_status(d, now) == "pendiente"),
+        "expirada": sum(1 for d in docs if _reg_status(d, now) == "expirada"),
+    }
+    return {"items": rows, "stats": stats}
+
+
+@router.post("/admin/{reg_id}/resend")
+async def admin_resend(reg_id: str, request: Request, user: dict = Depends(get_current_user)):
+    if user.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    from bson import ObjectId
+    try:
+        oid = ObjectId(reg_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID invalido")
+    reg = await db.pending_registrations.find_one({"_id": oid})
+    if not reg:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+    if reg.get("verified"):
+        raise HTTPException(status_code=400, detail="Esta cuenta ya fue verificada.")
+    now = datetime.now(timezone.utc)
+    token = secrets.token_urlsafe(48)
+    await db.pending_registrations.update_one(
+        {"_id": oid},
+        {"$set": {"token": token, "expires_at": now + timedelta(hours=VERIFY_TOKEN_HOURS)},
+         "$inc": {"resend_count": 1}, "$unset": {"reminder_sent_at": ""}},
+    )
+    reg["token"] = token
+    await _send_verification_email(reg)
+    await log_audit("REGISTRATION_ADMIN_RESEND", actor_id=user["_id"], actor_email=user.get("email"),
+                    actor_role="superadmin", metadata={"reg_id": reg_id, "email": reg.get("email")}, request=request)
+    return {"ok": True, "message": "Correo de verificacion reenviado."}
+
+
+# ─────────────────────────── CRON: recordatorio a abandonados (24h) ───────────────────────────
+def _cron_authorized(request: Request) -> bool:
+    secret = os.environ.get("WEBHOOK_CRON_SECRET") or ""
+    auth = request.headers.get("authorization", "")
+    token = auth[7:] if auth[:7].lower() == "bearer " else ""
+    return bool(secret and token and hmac.compare_digest(token, secret))
+
+
+async def _send_registration_reminders_job() -> int:
+    """Envia UN recordatorio a los registros no verificados con mas de REMINDER_AFTER_HOURS
+    de antiguedad cuyo enlace aun no expira. Marca reminder_sent_at para no repetir."""
+    now = datetime.now(timezone.utc)
+    cutoff = (now - timedelta(hours=REMINDER_AFTER_HOURS)).isoformat()
+    candidates = await db.pending_registrations.find({
+        "verified": {"$ne": True},
+        "reminder_sent_at": {"$exists": False},
+        "created_at": {"$lte": cutoff},
+    }).limit(500).to_list(500)
+    sent = 0
+    for reg in candidates:
+        exp = _to_aware(reg.get("expires_at"))
+        if not (isinstance(exp, datetime) and exp > now):
+            continue  # el enlace ya expiro: no tiene sentido recordar
+        # Claim atomico para no duplicar el envio entre entregas concurrentes del cron.
+        claimed = await db.pending_registrations.find_one_and_update(
+            {"_id": reg["_id"], "reminder_sent_at": {"$exists": False}, "verified": {"$ne": True}},
+            {"$set": {"reminder_sent_at": now.isoformat()}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if not claimed:
+            continue
+        verify_link = f"{_app_url()}/verificar-cuenta?token={reg['token']}"
+        hours_left = max(1, int((exp - now).total_seconds() // 3600))
+        try:
+            html_body = render_registration_reminder(
+                name=reg.get("name") or "", optica_name=reg.get("optica_name") or "",
+                verify_link=verify_link, hours_left=hours_left)
+            await queue_email(reg["email"], "Te falta un paso para activar tu cuenta - Cortexia Optical",
+                              html_body, tag="registration_reminder")
+            sent += 1
+        except Exception as e:
+            logger.warning(f"No se pudo encolar recordatorio a {reg.get('email')}: {e}")
+    if sent:
+        logger.info(f"[registration-reminders] {sent} recordatorio(s) encolado(s).")
+    return sent
+
+
+@cron_router.post("/registration-reminders")
+async def cron_registration_reminders(request: Request):
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    if not _cron_authorized(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    asyncio.create_task(_send_registration_reminders_job())
+    return {"ok": True}
+

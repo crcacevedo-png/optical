@@ -72,6 +72,7 @@ api_router.include_router(email_queue_admin.router)
 api_router.include_router(leads.router)
 api_router.include_router(registration.router)
 api_router.include_router(billing.cron_router)
+api_router.include_router(registration.cron_router)
 # Cron de la plataforma (Bearer WEBHOOK_CRON_SECRET) va bajo /api/cron/* via api_router.
 
 # Global search

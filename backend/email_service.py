@@ -757,3 +757,35 @@ def render_welcome_self_service(admin_name: str, company_name: str, login_link: 
       </p>
     """
     return _wrapper(content, f"Bienvenido, {company_name}")
+
+
+def render_registration_reminder(name: str, optica_name: str, verify_link: str, hours_left: int = 24) -> str:
+    """Recordatorio a quienes se registraron pero aun no verificaron su correo."""
+    name, optica_name = _e(name), _e(optica_name)
+    content = f"""
+      <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{name}</strong>,</p>
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+        Notamos que empezaste a crear la cuenta de tu optica
+        <strong style="color:{BRAND_DARK};">{optica_name}</strong> en Cortexia Optical, pero aun no confirmaste tu correo.
+        Estas a un solo clic de activarla y empezar gratis.
+      </p>
+      {_button("Activar mi cuenta ahora", verify_link, BRAND_EMERALD)}
+      <div style="background-color:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:14px 18px;margin:20px 0;">
+        <p style="color:#065F46;font-size:13px;margin:0;line-height:1.6;">
+          El <strong>Plan gratuito</strong> te deja registrar pacientes, recetas y ventas sin costo y sin tarjeta.
+          Cuando crezcas, actualizas de plan desde la app.
+        </p>
+      </div>
+      <div style="background-color:#FEF3C7;border-left:3px solid #F59E0B;padding:12px 16px;border-radius:6px;margin:24px 0;">
+        <p style="color:#92400E;font-size:13px;margin:0;line-height:1.5;">
+          <strong>No lo dejes pasar:</strong> este enlace vence en aproximadamente <strong>{hours_left} horas</strong>.
+          Despues tendras que registrarte de nuevo.
+        </p>
+      </div>
+      <p style="color:{TEXT_MUTED};font-size:12px;line-height:1.5;margin:24px 0 0 0;">
+        Si el boton no funciona, copia y pega este enlace en tu navegador:<br>
+        <span style="word-break:break-all;color:#475569;">{verify_link}</span>
+      </p>
+    """
+    return _wrapper(content, "Te falta un paso")
+

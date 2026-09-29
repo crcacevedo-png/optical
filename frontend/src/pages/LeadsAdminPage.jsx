@@ -73,6 +73,14 @@ export default function LeadsAdminPage() {
   const [creating, setCreating] = useState(false);
   const [limitDrafts, setLimitDrafts] = useState({});
 
+  // Autoservicio (registros self-service)
+  const [regItems, setRegItems] = useState([]);
+  const [regStats, setRegStats] = useState({ total: 0, verificada: 0, pendiente: 0, expirada: 0 });
+  const [regStatus, setRegStatus] = useState('');
+  const [regSearch, setRegSearch] = useState('');
+  const [regLoading, setRegLoading] = useState(false);
+  const [resendingId, setResendingId] = useState(null);
+
   const copy = (text, msg) => { navigator.clipboard?.writeText(text); toast.success(msg || 'Copiado'); };
 
   const loadStats = useCallback(async () => {
@@ -106,9 +114,33 @@ export default function LeadsAdminPage() {
     catch (err) { toast.error(formatApiErrorDetail(err?.response?.data?.detail) || 'Error al agrupar'); }
   }, []);
 
+  const loadRegistrations = useCallback(async () => {
+    try {
+      setRegLoading(true);
+      const params = {};
+      if (regStatus) params.status = regStatus;
+      if (regSearch.trim()) params.search = regSearch.trim();
+      const { data } = await api.get('/api/registration/admin/list', { params });
+      setRegItems(data.items || []);
+      setRegStats(data.stats || { total: 0, verificada: 0, pendiente: 0, expirada: 0 });
+    } catch (err) { toast.error(formatApiErrorDetail(err?.response?.data?.detail) || 'Error al cargar registros'); }
+    finally { setRegLoading(false); }
+  }, [regStatus, regSearch]);
+
+  const resendReg = async (id) => {
+    try {
+      setResendingId(id);
+      await api.post(`/api/registration/admin/${id}/resend`);
+      toast.success('Correo de verificación reenviado');
+      loadRegistrations();
+    } catch (err) { toast.error(formatApiErrorDetail(err?.response?.data?.detail) || 'No se pudo reenviar'); }
+    finally { setResendingId(null); }
+  };
+
   useEffect(() => { loadStats(); }, [loadStats]);
   useEffect(() => { if (tab === 'envios') loadLeads(); }, [tab, loadLeads]);
   useEffect(() => { if (tab === 'agrupado') loadGrouped(); }, [tab, loadGrouped]);
+  useEffect(() => { if (tab === 'autoservicio') loadRegistrations(); }, [tab, loadRegistrations]);
 
   const doExport = async () => {
     try {
@@ -222,6 +254,7 @@ export default function LeadsAdminPage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList data-testid="leads-tabs">
           <TabsTrigger value="envios" data-testid="tab-envios">Solicitudes</TabsTrigger>
+          <TabsTrigger value="autoservicio" data-testid="tab-autoservicio">Autoservicio</TabsTrigger>
           <TabsTrigger value="agrupado" data-testid="tab-agrupado">Agrupado por código</TabsTrigger>
           <TabsTrigger value="codigos" data-testid="tab-codigos">Códigos</TabsTrigger>
         </TabsList>
@@ -351,6 +384,78 @@ export default function LeadsAdminPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* AUTOSERVICIO */}
+        <TabsContent value="autoservicio">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <StatCard label="Total registros" value={regStats.total} icon={Building2} color="border-indigo-400" testId="reg-stat-total" />
+            <StatCard label="Verificadas" value={regStats.verificada} icon={CheckCircle2} color="border-emerald-400" testId="reg-stat-verificada" />
+            <StatCard label="Pendientes" value={regStats.pendiente} icon={KeyRound} color="border-amber-400" testId="reg-stat-pendiente" />
+            <StatCard label="Expiradas" value={regStats.expirada} icon={AlertTriangle} color="border-slate-300" testId="reg-stat-expirada" />
+          </div>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-end gap-2 flex-wrap mb-4">
+                <div>
+                  <label className="text-xs text-slate-500 block mb-1">Estado</label>
+                  <select value={regStatus} onChange={(e) => setRegStatus(e.target.value)} className="h-9 rounded-md border border-slate-200 text-sm px-2 bg-white" data-testid="reg-filter-status">
+                    <option value="">Todas</option>
+                    <option value="verificada">Verificadas</option>
+                    <option value="pendiente">Pendientes</option>
+                    <option value="expirada">Expiradas</option>
+                  </select>
+                </div>
+                <div className="relative">
+                  <label className="text-xs text-slate-500 block mb-1">Buscar</label>
+                  <Search className="w-4 h-4 text-slate-400 absolute left-2 top-[30px]" />
+                  <Input value={regSearch} onChange={(e) => setRegSearch(e.target.value)} placeholder="Nombre, óptica, correo…" className="h-9 w-64 pl-8" data-testid="reg-search-input" />
+                </div>
+                <Button size="sm" variant="outline" onClick={loadRegistrations} data-testid="reg-refresh-btn"><RefreshCw className="w-4 h-4" /> Actualizar</Button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr className="text-left text-xs uppercase text-slate-500 border-b border-slate-200">
+                    <th className="py-2 px-3">Responsable</th><th className="py-2 px-3">Óptica</th><th className="py-2 px-3">Correo</th><th className="py-2 px-3">Código</th><th className="py-2 px-3 text-center">Tope</th><th className="py-2 px-3">Estado</th><th className="py-2 px-3">Registrado</th><th className="py-2 px-3">Vence / Verificado</th><th className="py-2 px-3 text-right">Acción</th>
+                  </tr></thead>
+                  <tbody data-testid="reg-tbody">
+                    {regLoading ? (
+                      <tr><td colSpan={9} className="py-10 text-center text-slate-400"><Loader2 className="w-6 h-6 mx-auto animate-spin" /></td></tr>
+                    ) : regItems.length === 0 ? (
+                      <tr><td colSpan={9} className="py-10 text-center text-slate-400"><Building2 className="w-8 h-8 mx-auto mb-2 opacity-40" /> Aún no hay registros por autoservicio.</td></tr>
+                    ) : regItems.map((r) => (
+                      <tr key={r.id} className="border-b border-slate-100" data-testid={`reg-row-${r.id}`}>
+                        <td className="py-2.5 px-3">
+                          <div className="font-medium text-slate-700">{r.name || '—'}</div>
+                          {r.whatsapp && <a href={waLink(r.whatsapp)} target="_blank" rel="noreferrer" className="text-xs text-emerald-600 inline-flex items-center gap-1 hover:underline"><MessageCircle className="w-3 h-3" /> {r.whatsapp}</a>}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600">{r.optica_name || '—'}{r.location ? <div className="text-xs text-slate-400">{r.location}</div> : null}</td>
+                        <td className="py-2.5 px-3 text-slate-600">{r.email}</td>
+                        <td className="py-2.5 px-3">{r.promo_code ? <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200" variant="outline">{r.promo_code}</Badge> : <span className="text-slate-300">—</span>}</td>
+                        <td className="py-2.5 px-3 text-center font-semibold">{r.patient_limit || <span className="text-slate-400 font-normal text-xs">50</span>}</td>
+                        <td className="py-2.5 px-3">
+                          {r.status === 'verificada' && <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200" variant="outline" data-testid={`reg-status-${r.id}`}>Verificada</Badge>}
+                          {r.status === 'pendiente' && <Badge className="bg-amber-100 text-amber-700 border-amber-200" variant="outline" data-testid={`reg-status-${r.id}`}>Pendiente</Badge>}
+                          {r.status === 'expirada' && <Badge className="bg-slate-100 text-slate-500 border-slate-200" variant="outline" data-testid={`reg-status-${r.id}`}>Expirada</Badge>}
+                          {r.reminder_sent_at && r.status === 'pendiente' && <div className="text-[10px] text-slate-400 mt-0.5">recordatorio enviado</div>}
+                        </td>
+                        <td className="py-2.5 px-3 text-xs text-slate-500 whitespace-nowrap">{fmtDate(r.created_at)}</td>
+                        <td className="py-2.5 px-3 text-xs text-slate-500 whitespace-nowrap">{r.status === 'verificada' ? fmtDate(r.verified_at) : fmtDate(r.expires_at)}</td>
+                        <td className="py-2.5 px-3 text-right">
+                          {r.status !== 'verificada' ? (
+                            <Button size="sm" variant="outline" className="h-8 text-xs" disabled={resendingId === r.id} onClick={() => resendReg(r.id)} data-testid={`reg-resend-${r.id}`}>
+                              {resendingId === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><RefreshCw className="w-3.5 h-3.5" /> Reenviar</>}
+                            </Button>
+                          ) : <span className="text-slate-300 text-xs">—</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
 
         {/* AGRUPADO */}
         <TabsContent value="agrupado">

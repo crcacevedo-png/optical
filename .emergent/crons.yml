@@ -6,3 +6,10 @@ crons:
     method: POST
     # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
     enabled: true
+  - name: reg-reminders
+    description: "Recordatorio a quienes se registraron por autoservicio pero no verificaron su correo en 24h"
+    cron: "0 */3 * * *"
+    endpoint: "{{BASE_URL}}/api/cron/registration-reminders"
+    method: POST
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    enabled: true
