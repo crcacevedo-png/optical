@@ -9,6 +9,10 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### UI del formulario de registro rediseñada (Jun 2026)
+`SelfRegisterPage.jsx` (`/registro`) rediseñada a layout profesional de dos columnas: panel izquierdo (desktop) con **foto de interior de óptica de fondo** (Unsplash) + overlay azul profundo, wordmark blanco "CORTEXIA OPTICAL", headline con acento teal y 4 bullets de beneficios; panel derecho blanco con el logo + formulario (contraseña/confirmar en 2 columnas). En móvil, hero superior con la misma imagen + overlay y el formulario debajo. Animaciones sutiles (Ken Burns en la imagen, fade-up escalonado), foco teal en inputs y CTA con elevación en hover. Toda la lógica y los `data-testid` se conservaron. Verificado por screenshots (desktop 1920 y móvil 390, sin overflow).
+
+
 
 ### Panel de Registros por Autoservicio + Recordatorio a abandonados (Jun 2026)
 Extensión del autoservicio: visibilidad para el Superadmin y recuperación automática de registros no verificados.
