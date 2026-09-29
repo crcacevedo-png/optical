@@ -340,11 +340,13 @@ async def export_leads(
 class PromoCodeCreate(BaseModel):
     code: str
     label: Optional[str] = ""
+    patient_limit: Optional[int] = None  # tope de pacientes gratuito ampliado (None => usa 50 por defecto)
 
 
 class PromoCodeUpdate(BaseModel):
     is_active: Optional[bool] = None
     label: Optional[str] = None
+    patient_limit: Optional[int] = None
 
 
 @router.get("/codes")
@@ -367,9 +369,17 @@ async def create_promo_code(request: Request, data: PromoCodeCreate, user: dict 
     if await db.promo_codes.find_one({"code": code}, {"_id": 1}):
         raise HTTPException(status_code=409, detail="Ese codigo ya existe.")
     now = datetime.now(timezone.utc).isoformat()
+    plimit = data.patient_limit
+    if plimit is not None:
+        plimit = int(plimit)
+        if plimit <= 0:
+            plimit = None
+        elif plimit > 1000000:
+            raise HTTPException(status_code=400, detail="El limite de pacientes es demasiado alto.")
     doc = {
         "code": code,
         "label": (data.label or "").strip(),
+        "patient_limit": plimit,
         "is_active": True,
         "created_at": now,
         "created_by": user["_id"],
@@ -380,7 +390,7 @@ async def create_promo_code(request: Request, data: PromoCodeCreate, user: dict 
     except DuplicateKeyError:
         raise HTTPException(status_code=409, detail="Ese codigo ya existe.")
     await log_audit("PROMO_CODE_CREATED", actor_id=user["_id"], actor_email=user.get("email"),
-                    actor_role="superadmin", metadata={"code": code}, request=request)
+                    actor_role="superadmin", metadata={"code": code, "patient_limit": plimit}, request=request)
     doc["_id"] = res.inserted_id
     doc["lead_count"] = 0
     return serialize_doc(doc)
@@ -398,6 +408,14 @@ async def update_promo_code(code_id: str, data: PromoCodeUpdate, request: Reques
         upd["is_active"] = data.is_active
     if data.label is not None:
         upd["label"] = data.label.strip()
+    if data.patient_limit is not None:
+        pl = int(data.patient_limit)
+        if pl <= 0:
+            upd["patient_limit"] = None
+        elif pl > 1000000:
+            raise HTTPException(status_code=400, detail="El limite de pacientes es demasiado alto.")
+        else:
+            upd["patient_limit"] = pl
     r = await db.promo_codes.update_one({"_id": oid}, {"$set": upd})
     if r.matched_count == 0:
         raise HTTPException(status_code=404, detail="Codigo no encontrado")

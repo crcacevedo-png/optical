@@ -684,3 +684,76 @@ def render_payment_restored(admin_name: str, company_name: str, plan_name: str) 
       {_button("Ingresar a mi cuenta", app_url, BRAND_EMERALD)}
     """
     return _wrapper(content, "Tu cuenta fue reactivada")
+
+
+
+def render_verify_registration(name: str, optica_name: str, verify_link: str, hours: int = 48) -> str:
+    """Correo de verificacion (doble opt-in) del autoservicio de registro."""
+    name, optica_name = _e(name), _e(optica_name)
+    content = f"""
+      <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{name}</strong>,</p>
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+        Gracias por crear la cuenta de tu optica <strong style="color:{BRAND_DARK};">{optica_name}</strong> en Cortexia Optical.
+        Para activarla y poder ingresar, solo necesitas confirmar tu correo electronico.
+      </p>
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 8px 0;">
+        Haz clic en el siguiente boton para verificar tu correo y activar tu cuenta:
+      </p>
+      {_button("Verificar mi correo y activar", verify_link, BRAND_EMERALD)}
+      <div style="background-color:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:14px 18px;margin:20px 0;">
+        <p style="color:#065F46;font-size:13px;margin:0;line-height:1.6;">
+          Tu cuenta arranca con el <strong>Plan gratuito</strong>: sin tarjeta y sin costo. Empieza hoy mismo a
+          registrar pacientes. Cuando tu optica crezca, podras actualizar de plan desde la app.
+        </p>
+      </div>
+      <div style="background-color:#FEF3C7;border-left:3px solid #F59E0B;padding:12px 16px;border-radius:6px;margin:24px 0;">
+        <p style="color:#92400E;font-size:13px;margin:0;line-height:1.5;">
+          <strong>Importante:</strong> este enlace expira en <strong>{hours} horas</strong> por seguridad.
+          Si no fuiste tu quien se registro, puedes ignorar este mensaje.
+        </p>
+      </div>
+      <p style="color:{TEXT_MUTED};font-size:12px;line-height:1.5;margin:24px 0 0 0;">
+        Si el boton no funciona, copia y pega este enlace en tu navegador:<br>
+        <span style="word-break:break-all;color:#475569;">{verify_link}</span>
+      </p>
+    """
+    return _wrapper(content, "Verifica tu correo")
+
+
+def render_welcome_self_service(admin_name: str, company_name: str, login_link: str) -> str:
+    """Bienvenida tras verificar el correo (autoservicio). El usuario ya definio su
+    propia contrasena, por lo que este correo NO incluye credenciales."""
+    admin_name, company_name = _e(admin_name), _e(company_name)
+    content = f"""
+      <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{admin_name}</strong>,</p>
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+        Tu correo fue verificado y la cuenta de tu optica
+        <strong style="color:{BRAND_DARK};">{company_name}</strong> ya esta <strong style="color:{BRAND_EMERALD};">activa</strong>.
+        Puedes iniciar sesion con el correo y la contrasena que elegiste al registrarte.
+      </p>
+      {_button("Ingresar a Cortexia", login_link, BRAND_EMERALD)}
+      <div style="background:linear-gradient(135deg,#6D35D8 0%,#13B8B0 100%);border-radius:10px;padding:20px 22px;margin:28px 0 8px 0;">
+        <p style="color:#FFFFFF;font-size:13px;margin:0 0 4px 0;font-weight:bold;text-transform:uppercase;letter-spacing:0.6px;opacity:0.85;">Inicio rapido recomendado</p>
+        <p style="color:#FFFFFF;font-size:15px;line-height:1.5;margin:0 0 14px 0;font-weight:600;">
+          Deja tu optica lista en unos minutos con los pasos guiados del Inicio rapido.
+        </p>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+          <td style="background-color:#FFFFFF;border-radius:8px;">
+            <a href="{login_link}/onboarding" style="display:inline-block;padding:11px 22px;color:#0F172A;text-decoration:none;font-size:14px;font-weight:bold;font-family:Helvetica,Arial,sans-serif;">
+              Ir al Inicio rapido &rarr;
+            </a>
+          </td>
+        </tr></table>
+      </div>
+      <div style="background-color:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:14px 18px;margin:20px 0;">
+        <p style="color:#065F46;font-size:13px;margin:0;line-height:1.6;">
+          Estas en el <strong>Plan gratuito</strong>. Cuando te acerques al limite de pacientes, la app te
+          avisara y podras actualizar de plan para seguir creciendo.
+        </p>
+      </div>
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:24px 0 0 0;">
+        Si necesitas ayuda, escribenos a
+        <a href="mailto:info@cortexiagt.com" style="color:{BRAND_TEAL};">info@cortexiagt.com</a>.
+      </p>
+    """
+    return _wrapper(content, f"Bienvenido, {company_name}")

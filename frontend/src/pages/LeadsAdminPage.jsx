@@ -69,7 +69,9 @@ export default function LeadsAdminPage() {
   // Codigos
   const [newCode, setNewCode] = useState('');
   const [newLabel, setNewLabel] = useState('');
+  const [newLimit, setNewLimit] = useState('');
   const [creating, setCreating] = useState(false);
+  const [limitDrafts, setLimitDrafts] = useState({});
 
   const copy = (text, msg) => { navigator.clipboard?.writeText(text); toast.success(msg || 'Copiado'); };
 
@@ -154,12 +156,28 @@ export default function LeadsAdminPage() {
     if (!newCode.trim()) return;
     try {
       setCreating(true);
-      await api.post('/api/leads/codes', { code: newCode.trim(), label: newLabel.trim() });
+      const payload = { code: newCode.trim(), label: newLabel.trim() };
+      const lim = parseInt(newLimit, 10);
+      if (!Number.isNaN(lim) && lim > 0) payload.patient_limit = lim;
+      await api.post('/api/leads/codes', payload);
       toast.success('Código creado');
-      setNewCode(''); setNewLabel('');
+      setNewCode(''); setNewLabel(''); setNewLimit('');
       loadStats();
     } catch (err) { toast.error(formatApiErrorDetail(err?.response?.data?.detail) || 'No se pudo crear'); }
     finally { setCreating(false); }
+  };
+
+  const saveLimit = async (c) => {
+    const raw = limitDrafts[c._id];
+    const parsed = raw === '' || raw === undefined ? 0 : parseInt(raw, 10);
+    if (Number.isNaN(parsed) || parsed < 0) { toast.error('Ingresa un número válido'); return; }
+    try {
+      await api.patch(`/api/leads/codes/${c._id}`, { patient_limit: parsed });
+      const newVal = parsed > 0 ? parsed : null;
+      setCodes((prev) => prev.map((x) => (x._id === c._id ? { ...x, patient_limit: newVal } : x)));
+      setLimitDrafts((d) => { const nd = { ...d }; delete nd[c._id]; return nd; });
+      toast.success(newVal ? `Tope actualizado a ${newVal} pacientes` : 'Tope restablecido a 50 (por defecto)');
+    } catch (err) { toast.error(formatApiErrorDetail(err?.response?.data?.detail) || 'No se pudo actualizar'); }
   };
 
   const toggleCode = async (c) => {
@@ -407,8 +425,13 @@ export default function LeadsAdminPage() {
                   <label className="text-xs text-slate-500 block mb-1">Descripción (opcional)</label>
                   <Input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Campaña de verano" className="h-9 w-64" data-testid="new-code-label-input" />
                 </div>
+                <div>
+                  <label className="text-xs text-slate-500 block mb-1">Tope de pacientes gratis</label>
+                  <Input type="number" min="0" value={newLimit} onChange={(e) => setNewLimit(e.target.value)} placeholder="50 (por defecto)" className="h-9 w-40" data-testid="new-code-limit-input" />
+                </div>
                 <Button type="submit" disabled={creating || !newCode.trim()} data-testid="create-code-btn"><Plus className="w-4 h-4" /> Crear código</Button>
               </form>
+              <p className="text-[11px] text-slate-400 mt-2">El código no da descuento en dinero: amplía el <strong>tope gratuito de pacientes</strong>. Déjalo vacío para usar el tope por defecto (50).</p>
             </CardContent>
           </Card>
           <Card>
@@ -416,15 +439,30 @@ export default function LeadsAdminPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead><tr className="text-left text-xs uppercase text-slate-500 border-b border-slate-200">
-                    <th className="py-2 px-3">Código</th><th className="py-2 px-3">Descripción</th><th className="py-2 px-3 text-center">Leads</th><th className="py-2 px-3">Enlace</th><th className="py-2 px-3 text-right">Activo</th>
+                    <th className="py-2 px-3">Código</th><th className="py-2 px-3">Descripción</th><th className="py-2 px-3 text-center">Tope pacientes</th><th className="py-2 px-3 text-center">Leads</th><th className="py-2 px-3">Enlace</th><th className="py-2 px-3 text-right">Activo</th>
                   </tr></thead>
                   <tbody data-testid="codes-tbody">
                     {codes.length === 0 ? (
-                      <tr><td colSpan={5} className="py-10 text-center text-slate-400"><Ticket className="w-8 h-8 mx-auto mb-2 opacity-40" /> Aún no has creado códigos.</td></tr>
+                      <tr><td colSpan={6} className="py-10 text-center text-slate-400"><Ticket className="w-8 h-8 mx-auto mb-2 opacity-40" /> Aún no has creado códigos.</td></tr>
                     ) : codes.map((c) => (
                       <tr key={c._id} className="border-b border-slate-100" data-testid={`code-row-${c._id}`}>
                         <td className="py-2.5 px-3"><Badge className="bg-indigo-100 text-indigo-700 border-indigo-200" variant="outline">{c.code}</Badge></td>
                         <td className="py-2.5 px-3 text-slate-600">{c.label || <span className="text-slate-300">—</span>}</td>
+                        <td className="py-2.5 px-3">
+                          <div className="flex items-center justify-center gap-1">
+                            <Input
+                              type="number" min="0"
+                              value={limitDrafts[c._id] !== undefined ? limitDrafts[c._id] : (c.patient_limit ?? '')}
+                              placeholder="50"
+                              onChange={(e) => setLimitDrafts((d) => ({ ...d, [c._id]: e.target.value }))}
+                              className="h-8 w-20 text-center" data-testid={`code-limit-input-${c._id}`}
+                            />
+                            {limitDrafts[c._id] !== undefined && String(limitDrafts[c._id]) !== String(c.patient_limit ?? '') && (
+                              <Button size="sm" variant="outline" className="h-8 px-2 text-xs" onClick={() => saveLimit(c)} data-testid={`code-limit-save-${c._id}`}>Guardar</Button>
+                            )}
+                          </div>
+                          {(!c.patient_limit) && <p className="text-[10px] text-slate-400 text-center mt-0.5">por defecto (50)</p>}
+                        </td>
                         <td className="py-2.5 px-3 text-center font-semibold">{c.lead_count ?? 0}</td>
                         <td className="py-2.5 px-3">
                           <span onClick={() => copy(`${publicLink}?codigo=${c.code}`, 'Enlace con código copiado')} className="text-xs text-indigo-600 hover:underline inline-flex items-center gap-1 cursor-pointer" data-testid={`copy-link-${c._id}`}>

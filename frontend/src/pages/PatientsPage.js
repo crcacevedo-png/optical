@@ -339,7 +339,16 @@ export default function PatientsPage() {
       });
       fetchPatients();
     } catch (error) {
-      toast.error(formatApiErrorDetail(error.response?.data?.detail));
+      const detail = error.response?.data?.detail;
+      if (error.response?.status === 403 && typeof detail === 'string' && detail.toLowerCase().includes('limite de pacientes')) {
+        toast.error(detail, {
+          description: 'Actualiza tu plan para seguir agregando pacientes.',
+          action: { label: 'Actualizar plan', onClick: () => { window.location.href = '/my-plan'; } },
+          duration: 8000,
+        });
+      } else {
+        toast.error(formatApiErrorDetail(detail));
+      }
     }
   };
 

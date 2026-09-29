@@ -41,6 +41,8 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import RetentionDashboard from './pages/RetentionDashboard';
 import EmailQueuePage from './pages/EmailQueuePage';
 import PublicLeadFormPage from './pages/PublicLeadFormPage';
+import SelfRegisterPage from './pages/SelfRegisterPage';
+import VerifyRegistrationPage from './pages/VerifyRegistrationPage';
 import LeadsAdminPage from './pages/LeadsAdminPage';
 import CollectionsPage from './pages/CollectionsPage';
 import './App.css';
@@ -52,7 +54,10 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/registro" element={<PublicLeadFormPage />} />
+          <Route path="/registro" element={<SelfRegisterPage />} />
+          <Route path="/verificar-cuenta" element={<VerifyRegistrationPage />} />
+          <Route path="/contacto" element={<PublicLeadFormPage />} />
+          <Route path="/solicitar-plan" element={<PublicLeadFormPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route

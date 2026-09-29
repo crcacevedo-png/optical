@@ -197,6 +197,16 @@ export default function LoginPage() {
                 ¿Olvidaste tu contraseña?
               </Link>
             </div>
+            <div className="text-center pt-2">
+              <span className="text-sm text-slate-500">¿No tienes cuenta? </span>
+              <Link
+                to="/registro"
+                className="text-sm font-semibold text-[#1B2A49] hover:underline"
+                data-testid="login-register-link"
+              >
+                Crear cuenta gratis
+              </Link>
+            </div>
           </form>
         </div>
       </div>

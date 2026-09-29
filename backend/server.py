@@ -20,7 +20,7 @@ from routes import (
     notifications, security, data_export, audit_log, onboarding, health_metrics,
     cash_register, support_tickets, billing, jornadas, jornada_ops, jornada_consignment,
     superadmin_retention, reactivation_feedback, sessions, security_reports, user_guide,
-    email_queue_admin, leads,
+    email_queue_admin, leads, registration,
 )
 
 app = FastAPI(title="Cortexia Optical API")
@@ -70,6 +70,7 @@ api_router.include_router(security_reports.router)
 api_router.include_router(user_guide.router)
 api_router.include_router(email_queue_admin.router)
 api_router.include_router(leads.router)
+api_router.include_router(registration.router)
 api_router.include_router(billing.cron_router)
 # Cron de la plataforma (Bearer WEBHOOK_CRON_SECRET) va bajo /api/cron/* via api_router.
 
@@ -484,6 +485,11 @@ async def startup():
     await db.leads.create_index("source")
     await db.leads.create_index("whatsapp")
     await db.promo_codes.create_index("code", unique=True)
+
+    # --- Autoservicio de registro (verificacion de correo) ---
+    await db.pending_registrations.create_index("token", unique=True)
+    await db.pending_registrations.create_index("email")
+    await db.pending_registrations.create_index("created_at")
 
     logger.info("MongoDB indexes verified/created OK")
 

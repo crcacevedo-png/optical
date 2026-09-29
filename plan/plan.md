@@ -1,68 +1,68 @@
-# Control de Cobros y Suspensión por Impago — Cortexia Optical
+# Autoservicio de registro — Plan Básico (Cortexia Optical)
 
-Sistema automático de gestión de cobros para las membresías de las ópticas: detecta pagos fallidos en Stripe, da 3 días de gracia con avisos, suspende el acceso si no se regulariza y reactiva solo cuando se paga. Incluye alertas al superadmin y a la óptica, más un panel de cobros para el superadmin.
+Permite que un interesado se inscriba solo desde la web, verifique su correo y entre de inmediato a usar el Plan Básico, sin esperar aprobación manual. La meta es eliminar la fricción inicial: de "solicitar y esperar" a "crear cuenta y empezar hoy".
 
 ## Para quién es
-- **Superadmin (dueño de la plataforma):** supervisa el estado de cobro de todas las ópticas, recibe alertas y actúa sobre morosos.
-- **Admin de cada óptica:** recibe avisos de impago y regulariza su pago desde la app.
-- **Vendedores y otros roles de la óptica:** solo se ven afectados por el bloqueo; no participan del cobro.
-- Las cuentas marcadas como **cortesía** quedan siempre exentas (sin costo ni suspensión).
+- Dueños o administradores de ópticas en Latinoamérica que quieren probar Cortexia sin trámites ni contacto previo con ventas.
+- El Superadmin, que deja de crear cuentas Básicas a mano y solo atiende solicitudes de planes superiores.
 
-## Funcionalidades y experiencia
-1. **Detección automática de impago.** El sistema reconoce cuando Stripe marca un pago como fallido y arranca el reloj de gracia.
-2. **Periodo de gracia de 3 días** desde el fallo del pago. Durante la gracia la óptica sigue operando con normalidad, pero ve avisos claros de que debe regularizar.
-3. **Recordatorios escalonados a la óptica** (in-app + correo): al fallar el pago, durante los días de gracia y al momento del bloqueo.
-4. **Suspensión con "muro de pago".** Al terminar la gracia sin pago, la cuenta se suspende: el **admin** solo puede entrar a una pantalla que muestra su estado de cuenta y el enlace para pagar/actualizar su tarjeta; el resto de la app queda bloqueado. Los demás usuarios de esa óptica ven un aviso de "cuenta suspendida, contacta a tu administrador".
-5. **Reactivación automática.** En cuanto el pago se regulariza (Stripe confirma el cobro), la cuenta recupera su plan y el acceso completo, sin intervención manual.
-6. **Alertas al superadmin** (in-app + correo) cuando una óptica cae en impago y cuando se suspende.
-7. **Panel de Cobros del superadmin.** Un tablero para ver de un vistazo: renovaciones próximas, pagos fallidos / en gracia (con días restantes), cuentas suspendidas, e ingresos mensuales en riesgo. Desde ahí se abre la ficha de cada óptica.
-8. **Verificación de monto vs. plan contratado.** El sistema compara lo que Stripe está cobrando contra el precio vigente del plan de esa óptica (mensual/anual). Si no coinciden, marca la cuenta y avisa al superadmin (sin suspender por esta causa).
+## Funcionalidad principal y experiencia
+- **Registro público en una pantalla** (reemplaza el formulario actual de solicitud en `/registro`): la persona ingresa nombre del responsable, nombre de la óptica, correo, contraseña, WhatsApp, ciudad/país, código promocional (opcional) y acepta el consentimiento.
+- **Verificación de correo obligatoria**: al enviar el formulario se manda un correo con un enlace seguro. La cuenta se crea y se activa recién cuando la persona hace clic en ese enlace. Hasta entonces no puede entrar. Incluye botón para reenviar el correo.
+- **Provisión 100% automática**: al verificar, el sistema crea sola la óptica (empresa) y al usuario como Admin, le asigna el Plan Básico y lo deja listo para iniciar sesión. Sin intervención del Superadmin.
+- **Plan Básico gratuito hasta 50 pacientes**: la cuenta funciona sin costo mientras no supere los 50 pacientes activos.
+- **Al llegar al límite, "flujo normal"**: cuando la óptica alcanza su tope de pacientes, el sistema le impide agregar más y le muestra un aviso claro para actualizar de plan y pagar por Stripe (esto ya existe en la app y se reutiliza).
+- **Código promocional con beneficio (límite de pacientes ampliado)**: los códigos ya existen hoy en el área de Solicitudes de cuenta del Superadmin. El beneficio **no es monetario**: es un **límite de pacientes ampliado en el plan gratis**. Cada código tiene un límite de pacientes que el **Superadmin puede modificar en el área de códigos**. Si la persona ingresa un código válido durante el registro, su cuenta arranca con ese tope gratuito (por ejemplo 200 pacientes en lugar de 50). Un código sin límite configurado queda registrado para atribución de campaña y usa el tope por defecto (50), como hoy.
+- **Planes superiores siguen por solicitud**: quien necesite un plan mayor verá un enlace tipo "¿Necesitas un plan superior? Contáctanos" que abre el formulario de solicitud actual y sigue llegando al CRM del Superadmin.
 
-## Flujo de uso
-**Impago (óptica):**
-Pago falla en Stripe → **Día 0:** aviso al admin y al superadmin + banner de gracia con cuenta regresiva de 3 días (sigue operando) → **Días 1–2:** recordatorios de gracia → **Día 3 sin pago:** suspensión + muro de pago → el admin paga o actualiza su tarjeta → **reactivación automática** y recuperación del plan.
+## Flujo del usuario
+1. Desde tu sitio de marketing (`web.cortexiaoptical.com`) hace clic en "Crear cuenta gratis", que lo lleva a la página de registro de la app (`www.cortexiaoptical.com/registro`).
+2. Llena el formulario de registro (incluye contraseña propia y, si tiene, código promocional) y acepta el consentimiento.
+3. Recibe un correo de verificación y hace clic en el enlace.
+4. El sistema crea su óptica y su usuario Admin con Plan Básico y lo lleva a iniciar sesión.
+5. Entra y empieza a cargar pacientes, inventario y ventas de inmediato.
+6. Al acercarse/llegar a 50 pacientes (o al tope ampliado por su código), ve el aviso para actualizar de plan y pagar por Stripe.
 
-**Superadmin:**
-Entra al panel de Cobros → ve quién está por renovar, quién falló, quién está en gracia (y cuántos días le quedan), quién está suspendido y qué cuentas tienen discrepancia de monto → abre la ficha de la óptica para más detalle.
+## Sensación UI/UX
+- Coherente con la identidad actual de Cortexia (azul profundo profesional, estética limpia y sobria de la app).
+- Registro de mínima fricción: una sola pantalla, campos claros, validación en vivo, mensajes de error entendibles y señales de confianza ("sin tarjeta", "empieza gratis hasta 50 pacientes").
+- Estados explícitos: "revisa tu correo para verificar", "correo verificado, ya puedes entrar", "límite alcanzado, actualiza tu plan".
 
-**Verificación de monto:**
-El sistema revisa periódicamente que el cargo activo de cada suscripción coincida con el precio del plan contratado; ante una diferencia, marca la cuenta y notifica al superadmin.
-
-## Sensación de UI/UX
-- Consistente con la estética actual (Shadcn UI, azul navy de Cortexia).
-- Código de color claro: **verde** = al día, **ámbar** = en gracia / por renovar, **rojo** = vencido / suspendido.
-- Durante la gracia, banners visibles pero no bloqueantes; al suspender, un muro de pago simple y directo con un único llamado a la acción ("Pagar ahora").
-- Panel de cobros tipo tablero: tarjetas de indicadores arriba + listas filtrables abajo.
+## Conexión con el sitio web
+- **Sitio de marketing:** `web.cortexiaoptical.com` (WordPress u otra plataforma), separado y sin cambios.
+- **App Cortexia (producción):** `www.cortexiaoptical.com`, con su propia dirección. No hay conflicto: marketing en `web.` y app en `www.`.
+- La conexión es por **enlace**: en tu sitio de marketing (`web.cortexiaoptical.com`) agregas un botón "Crear cuenta gratis" que apunta a `https://www.cortexiaoptical.com/registro`. Ese botón lo configuras tú con tus accesos a la web; del lado de la app yo construyo la página de registro.
+- Los enlaces del correo de verificación se arman desde la variable `APP_URL`, fijada a `https://www.cortexiaoptical.com`, para que apunten a la app y no al sitio de marketing.
 
 ## Fases de implementación
-
 **Fase 1 — MVP (se construye ahora)**
-- Detección de impago vía Stripe y gracia de 3 días desde el fallo.
-- Recordatorios a la óptica (in-app + correo) al fallar, durante la gracia y al bloquear.
-- Suspensión con muro de pago (admin ve estado + enlace de pago; otros usuarios ven aviso).
-- Reactivación automática al regularizar el pago.
-- Alertas al superadmin (in-app + correo) en fallo y en suspensión.
-- Panel de Cobros del superadmin: renovaciones próximas, fallidos/en gracia con días restantes, suspendidos e ingresos en riesgo.
-- Verificación de que el monto cobrado corresponde al plan contratado + alerta de discrepancia.
+- Nueva pantalla de autoservicio en `/registro` (reemplaza el formulario de solicitud para el Plan Básico).
+- Verificación de correo por enlace seguro con expiración y reenvío.
+- Provisión automática de óptica + Admin con Plan Básico al verificar.
+- Nuevo campo "límite de pacientes" en cada código promocional, editable por el Superadmin en el área de códigos existente (Solicitudes de cuenta).
+- Aplicación del límite ampliado del código al registrarse: la cuenta arranca con el tope del código en lugar de 50.
+- Aviso/upsell al alcanzar el límite gratuito, reutilizando el control de pacientes y el pago existente por Stripe.
+- Enlace "Contáctanos" hacia el formulario de solicitud actual para planes superiores.
 
-**Fase 2**
-- Periodo de gracia y cadencia de recordatorios **configurables** por el superadmin (días y textos de los mensajes).
-- Historial de pagos y comprobantes por óptica (descargables).
-- Recordatorios **proactivos antes** del vencimiento (tarjeta por expirar, próximo cargo).
-- Reportes de recuperación de pagos y de bajas por impago (churn).
+**Fase 2 — Más adelante**
+- Tope gratuito configurable por plan (no fijo en 50).
+- Panel del Superadmin para ver registros por autoservicio, estados de verificación y expiraciones.
+- Onboarding de bienvenida más guiado tras el primer ingreso.
 
-**Fase 3**
-- Gestión avanzada: prórrogas manuales del superadmin, pagos parciales, cupones/descuentos.
-- Enganche con facturación fiscal de Guatemala (FEL/SAT) al momento del cobro.
-- Multi-moneda y ajuste fino de los reintentos de cobro.
+**Fase 3 — Futuro**
+- Página pública de marketing con tabla de precios y botón por plan.
+- Correos de seguimiento a registros abandonados (no verificados).
+- Analítica del embudo de registro (visitas → registros → verificados → activos).
 
-## Supuestos
-- Todas las cuentas de pago usan Stripe; **cortesía = exenta** (sin cobro ni suspensión).
-- La gracia de 3 días la controla la plataforma desde que Stripe marca el pago como fallido, independientemente de la ventana de reintentos propia de Stripe; si Stripe recupera el pago más tarde, la cuenta se reactiva sola.
-- "Bloquear" significa **suspender**: el admin de la óptica solo accede al muro de pago (estado + enlace); vendedores y otros roles quedan sin operar y ven "cuenta suspendida, contacta a tu administrador".
-- La **cancelación voluntaria** de la suscripción (al llegar a fin de periodo) también lleva a suspensión, no a un plan gratuito; no hay uso gratuito para cuentas que dejan de pagar (salvo cortesía).
-- Recordatorios durante la gracia: uno al fallar (día 0), uno en cada día de gracia (días 1 y 2) y uno al suspender (día 3). Ajustable si se prefieren menos correos.
-- La reactivación es automática al confirmarse el pago; el superadmin no necesita intervenir (podrá hacerlo manualmente solo en casos especiales, en fases posteriores).
-- La verificación de monto compara el cargo activo de Stripe contra el precio vigente del plan (mensual/anual); una discrepancia se marca y se avisa, pero **no** suspende por sí sola.
-- Las membresías se siguen cobrando en **USD** (la operación de la óptica permanece en Quetzales), como ya está definido.
-- Las alertas usan los canales ya existentes de la plataforma (avisos in-app + correos).
+## Suposiciones (decisiones tomadas sin preguntar)
+- El autoservicio **reemplaza** el formulario de solicitud en la ruta pública `/registro` para el Plan Básico; el formulario/CRM actual se conserva solo para planes superiores, accesible desde un enlace "Contáctanos".
+- La persona **define su propia contraseña** durante el registro (no se envía contraseña temporal). El correo de verificación solo confirma el correo y activa la cuenta.
+- La cuenta y la empresa se **crean al hacer clic en el enlace de verificación** (no antes); el enlace expira a las 48 horas y puede reenviarse.
+- El Plan Básico es el plan marcado como predeterminado de autoservicio; si no hay uno marcado, se usa el plan gratuito con tope de 50 pacientes; en su defecto, el plan más económico.
+- El tope gratuito por defecto es **50 pacientes activos** (coincide con el valor por defecto actual del sistema).
+- El beneficio del código promocional es **exclusivamente un límite de pacientes ampliado en el plan gratis** (no monetario). El número lo configura y edita el Superadmin en el área de códigos ya existente. Se aplica sobre la nueva cuenta como límite efectivo de pacientes al registrarse.
+- Se mantiene el consentimiento obligatorio y las protecciones anti-spam (honeypot + límite de intentos) del formulario actual.
+- La verificación de correo usa el servicio de correo ya integrado (Resend); no se requiere una integración nueva.
+- Las operaciones de la óptica siguen en GTQ; los cobros de membresía siguen en USD por Stripe, sin cambios.
+- La app vive en `www.cortexiaoptical.com` y el sitio de marketing en `web.cortexiaoptical.com`; son dominios distintos, sin conflicto. `APP_URL` se fija a `https://www.cortexiaoptical.com` para los enlaces de la app y del correo de verificación.
+- El botón "Crear cuenta gratis" en el sitio de marketing lo agregas tú (WordPress/plataforma actual); del lado de la app solo se entrega la ruta pública de registro (`/registro`) a la que enlazar.
