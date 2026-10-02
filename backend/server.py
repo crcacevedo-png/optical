@@ -492,6 +492,10 @@ async def startup():
     await db.pending_registrations.create_index("email")
     await db.pending_registrations.create_index("created_at")
 
+    # --- Enlaces de comparticion de recetas (WhatsApp) con expiracion (TTL) ---
+    await db.rx_share_links.create_index("token", unique=True)
+    await db.rx_share_links.create_index("expires_at", expireAfterSeconds=0)
+
     logger.info("MongoDB indexes verified/created OK")
 
     # ═══════════════════════════════════════════════════════════════════

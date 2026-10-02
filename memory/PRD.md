@@ -9,6 +9,14 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Enviar receta al paciente por WhatsApp o correo desde la consulta (Fase 2, Jun 2026)
+En el detalle de la consulta guardada, la lista "Recetas Generadas" ahora muestra por receta (anteojos / lentes de contacto / médica) tres acciones: **PDF** (descargar/imprimir), **WhatsApp** y **Correo**.
+- **WhatsApp (enlace seguro)**: `POST /api/prescriptions/{type}/{rx_id}/share-link` crea un token (`secrets.token_urlsafe(32)`, colección `rx_share_links`, expira a 30 días, env `RX_SHARE_LINK_DAYS`). El frontend arma el mensaje de WhatsApp con el enlace público `${REACT_APP_BACKEND_URL}/api/prescriptions/public/{token}` y abre `wa.me` con el teléfono del paciente. Enlace **público sin auth** `GET /api/prescriptions/public/{token}` valida token+expiración (404 inválido, 410 expirado) y devuelve el PDF `inline`. Índices nuevos: `rx_share_links.token` (unique) + TTL en `expires_at`.
+- **Correo (PDF adjunto)**: `POST /api/prescriptions/{type}/{rx_id}/email` renderiza el PDF y lo envía al correo del paciente vía `queue_email(..., attachments=[{filename, content, content_type}])` con plantilla `render_prescription_email` (email_service). Si el paciente no tiene correo → 400 con aviso (sin input manual, por decisión del usuario). El envío real depende de Resend configurado (producción).
+- Reutiliza los renderizadores de PDF existentes (`_render_eyeglass_pdf`/`_render_contact_pdf`/`_render_medical_pdf`) vía un registry por tipo. Frontend en `ConsultationsPage.js` (`rxRow`, `shareRxWhatsApp`, `emailRx`).
+- **Verificado**: curl E2E (share-link→token 30d; público 200 PDF válido; token inválido 404; email 400 sin correo / 200 con adjunto encolado) + screenshot del detalle con los 3 botones por receta. Datos de prueba limpiados.
+
+
 ### Refracciones en consulta → receta imprimible (Jun 2026)
 Fase 1 (MVP) del plan aprobado, 100% frontend (backend de recetas/PDF ya existía). En `ConsultationsPage.js`:
 - **Área "Refracción y receta" reubicada**: ahora aparece después de "Plan / Tratamiento" y "Recomendaciones", antes de "Observaciones" (antes estaba antes del diagnóstico). Se conserva agregar/quitar varias refracciones (OD/OS: Esfera, Cilindro, Eje, Adición + nota).

@@ -14,6 +14,9 @@ from reportlab.lib.utils import ImageReader
 from db import db, serialize_doc, calculate_age, UPLOADS_DIR
 from auth_utils import get_current_user
 from models import EyeglassPrescriptionCreate, ContactLensPrescriptionCreate, MedicalPrescriptionCreate
+from email_service import queue_email, render_prescription_email
+import os
+import secrets
 
 router = APIRouter(prefix="/prescriptions", tags=["Recetas"])
 
@@ -614,5 +617,97 @@ async def get_medical_prescription_pdf(rx_id: str, user: dict = Depends(get_curr
     patient = await db.patients.find_one({"_id": rx["patient_id"]})
     company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
     pdf_bytes = await asyncio.to_thread(_render_medical_pdf, rx, patient, company)
+
+# ==================== ENVIO AL PACIENTE (enlace WhatsApp + correo con PDF) ====================
+SHARE_LINK_DAYS = int(os.environ.get("RX_SHARE_LINK_DAYS", "30"))
+
+
+def _rx_registry():
+    """type -> (coleccion, render_fn, etiqueta, prefijo_archivo). Definido como funcion
+    para usar los _render_* ya declarados arriba en el modulo."""
+    return {
+        "eyeglass": (db.eyeglass_prescriptions, _render_eyeglass_pdf, "anteojos", "receta_anteojos"),
+        "contact": (db.contact_lens_prescriptions, _render_contact_pdf, "lentes de contacto", "receta_contacto"),
+        "medical": (db.medical_prescriptions, _render_medical_pdf, "medica", "receta_medica"),
+    }
+
+
+async def _load_rx_ctx(rx_type: str, rx_id: str, company_id: str):
+    reg = _rx_registry().get(rx_type)
+    if not reg:
+        raise HTTPException(status_code=404, detail="Tipo de receta invalido")
+    coll, render, label, fileprefix = reg
+    rx = await coll.find_one({"_id": ObjectId(rx_id)})
+    if not rx or str(rx["company_id"]) != str(company_id):
+        raise HTTPException(status_code=404, detail="Receta no encontrada")
+    patient = await db.patients.find_one({"_id": rx["patient_id"]}) if rx.get("patient_id") else None
+    company = await db.companies.find_one({"_id": ObjectId(company_id)})
+    return rx, patient, company, render, label, fileprefix
+
+
+@router.post("/{rx_type}/{rx_id}/share-link")
+async def create_rx_share_link(rx_type: str, rx_id: str, user: dict = Depends(get_current_user)):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    rx, _patient, _company, _render, _label, _fp = await _load_rx_ctx(rx_type, rx_id, user["company_id"])
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    await db.rx_share_links.insert_one({
+        "token": token,
+        "rx_type": rx_type,
+        "rx_id": ObjectId(rx_id),
+        "company_id": ObjectId(user["company_id"]),
+        "created_at": now.isoformat(),
+        "created_by": ObjectId(user["_id"]),
+        "expires_at": now + timedelta(days=SHARE_LINK_DAYS),
+    })
+    return {"token": token, "expires_in_days": SHARE_LINK_DAYS}
+
+
+@router.get("/public/{token}")
+async def public_rx_pdf(token: str):
+    """Descarga publica (sin auth) de la receta mediante un token con expiracion.
+    El enlace se comparte por WhatsApp para que el paciente obtenga su PDF."""
+    link = await db.rx_share_links.find_one({"token": token})
+    if not link:
+        raise HTTPException(status_code=404, detail="Enlace invalido o no encontrado")
+    exp = link.get("expires_at")
+    if isinstance(exp, datetime):
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp < datetime.now(timezone.utc):
+            raise HTTPException(status_code=410, detail="El enlace expiro")
+    reg = _rx_registry().get(link.get("rx_type"))
+    if not reg:
+        raise HTTPException(status_code=404, detail="Receta no encontrada")
+    coll, render, _label, fileprefix = reg
+    rx = await coll.find_one({"_id": link["rx_id"]})
+    if not rx:
+        raise HTTPException(status_code=404, detail="Receta no encontrada")
+    patient = await db.patients.find_one({"_id": rx["patient_id"]}) if rx.get("patient_id") else None
+    company = await db.companies.find_one({"_id": rx["company_id"]})
+    pdf_bytes = await asyncio.to_thread(render, rx, patient, company)
+    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
+                             headers={"Content-Disposition": f"inline; filename={fileprefix}_{str(rx['_id'])}.pdf"})
+
+
+@router.post("/{rx_type}/{rx_id}/email")
+async def email_rx_to_patient(rx_type: str, rx_id: str, user: dict = Depends(get_current_user)):
+    if user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    rx, patient, company, render, label, fileprefix = await _load_rx_ctx(rx_type, rx_id, user["company_id"])
+    to_email = (patient or {}).get("email")
+    if not to_email:
+        raise HTTPException(status_code=400, detail="El paciente no tiene correo registrado.")
+    pdf_bytes = await asyncio.to_thread(render, rx, patient, company)
+    pname = f"{patient.get('first_name', '')} {patient.get('last_name', '')}".strip() if patient else ""
+    cname = (company or {}).get("name") or "tu optica"
+    subject = f"Tu receta de {label} - {cname}"
+    html_body = render_prescription_email(pname, label, cname)
+    await queue_email(to_email, subject, html_body, tag="prescription", attachments=[
+        {"filename": f"{fileprefix}.pdf", "content": pdf_bytes, "content_type": "application/pdf"},
+    ])
+    return {"ok": True, "email": to_email}
+
     return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
                            headers={"Content-Disposition": f"attachment; filename=receta_medica_{rx_id}.pdf"})

@@ -789,3 +789,27 @@ def render_registration_reminder(name: str, optica_name: str, verify_link: str, 
     """
     return _wrapper(content, "Te falta un paso")
 
+
+
+def render_prescription_email(patient_name: str, label: str, company_name: str) -> str:
+    """Correo al paciente con su receta adjunta en PDF."""
+    patient_name = _e(patient_name) or "paciente"
+    label, company_name = _e(label), _e(company_name)
+    content = f"""
+      <p style="color:#0F172A;font-size:15px;line-height:1.6;margin:0 0 16px 0;">Hola <strong>{patient_name}</strong>,</p>
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+        Adjunto encontraras tu <strong>receta de {label}</strong> emitida por
+        <strong style="color:{BRAND_DARK};">{company_name}</strong>. Puedes descargarla, guardarla o imprimirla
+        cuando la necesites.
+      </p>
+      <div style="background-color:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:14px 18px;margin:20px 0;">
+        <p style="color:#065F46;font-size:13px;margin:0;line-height:1.6;">
+          El documento PDF viene como archivo adjunto en este mismo correo.
+        </p>
+      </div>
+      <p style="color:#475569;font-size:14px;line-height:1.6;margin:20px 0 0 0;">
+        Si tienes dudas sobre tu receta, contacta a tu optica. Gracias por tu confianza.
+      </p>
+    """
+    return _wrapper(content, f"Tu receta de {label}")
+

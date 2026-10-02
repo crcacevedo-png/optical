@@ -12,11 +12,13 @@ import { Checkbox } from '../components/ui/checkbox';
 import { BranchFilter } from '../components/BranchFilter';
 import {
   Plus, Trash2, Search, Eye, Glasses, Pencil, Stethoscope, FileText, Pill,
-  Clock, User, CalendarIcon, ChevronRight, Save, ArrowLeft
+  Clock, User, CalendarIcon, ChevronRight, Save, ArrowLeft, MessageCircle, Mail, Download, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EyeglassRxDialog, ContactRxDialog, MedicalRxDialog } from '../components/patients/PatientDialogs';
 import { NextAppointmentDialog } from '../components/appointments/NextAppointmentDialog';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const CONSULTATION_TYPES = [
   { value: 'control', label: 'Control' },
@@ -84,6 +86,7 @@ export default function ConsultationsPage() {
   const [eyeglassForm, setEyeglassForm] = useState(emptyEyeglassForm);
   // Contexto de impresion de receta (paciente/consulta origen): funciona desde el formulario o el detalle
   const [rxContext, setRxContext] = useState({ patient_id: null, consultation_id: null, professional_name: null });
+  const [sendingRx, setSendingRx] = useState(null);
 
   // Contact lens Rx from consultation
   const emptyContactForm = { od_power: '', od_bc: '', od_dia: '', od_cylinder: '', od_axis: '', od_addition: '', oi_power: '', oi_bc: '', oi_dia: '', oi_cylinder: '', oi_axis: '', oi_addition: '', brand: '', lens_type: '', replacement: '', observations: '' };
@@ -235,6 +238,51 @@ export default function ConsultationsPage() {
       toast.error('La receta se guardo, pero no se pudo abrir el PDF.');
     }
   };
+
+  const RX_LABELS = { eyeglass: 'anteojos', contact: 'lentes de contacto', medical: 'medica' };
+  const shareRxWhatsApp = async (type, rx) => {
+    const phone = (selectedConsultation?.patient_phone || '').replace(/\D/g, '');
+    if (!phone) { toast.error('El paciente no tiene telefono registrado'); return; }
+    setSendingRx(`${type}-${rx._id}-wa`);
+    try {
+      const { data } = await api.post(`/api/prescriptions/${type}/${rx._id}/share-link`);
+      const url = `${API_URL}/api/prescriptions/public/${data.token}`;
+      const name = selectedConsultation?.patient_name || '';
+      const msg = `Hola ${name}, aqui tienes tu receta de ${RX_LABELS[type]}. Puedes descargarla o imprimirla desde este enlace: ${url}`;
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+      toast.success('Se abrio WhatsApp con el enlace de la receta');
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err?.response?.data?.detail) || 'No se pudo generar el enlace');
+    } finally {
+      setSendingRx(null);
+    }
+  };
+  const emailRx = async (type, rx) => {
+    setSendingRx(`${type}-${rx._id}-mail`);
+    try {
+      const { data } = await api.post(`/api/prescriptions/${type}/${rx._id}/email`);
+      toast.success(`Receta enviada al correo del paciente (${data.email})`);
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err?.response?.data?.detail) || 'No se pudo enviar el correo');
+    } finally {
+      setSendingRx(null);
+    }
+  };
+  const rxRow = (type, rx, Icon, iconColor, label) => (
+    <div key={`${type}-${rx._id}`} className="flex flex-wrap items-center gap-1.5 text-sm py-1.5 border-b border-slate-50 last:border-0" data-testid={`rx-row-${type}-${rx._id}`}>
+      <Icon className={`w-3.5 h-3.5 ${iconColor}`} />
+      <span className="flex-1 min-w-[110px] text-slate-700">{label} <span className="text-slate-400">({formatDate(rx.created_at)})</span></span>
+      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => openRxPdf(type, rx._id)} data-testid={`rx-pdf-${type}-${rx._id}`}>
+        <Download className="w-3.5 h-3.5 mr-1" /> PDF
+      </Button>
+      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-green-700 hover:bg-green-50" disabled={sendingRx === `${type}-${rx._id}-wa`} onClick={() => shareRxWhatsApp(type, rx)} data-testid={`rx-wa-${type}-${rx._id}`}>
+        {sendingRx === `${type}-${rx._id}-wa` ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5 mr-1" />} WhatsApp
+      </Button>
+      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-blue-700 hover:bg-blue-50" disabled={sendingRx === `${type}-${rx._id}-mail`} onClick={() => emailRx(type, rx)} data-testid={`rx-mail-${type}-${rx._id}`}>
+        {sendingRx === `${type}-${rx._id}-mail` ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Mail className="w-3.5 h-3.5 mr-1" />} Correo
+      </Button>
+    </div>
+  );
 
   const handleCreateEyeglassRx = async () => {
     if (!rxContext.patient_id) { toast.error('Seleccione un paciente'); return; }
@@ -911,24 +959,10 @@ export default function ConsultationsPage() {
               {((c.eyeglass_prescriptions?.length || 0) + (c.medical_prescriptions?.length || 0) + (c.contact_prescriptions?.length || 0)) > 0 && (
                 <div className="pt-3 border-t">
                   <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Recetas Generadas</p>
-                  {(c.eyeglass_prescriptions || []).map((rx) => (
-                    <div key={rx._id} className="flex items-center gap-2 text-sm py-1">
-                      <FileText className="w-3.5 h-3.5 text-blue-500" />
-                      <span>Anteojos ({formatDate(rx.created_at)})</span>
-                    </div>
-                  ))}
-                  {(c.contact_prescriptions || []).map((rx) => (
-                    <div key={rx._id} className="flex items-center gap-2 text-sm py-1">
-                      <FileText className="w-3.5 h-3.5 text-teal-500" />
-                      <span>Lentes de contacto ({formatDate(rx.created_at)})</span>
-                    </div>
-                  ))}
-                  {(c.medical_prescriptions || []).map((rx) => (
-                    <div key={rx._id} className="flex items-center gap-2 text-sm py-1">
-                      <Pill className="w-3.5 h-3.5 text-purple-500" />
-                      <span>Medica ({formatDate(rx.created_at)})</span>
-                    </div>
-                  ))}
+                  <p className="text-[11px] text-slate-400 mb-2">Descarga el PDF o envialo al paciente por WhatsApp o correo.</p>
+                  {(c.eyeglass_prescriptions || []).map((rx) => rxRow('eyeglass', rx, FileText, 'text-blue-500', 'Anteojos'))}
+                  {(c.contact_prescriptions || []).map((rx) => rxRow('contact', rx, FileText, 'text-teal-500', 'Lentes de contacto'))}
+                  {(c.medical_prescriptions || []).map((rx) => rxRow('medical', rx, Pill, 'text-purple-500', 'Medica'))}
                 </div>
               )}
             </CardContent>
