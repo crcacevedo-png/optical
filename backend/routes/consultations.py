@@ -109,6 +109,14 @@ async def create_consultation(data: ConsultationCreate, user: dict = Depends(get
         "va_pinhole_od": data.va_pinhole_od or "",
         "va_pinhole_oi": data.va_pinhole_oi or "",
         "visual_acuity_method": data.visual_acuity_method or "",
+        "lensometry_od_sphere": data.lensometry_od_sphere or "",
+        "lensometry_od_cyl": data.lensometry_od_cyl or "",
+        "lensometry_od_axis": data.lensometry_od_axis or "",
+        "lensometry_od_add": data.lensometry_od_add or "",
+        "lensometry_oi_sphere": data.lensometry_oi_sphere or "",
+        "lensometry_oi_cyl": data.lensometry_oi_cyl or "",
+        "lensometry_oi_axis": data.lensometry_oi_axis or "",
+        "lensometry_oi_add": data.lensometry_oi_add or "",
         "refractions": [r.model_dump() for r in (data.refractions or [])],
         "created_by": ObjectId(user["_id"]),
         "created_at": now.isoformat(),
@@ -170,7 +178,9 @@ async def update_consultation(consultation_id: str, data: ConsultationUpdate, us
         "family_high_myopia", "family_high_myopia_relationship", "family_other_history",
         "va_distance_without_rx_od", "va_distance_without_rx_oi", "va_distance_with_rx_od", "va_distance_with_rx_oi",
         "va_near_without_rx_od", "va_near_without_rx_oi", "va_near_with_rx_od", "va_near_with_rx_oi",
-        "va_pinhole_od", "va_pinhole_oi", "visual_acuity_method"
+        "va_pinhole_od", "va_pinhole_oi", "visual_acuity_method",
+        "lensometry_od_sphere", "lensometry_od_cyl", "lensometry_od_axis", "lensometry_od_add",
+        "lensometry_oi_sphere", "lensometry_oi_cyl", "lensometry_oi_axis", "lensometry_oi_add"
     ]
     for field in all_fields:
         val = getattr(data, field, None)

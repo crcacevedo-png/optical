@@ -317,6 +317,14 @@ class ConsultationCreate(BaseModel):
     va_pinhole_od: Optional[str] = None
     va_pinhole_oi: Optional[str] = None
     visual_acuity_method: Optional[str] = None
+    lensometry_od_sphere: Optional[str] = None
+    lensometry_od_cyl: Optional[str] = None
+    lensometry_od_axis: Optional[str] = None
+    lensometry_od_add: Optional[str] = None
+    lensometry_oi_sphere: Optional[str] = None
+    lensometry_oi_cyl: Optional[str] = None
+    lensometry_oi_axis: Optional[str] = None
+    lensometry_oi_add: Optional[str] = None
     refractions: Optional[List[Refraction]] = None
 
 class ConsultationUpdate(BaseModel):
@@ -360,6 +368,14 @@ class ConsultationUpdate(BaseModel):
     va_pinhole_od: Optional[str] = None
     va_pinhole_oi: Optional[str] = None
     visual_acuity_method: Optional[str] = None
+    lensometry_od_sphere: Optional[str] = None
+    lensometry_od_cyl: Optional[str] = None
+    lensometry_od_axis: Optional[str] = None
+    lensometry_od_add: Optional[str] = None
+    lensometry_oi_sphere: Optional[str] = None
+    lensometry_oi_cyl: Optional[str] = None
+    lensometry_oi_axis: Optional[str] = None
+    lensometry_oi_add: Optional[str] = None
     refractions: Optional[List[Refraction]] = None
 
 class SupplierCreate(BaseModel):

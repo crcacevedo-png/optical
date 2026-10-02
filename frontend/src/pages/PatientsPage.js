@@ -44,12 +44,14 @@ const defaultClinicalFields = {
 };
 
 const CONSULTATION_TYPES = [
-  { value: 'general', label: 'Consulta General' },
   { value: 'control', label: 'Control' },
   { value: 'urgencia', label: 'Urgencia' },
   { value: 'primera_vez', label: 'Primera Vez' },
-  { value: 'seguimiento', label: 'Seguimiento' },
 ];
+const CONSULTATION_TYPE_LABELS = {
+  general: 'Consulta General', control: 'Control', urgencia: 'Urgencia',
+  primera_vez: 'Primera Vez', seguimiento: 'Seguimiento',
+};
 
 export default function PatientsPage() {
   const { user } = useAuth();
@@ -80,7 +82,7 @@ export default function PatientsPage() {
   const [consultationForm, setConsultationForm] = useState({
     consultation_date: new Date().toISOString().slice(0, 10),
     consultation_time: new Date().toTimeString().slice(0, 5),
-    consultation_type: 'general',
+    consultation_type: 'primera_vez',
     chief_complaint: '',
     anamnesis: '',
     findings: '',
@@ -163,7 +165,7 @@ export default function PatientsPage() {
     setConsultationForm({
       consultation_date: new Date().toISOString().slice(0, 10),
       consultation_time: new Date().toTimeString().slice(0, 5),
-      consultation_type: 'general',
+      consultation_type: 'primera_vez',
       chief_complaint: '',
       anamnesis: '',
       findings: '',
@@ -528,7 +530,7 @@ export default function PatientsPage() {
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-semibold text-pine-700">{con.consultation_date?.slice(0, 10)}</span>
-                                <span className="px-2 py-0.5 bg-pine-50 text-pine-600 text-[10px] rounded-full font-medium">{con.consultation_type}</span>
+                                <span className="px-2 py-0.5 bg-pine-50 text-pine-600 text-[10px] rounded-full font-medium">{CONSULTATION_TYPE_LABELS[con.consultation_type] || con.consultation_type}</span>
                               </div>
                               <span className="text-xs text-slate-400">{con.professional_name || ''}</span>
                             </div>

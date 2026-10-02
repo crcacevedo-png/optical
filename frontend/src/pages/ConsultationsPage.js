@@ -19,12 +19,15 @@ import { EyeglassRxDialog, ContactRxDialog, MedicalRxDialog } from '../component
 import { NextAppointmentDialog } from '../components/appointments/NextAppointmentDialog';
 
 const CONSULTATION_TYPES = [
-  { value: 'general', label: 'Consulta General' },
   { value: 'control', label: 'Control' },
   { value: 'urgencia', label: 'Urgencia' },
   { value: 'primera_vez', label: 'Primera Vez' },
-  { value: 'seguimiento', label: 'Seguimiento' },
 ];
+// Incluye tipos retirados del menu para etiquetar correctamente consultas antiguas
+const CONSULTATION_TYPE_LABELS = {
+  general: 'Consulta General', control: 'Control', urgencia: 'Urgencia',
+  primera_vez: 'Primera Vez', seguimiento: 'Seguimiento',
+};
 
 const formatDate = (d) => {
   if (!d) return '';
@@ -49,6 +52,8 @@ export default function ConsultationsPage() {
   const defaultClinical = {
     wears_glasses: false, glasses_since: '', glasses_type: '',
     lensometry_od: '', lensometry_oi: '',
+    lensometry_od_sphere: '', lensometry_od_cyl: '', lensometry_od_axis: '', lensometry_od_add: '',
+    lensometry_oi_sphere: '', lensometry_oi_cyl: '', lensometry_oi_axis: '', lensometry_oi_add: '',
     ocular_surgeries: '', ocular_trauma: '', ocular_diseases: '',
     diabetes: false, hypertension: false, autoimmune_disease: false, autoimmune_details: '',
     current_medications: '', allergies: '',
@@ -66,7 +71,7 @@ export default function ConsultationsPage() {
   const [form, setForm] = useState({
     patient_id: '', consultation_date: new Date().toISOString().slice(0, 10),
     consultation_time: new Date().toTimeString().slice(0, 5),
-    consultation_type: 'general', chief_complaint: '', anamnesis: '',
+    consultation_type: 'primera_vez', chief_complaint: '', anamnesis: '',
     findings: '', diagnosis: '', treatment_plan: '', recommendations: '', notes: '',
     refractions: [],
     ...defaultClinical
@@ -116,7 +121,7 @@ export default function ConsultationsPage() {
     setForm({
       patient_id: '', consultation_date: new Date().toISOString().slice(0, 10),
       consultation_time: new Date().toTimeString().slice(0, 5),
-      consultation_type: 'general', chief_complaint: '', anamnesis: '',
+      consultation_type: 'primera_vez', chief_complaint: '', anamnesis: '',
       findings: '', diagnosis: '', treatment_plan: '', recommendations: '', notes: '',
       refractions: [],
       ...defaultClinical
@@ -141,7 +146,7 @@ export default function ConsultationsPage() {
     setForm({
       patient_id: c.patient_id, consultation_date: c.consultation_date,
       consultation_time: c.consultation_time || '',
-      consultation_type: c.consultation_type || 'general',
+      consultation_type: c.consultation_type || 'primera_vez',
       chief_complaint: c.chief_complaint || '', anamnesis: c.anamnesis || '',
       findings: c.findings || '', diagnosis: c.diagnosis || '',
       treatment_plan: c.treatment_plan || '', recommendations: c.recommendations || '',
@@ -149,6 +154,8 @@ export default function ConsultationsPage() {
       refractions: c.refractions || [],
       wears_glasses: c.wears_glasses || false, glasses_since: c.glasses_since || '',
       glasses_type: c.glasses_type || '', lensometry_od: c.lensometry_od || '', lensometry_oi: c.lensometry_oi || '', ocular_surgeries: c.ocular_surgeries || '',
+      lensometry_od_sphere: c.lensometry_od_sphere || '', lensometry_od_cyl: c.lensometry_od_cyl || '', lensometry_od_axis: c.lensometry_od_axis || '', lensometry_od_add: c.lensometry_od_add || '',
+      lensometry_oi_sphere: c.lensometry_oi_sphere || '', lensometry_oi_cyl: c.lensometry_oi_cyl || '', lensometry_oi_axis: c.lensometry_oi_axis || '', lensometry_oi_add: c.lensometry_oi_add || '',
       ocular_trauma: c.ocular_trauma || '', ocular_diseases: c.ocular_diseases || '',
       diabetes: c.diabetes || false, hypertension: c.hypertension || false,
       autoimmune_disease: c.autoimmune_disease || false, autoimmune_details: c.autoimmune_details || '',
@@ -186,6 +193,8 @@ export default function ConsultationsPage() {
           findings: form.findings, diagnosis: form.diagnosis,
           treatment_plan: form.treatment_plan, recommendations: form.recommendations,
           notes: form.notes,
+          lensometry_od_sphere: form.lensometry_od_sphere, lensometry_od_cyl: form.lensometry_od_cyl, lensometry_od_axis: form.lensometry_od_axis, lensometry_od_add: form.lensometry_od_add,
+          lensometry_oi_sphere: form.lensometry_oi_sphere, lensometry_oi_cyl: form.lensometry_oi_cyl, lensometry_oi_axis: form.lensometry_oi_axis, lensometry_oi_add: form.lensometry_oi_add,
           refractions: form.refractions
         });
         toast.success('Consulta actualizada');
@@ -379,7 +388,7 @@ export default function ConsultationsPage() {
                     <TableCell className="font-medium text-sm">{c.patient_name || '-'}</TableCell>
                     <TableCell>
                       <span className="px-2 py-0.5 bg-pine-50 text-pine-700 text-xs rounded-full font-medium">
-                        {CONSULTATION_TYPES.find(t => t.value === c.consultation_type)?.label || c.consultation_type}
+                        {CONSULTATION_TYPE_LABELS[c.consultation_type] || c.consultation_type}
                       </span>
                     </TableCell>
                     <TableCell className="text-sm text-slate-600 max-w-[200px] truncate">{c.chief_complaint}</TableCell>
@@ -513,19 +522,6 @@ export default function ConsultationsPage() {
                           onChange={(e) => setForm(f => ({ ...f, glasses_since: e.target.value }))} className="h-8 text-sm" />
                         <Input placeholder="Tipo de lentes" value={form.glasses_type}
                           onChange={(e) => setForm(f => ({ ...f, glasses_type: e.target.value }))} className="h-8 text-sm" />
-                        <div className="pt-1 space-y-1.5">
-                          <Label className="text-xs text-slate-500">Lensometria actual</Label>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-blue-700 w-7">OD</span>
-                            <Input placeholder="Graduacion actual OD" value={form.lensometry_od}
-                              onChange={(e) => setForm(f => ({ ...f, lensometry_od: e.target.value }))} className="h-8 text-sm" data-testid="form-lensometry-od" />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-green-700 w-7">OS</span>
-                            <Input placeholder="Graduacion actual OS" value={form.lensometry_oi}
-                              onChange={(e) => setForm(f => ({ ...f, lensometry_oi: e.target.value }))} className="h-8 text-sm" data-testid="form-lensometry-os" />
-                          </div>
-                        </div>
                       </div>
                     )}
                   </div>
@@ -686,9 +682,48 @@ export default function ConsultationsPage() {
             </CardContent>
           </Card>
 
-          {/* IV. Hallazgos, Diagnostico, Plan */}
+          {/* IV. Lensometria */}
           <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-sm text-slate-500">IV. Hallazgos y Plan</CardTitle></CardHeader>
+            <CardHeader className="pb-3"><CardTitle className="text-sm text-slate-500">IV. Lensometria</CardTitle></CardHeader>
+            <CardContent>
+              <p className="text-xs text-slate-400 mb-3">Graduacion actual de los lentes del paciente (opcional).</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" data-testid="lensometry-table">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500 uppercase">Ojo</th>
+                      <th className="text-center py-2 px-2 text-xs font-semibold text-slate-500 uppercase">Esfera</th>
+                      <th className="text-center py-2 px-2 text-xs font-semibold text-slate-500 uppercase">Cilindro</th>
+                      <th className="text-center py-2 px-2 text-xs font-semibold text-slate-500 uppercase">Eje</th>
+                      <th className="text-center py-2 px-2 text-xs font-semibold text-slate-500 uppercase">ADD</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { eye: 'OD', color: 'text-blue-700', sphere: 'lensometry_od_sphere', cyl: 'lensometry_od_cyl', axis: 'lensometry_od_axis', add: 'lensometry_od_add' },
+                      { eye: 'OS', color: 'text-green-700', sphere: 'lensometry_oi_sphere', cyl: 'lensometry_oi_cyl', axis: 'lensometry_oi_axis', add: 'lensometry_oi_add' },
+                    ].map((row) => (
+                      <tr key={row.eye} className="border-b last:border-0">
+                        <td className={`py-2 pr-4 font-bold ${row.color}`}>{row.eye}</td>
+                        {['sphere', 'cyl', 'axis', 'add'].map((col) => (
+                          <td key={col} className="py-2 px-1">
+                            <Input className="h-8 text-sm text-center" value={form[row[col]]}
+                              onChange={(e) => setForm(f => ({ ...f, [row[col]]: e.target.value }))}
+                              placeholder={col === 'axis' ? '0' : (col === 'add' ? '+0.00' : '0.00')}
+                              data-testid={`form-${row[col]}`} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* V. Hallazgos, Diagnostico, Plan */}
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-sm text-slate-500">V. Hallazgos y Plan</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Historia / Anamnesis</Label>
@@ -795,7 +830,7 @@ export default function ConsultationsPage() {
             </Button>
             <h1 className="text-xl font-bold text-slate-900">Consulta del {formatDate(c.consultation_date)}</h1>
             <span className="px-2 py-0.5 bg-pine-50 text-pine-700 text-xs rounded-full font-medium">
-              {CONSULTATION_TYPES.find(t => t.value === c.consultation_type)?.label || c.consultation_type}
+              {CONSULTATION_TYPE_LABELS[c.consultation_type] || c.consultation_type}
             </span>
           </div>
           <div className="flex gap-2">
@@ -954,9 +989,43 @@ export default function ConsultationsPage() {
               </Card>
             )}
 
-            {/* IV. Hallazgos y Plan */}
+            {/* IV. Lensometria */}
+            {(c.lensometry_od_sphere || c.lensometry_od_cyl || c.lensometry_od_axis || c.lensometry_od_add || c.lensometry_oi_sphere || c.lensometry_oi_cyl || c.lensometry_oi_axis || c.lensometry_oi_add) && (
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">IV. Lensometria</CardTitle></CardHeader>
+                <CardContent>
+                  <table className="w-full text-sm" data-testid="detail-lensometry-table">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500 uppercase">Ojo</th>
+                        <th className="text-center py-2 px-4 text-xs font-semibold text-slate-500 uppercase">Esfera</th>
+                        <th className="text-center py-2 px-4 text-xs font-semibold text-slate-500 uppercase">Cilindro</th>
+                        <th className="text-center py-2 px-4 text-xs font-semibold text-slate-500 uppercase">Eje</th>
+                        <th className="text-center py-2 px-4 text-xs font-semibold text-slate-500 uppercase">ADD</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { eye: 'OD', color: 'text-blue-700', s: c.lensometry_od_sphere, cy: c.lensometry_od_cyl, ax: c.lensometry_od_axis, ad: c.lensometry_od_add },
+                        { eye: 'OS', color: 'text-green-700', s: c.lensometry_oi_sphere, cy: c.lensometry_oi_cyl, ax: c.lensometry_oi_axis, ad: c.lensometry_oi_add },
+                      ].map((r) => (
+                        <tr key={r.eye} className="border-b last:border-0">
+                          <td className={`py-2 pr-4 font-bold ${r.color}`}>{r.eye}</td>
+                          <td className="py-2 px-4 text-center font-mono">{r.s || '-'}</td>
+                          <td className="py-2 px-4 text-center font-mono">{r.cy || '-'}</td>
+                          <td className="py-2 px-4 text-center font-mono">{r.ax || '-'}</td>
+                          <td className="py-2 px-4 text-center font-mono">{r.ad || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* V. Hallazgos y Plan */}
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">IV. Hallazgos y Plan</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">V. Hallazgos y Plan</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 {c.anamnesis && <Section title="Historia / Anamnesis" text={c.anamnesis} />}
                 {c.findings && <Section title="Hallazgos" text={c.findings} />}
