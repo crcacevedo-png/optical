@@ -9,6 +9,13 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Refracciones: reimprimir desde consulta guardada + marcar "final" (Jun 2026)
+Completa la Fase 2 restante + parte de la Fase 3 (solo A y B, por decisión del usuario). En `ConsultationsPage.js`:
+- **A) Reimprimir cualquier refracción desde la consulta guardada**: en el detalle, cada refracción (lista "Refraccion Actual") muestra botones "Imprimir anteojos" / "Imprimir lentes de contacto" que precargan el diálogo desde ESA refracción, con contexto de la consulta guardada (`printRefractionDetail`). Antes solo existían los botones del encabezado usando la 1ª refracción.
+- **B) Marcar refracción como "final"**: nuevo campo `is_final` en el modelo `Refraction` (models.py; persiste en create y update vía `refractions`). En el formulario, estrella por refracción (`toggleRefractionFinal`, solo una puede ser final) + insignia "FINAL". Los botones del encabezado "Receta Anteojos/Lentes de Contacto" ahora usan la refracción marcada como final (o la 1ª si ninguna). La insignia FINAL también se muestra en el detalle.
+- **Verificado**: curl (crear con 2 refracciones, #2 final → persiste; PUT mueve final a #1 → persiste) + screenshots (detalle con botones por refracción + insignia FINAL; formulario con estrella que mueve el "final" entre refracciones). Dato de prueba limpiado.
+
+
 ### Enviar receta al paciente por WhatsApp o correo desde la consulta (Fase 2, Jun 2026)
 En el detalle de la consulta guardada, la lista "Recetas Generadas" ahora muestra por receta (anteojos / lentes de contacto / médica) tres acciones: **PDF** (descargar/imprimir), **WhatsApp** y **Correo**.
 - **WhatsApp (enlace seguro)**: `POST /api/prescriptions/{type}/{rx_id}/share-link` crea un token (`secrets.token_urlsafe(32)`, colección `rx_share_links`, expira a 30 días, env `RX_SHARE_LINK_DAYS`). El frontend arma el mensaje de WhatsApp con el enlace público `${REACT_APP_BACKEND_URL}/api/prescriptions/public/{token}` y abre `wa.me` con el teléfono del paciente. Enlace **público sin auth** `GET /api/prescriptions/public/{token}` valida token+expiración (404 inválido, 410 expirado) y devuelve el PDF `inline`. Índices nuevos: `rx_share_links.token` (unique) + TTL en `expires_at`.

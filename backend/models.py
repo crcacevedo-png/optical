@@ -271,6 +271,7 @@ class Refraction(BaseModel):
     os_axis: Optional[str] = None
     os_addition: Optional[str] = None
     observations: Optional[str] = None
+    is_final: Optional[bool] = False
 
 class ConsultationCreate(BaseModel):
     patient_id: str

@@ -11,7 +11,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
 import { BranchFilter } from '../components/BranchFilter';
 import {
-  Plus, Trash2, Search, Eye, Glasses, Pencil, Stethoscope, FileText, Pill,
+  Plus, Trash2, Search, Eye, Glasses, Star, Pencil, Stethoscope, FileText, Pill,
   Clock, User, CalendarIcon, ChevronRight, Save, ArrowLeft, MessageCircle, Mail, Download, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -316,14 +316,21 @@ export default function ConsultationsPage() {
   const openEyeglassRxFromConsultation = () => {
     const refs = selectedConsultation?.refractions || [];
     setRxContext({ patient_id: selectedConsultation?.patient_id, consultation_id: selectedConsultation?._id || null, professional_name: selectedConsultation?.professional_name || user?.name });
-    setEyeglassForm(refractionToEyeglass(refs[0]));
+    setEyeglassForm(refractionToEyeglass(refs.find(r => r.is_final) || refs[0]));
     setShowEyeglassRx(true);
   };
   const openContactRxFromConsultation = () => {
     const refs = selectedConsultation?.refractions || [];
     setRxContext({ patient_id: selectedConsultation?.patient_id, consultation_id: selectedConsultation?._id || null, professional_name: selectedConsultation?.professional_name || user?.name });
-    setContactForm(refractionToContact(refs[0]));
+    setContactForm(refractionToContact(refs.find(r => r.is_final) || refs[0]));
     setShowContactRx(true);
+  };
+  // Imprimir una refraccion especifica desde el detalle de la consulta guardada
+  const printRefractionDetail = (kind, r) => {
+    if (!selectedConsultation?.patient_id) { toast.error('No hay paciente asociado a la consulta'); return; }
+    setRxContext({ patient_id: selectedConsultation.patient_id, consultation_id: selectedConsultation._id || null, professional_name: selectedConsultation.professional_name || user?.name });
+    if (kind === 'eyeglass') { setEyeglassForm(refractionToEyeglass(r)); setShowEyeglassRx(true); }
+    else { setContactForm(refractionToContact(r)); setShowContactRx(true); }
   };
   // Imprimir desde una refraccion especifica del formulario (requiere paciente seleccionado)
   const printCtxFromForm = () => ({ patient_id: form.patient_id, consultation_id: (isEditing && selectedConsultation?._id) ? selectedConsultation._id : null, professional_name: selectedConsultation?.professional_name || user?.name });
@@ -357,9 +364,14 @@ export default function ConsultationsPage() {
       toast.error(formatApiErrorDetail(err?.response?.data?.detail));
     }
   };
-  const addRefraction = () => setForm(f => ({ ...f, refractions: [...(f.refractions || []), { od_sphere: '', od_cylinder: '', od_axis: '', od_addition: '', os_sphere: '', os_cylinder: '', os_axis: '', os_addition: '', observations: '' }] }));
+  const addRefraction = () => setForm(f => ({ ...f, refractions: [...(f.refractions || []), { od_sphere: '', od_cylinder: '', od_axis: '', od_addition: '', os_sphere: '', os_cylinder: '', os_axis: '', os_addition: '', observations: '', is_final: false }] }));
   const updateRefraction = (idx, field, value) => setForm(f => { const arr = [...(f.refractions || [])]; arr[idx] = { ...arr[idx], [field]: value }; return { ...f, refractions: arr }; });
   const removeRefraction = (idx) => setForm(f => ({ ...f, refractions: (f.refractions || []).filter((_, i) => i !== idx) }));
+  const toggleRefractionFinal = (idx) => setForm(f => {
+    const arr = f.refractions || [];
+    const wasFinal = !!arr[idx]?.is_final;
+    return { ...f, refractions: arr.map((r, i) => ({ ...r, is_final: i === idx ? !wasFinal : false })) };
+  });
 
   const handleCreateMedicalRx = async () => {
     if (!selectedConsultation) return;
@@ -848,10 +860,18 @@ export default function ConsultationsPage() {
                 {(form.refractions || []).map((r, idx) => (
                   <div key={idx} className="border border-slate-200 rounded-lg p-3 space-y-2" data-testid={`refraction-${idx}`}>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-500">Refraccion {idx + 1}</span>
-                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-red-600 hover:bg-red-50" onClick={() => removeRefraction(idx)} data-testid={`remove-refraction-${idx}`}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-500">Refraccion {idx + 1}</span>
+                        {r.is_final && <span className="text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 rounded-full px-2 py-0.5" data-testid={`refraction-${idx}-final-badge`}>FINAL</span>}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button type="button" variant="ghost" size="sm" className={`h-7 px-2 ${r.is_final ? 'text-amber-600' : 'text-slate-400 hover:text-amber-600'}`} onClick={() => toggleRefractionFinal(idx)} data-testid={`refraction-${idx}-final-toggle`} title={r.is_final ? 'Quitar marca de final' : 'Marcar como final'}>
+                          <Star className={`w-3.5 h-3.5 ${r.is_final ? 'fill-amber-500' : ''}`} />
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-red-600 hover:bg-red-50" onClick={() => removeRefraction(idx)} data-testid={`remove-refraction-${idx}`}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="grid grid-cols-5 gap-2 text-[10px] uppercase text-slate-400">
                       <span></span><span>Esfera</span><span>Cilindro</span><span>Eje</span><span>Adicion</span>
@@ -1106,11 +1126,22 @@ export default function ConsultationsPage() {
                     <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Refraccion Actual</p>
                     <div className="space-y-2">
                       {c.refractions.map((r, i) => (
-                        <div key={i} className="border border-slate-200 rounded-lg p-2 text-sm">
-                          <p className="text-[11px] text-slate-400 mb-1">Refraccion {i + 1}</p>
+                        <div key={i} className="border border-slate-200 rounded-lg p-2 text-sm" data-testid={`detail-refraction-${i}`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-[11px] text-slate-400">Refraccion {i + 1}</p>
+                            {r.is_final && <span className="text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 rounded-full px-2 py-0.5" data-testid={`detail-refraction-${i}-final-badge`}>FINAL</span>}
+                          </div>
                           <p className="text-blue-700"><span className="font-bold">OD</span> · Esf {r.od_sphere || '-'} · Cil {r.od_cylinder || '-'} · Eje {r.od_axis || '-'} · Add {r.od_addition || '-'}</p>
                           <p className="text-green-700"><span className="font-bold">OS</span> · Esf {r.os_sphere || '-'} · Cil {r.os_cylinder || '-'} · Eje {r.os_axis || '-'} · Add {r.os_addition || '-'}</p>
                           {r.observations && <p className="text-slate-500 text-xs mt-1">Obs: {r.observations}</p>}
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            <Button size="sm" variant="outline" className="h-7 text-xs border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => printRefractionDetail('eyeglass', r)} data-testid={`detail-refraction-${i}-print-eyeglass`}>
+                              <Glasses className="w-3.5 h-3.5 mr-1" /> Imprimir anteojos
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-7 text-xs border-teal-200 text-teal-700 hover:bg-teal-50" onClick={() => printRefractionDetail('contact', r)} data-testid={`detail-refraction-${i}-print-contact`}>
+                              <Eye className="w-3.5 h-3.5 mr-1" /> Imprimir lentes de contacto
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
