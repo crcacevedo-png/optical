@@ -11,7 +11,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
 import { BranchFilter } from '../components/BranchFilter';
 import {
-  Plus, Trash2, Search, Eye, Pencil, Stethoscope, FileText, Pill,
+  Plus, Trash2, Search, Eye, Glasses, Pencil, Stethoscope, FileText, Pill,
   Clock, User, CalendarIcon, ChevronRight, Save, ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -79,12 +79,11 @@ export default function ConsultationsPage() {
   const [patientSearch, setPatientSearch] = useState('');
 
   // Eyeglass Rx from consultation
+  const emptyEyeglassForm = { od_sphere: '', od_cylinder: '', od_axis: '', od_addition: '', od_dp: '', oi_sphere: '', oi_cylinder: '', oi_axis: '', oi_addition: '', oi_dp: '', lens_type: '', frame_type: '', observations: '' };
   const [showEyeglassRx, setShowEyeglassRx] = useState(false);
-  const [eyeglassForm, setEyeglassForm] = useState({
-    od_sphere: '', od_cylinder: '', od_axis: '', od_addition: '', od_dp: '',
-    oi_sphere: '', oi_cylinder: '', oi_axis: '', oi_addition: '', oi_dp: '',
-    lens_type: '', frame_type: '', observations: ''
-  });
+  const [eyeglassForm, setEyeglassForm] = useState(emptyEyeglassForm);
+  // Contexto de impresion de receta (paciente/consulta origen): funciona desde el formulario o el detalle
+  const [rxContext, setRxContext] = useState({ patient_id: null, consultation_id: null, professional_name: null });
 
   // Contact lens Rx from consultation
   const emptyContactForm = { od_power: '', od_bc: '', od_dia: '', od_cylinder: '', od_axis: '', od_addition: '', oi_power: '', oi_bc: '', oi_dia: '', oi_cylinder: '', oi_axis: '', oi_addition: '', brand: '', lens_type: '', replacement: '', observations: '' };
@@ -227,19 +226,30 @@ export default function ConsultationsPage() {
     }
   };
 
-  const handleCreateEyeglassRx = async () => {
-    if (!selectedConsultation) return;
+  const openRxPdf = async (type, id) => {
     try {
-      await api.post('/api/prescriptions/eyeglass', {
-        patient_id: selectedConsultation.patient_id,
-        consultation_id: selectedConsultation._id,
-        professional_name: selectedConsultation.professional_name || user?.name,
+      const res = await api.get(`/api/prescriptions/${type}/${id}/pdf`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      window.open(url, '_blank');
+    } catch (err) {
+      toast.error('La receta se guardo, pero no se pudo abrir el PDF.');
+    }
+  };
+
+  const handleCreateEyeglassRx = async () => {
+    if (!rxContext.patient_id) { toast.error('Seleccione un paciente'); return; }
+    try {
+      const res = await api.post('/api/prescriptions/eyeglass', {
+        patient_id: rxContext.patient_id,
+        consultation_id: rxContext.consultation_id || undefined,
+        professional_name: rxContext.professional_name || user?.name,
         ...eyeglassForm
       });
-      toast.success('Receta de anteojos creada');
+      toast.success('Receta de anteojos guardada');
       setShowEyeglassRx(false);
-      setEyeglassForm({ od_sphere: '', od_cylinder: '', od_axis: '', od_addition: '', od_dp: '', oi_sphere: '', oi_cylinder: '', oi_axis: '', oi_addition: '', oi_dp: '', lens_type: '', frame_type: '', observations: '' });
-      openDetail(selectedConsultation._id);
+      setEyeglassForm(emptyEyeglassForm);
+      if (view === 'detail' && selectedConsultation?._id) openDetail(selectedConsultation._id);
+      await openRxPdf('eyeglass', res.data._id);
     } catch (err) {
       toast.error(formatApiErrorDetail(err?.response?.data?.detail));
     }
@@ -257,27 +267,44 @@ export default function ConsultationsPage() {
   });
   const openEyeglassRxFromConsultation = () => {
     const refs = selectedConsultation?.refractions || [];
+    setRxContext({ patient_id: selectedConsultation?.patient_id, consultation_id: selectedConsultation?._id || null, professional_name: selectedConsultation?.professional_name || user?.name });
     setEyeglassForm(refractionToEyeglass(refs[0]));
     setShowEyeglassRx(true);
   };
   const openContactRxFromConsultation = () => {
     const refs = selectedConsultation?.refractions || [];
+    setRxContext({ patient_id: selectedConsultation?.patient_id, consultation_id: selectedConsultation?._id || null, professional_name: selectedConsultation?.professional_name || user?.name });
     setContactForm(refractionToContact(refs[0]));
     setShowContactRx(true);
   };
+  // Imprimir desde una refraccion especifica del formulario (requiere paciente seleccionado)
+  const printCtxFromForm = () => ({ patient_id: form.patient_id, consultation_id: (isEditing && selectedConsultation?._id) ? selectedConsultation._id : null, professional_name: selectedConsultation?.professional_name || user?.name });
+  const openEyeglassFromRefraction = (r) => {
+    if (!form.patient_id) { toast.error('Seleccione un paciente para imprimir la receta'); return; }
+    setRxContext(printCtxFromForm());
+    setEyeglassForm(refractionToEyeglass(r));
+    setShowEyeglassRx(true);
+  };
+  const openContactFromRefraction = (r) => {
+    if (!form.patient_id) { toast.error('Seleccione un paciente para imprimir la receta'); return; }
+    setRxContext(printCtxFromForm());
+    setContactForm(refractionToContact(r));
+    setShowContactRx(true);
+  };
   const handleCreateContactRx = async () => {
-    if (!selectedConsultation) return;
+    if (!rxContext.patient_id) { toast.error('Seleccione un paciente'); return; }
     try {
-      await api.post('/api/prescriptions/contact', {
-        patient_id: selectedConsultation.patient_id,
-        consultation_id: selectedConsultation._id,
-        professional_name: selectedConsultation.professional_name || user?.name,
+      const res = await api.post('/api/prescriptions/contact', {
+        patient_id: rxContext.patient_id,
+        consultation_id: rxContext.consultation_id || undefined,
+        professional_name: rxContext.professional_name || user?.name,
         ...contactForm
       });
-      toast.success('Receta de lentes de contacto creada');
+      toast.success('Receta de lentes de contacto guardada');
       setShowContactRx(false);
       setContactForm(emptyContactForm);
-      openDetail(selectedConsultation._id);
+      if (view === 'detail' && selectedConsultation?._id) openDetail(selectedConsultation._id);
+      await openRxPdf('contact', res.data._id);
     } catch (err) {
       toast.error(formatApiErrorDetail(err?.response?.data?.detail));
     }
@@ -737,9 +764,32 @@ export default function ConsultationsPage() {
                   onChange={(e) => setForm(f => ({ ...f, findings: e.target.value }))}
                   placeholder="Resultados del examen visual, agudeza visual, biomicroscopia..." data-testid="form-findings" />
               </div>
-              <div className="space-y-2 border-t border-slate-100 pt-4">
+              <div className="space-y-2">
+                <Label>Diagnostico / Impresion Clinica</Label>
+                <Textarea value={form.diagnosis} rows={2}
+                  onChange={(e) => setForm(f => ({ ...f, diagnosis: e.target.value }))}
+                  placeholder="Diagnostico o impresion clinica..." data-testid="form-diagnosis" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Plan / Tratamiento</Label>
+                  <Textarea value={form.treatment_plan} rows={2}
+                    onChange={(e) => setForm(f => ({ ...f, treatment_plan: e.target.value }))}
+                    placeholder="Plan de tratamiento, prescripcion optica..." data-testid="form-treatment-plan" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Recomendaciones</Label>
+                  <Textarea value={form.recommendations} rows={2}
+                    onChange={(e) => setForm(f => ({ ...f, recommendations: e.target.value }))}
+                    placeholder="Recomendaciones al paciente..." data-testid="form-recommendations" />
+                </div>
+              </div>
+              <div className="space-y-3 border-t border-slate-100 pt-4">
                 <div className="flex items-center justify-between">
-                  <Label>Refraccion Actual</Label>
+                  <div>
+                    <Label>Refraccion y receta</Label>
+                    <p className="text-xs text-slate-400 mt-0.5">Registra la graduacion y, con un clic, imprimela como receta de anteojos o de lentes de contacto.</p>
+                  </div>
                   <Button type="button" variant="outline" size="sm" onClick={addRefraction} data-testid="add-refraction-btn">
                     <Plus className="w-3.5 h-3.5 mr-1" /> Agregar refraccion
                   </Button>
@@ -773,28 +823,16 @@ export default function ConsultationsPage() {
                       <Input className="h-8 text-sm" value={r.os_addition} onChange={(e) => updateRefraction(idx, 'os_addition', e.target.value)} />
                     </div>
                     <Textarea value={r.observations} rows={1} onChange={(e) => updateRefraction(idx, 'observations', e.target.value)} placeholder="Observaciones de esta refraccion..." data-testid={`refraction-${idx}-observations`} />
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Button type="button" size="sm" variant="outline" className="h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => openEyeglassFromRefraction(r)} data-testid={`refraction-${idx}-print-eyeglass`}>
+                        <Glasses className="w-3.5 h-3.5 mr-1" /> Imprimir como anteojos
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" className="h-8 text-xs border-teal-200 text-teal-700 hover:bg-teal-50" onClick={() => openContactFromRefraction(r)} data-testid={`refraction-${idx}-print-contact`}>
+                        <Eye className="w-3.5 h-3.5 mr-1" /> Imprimir como lentes de contacto
+                      </Button>
+                    </div>
                   </div>
                 ))}
-              </div>
-              <div className="space-y-2">
-                <Label>Diagnostico / Impresion Clinica</Label>
-                <Textarea value={form.diagnosis} rows={2}
-                  onChange={(e) => setForm(f => ({ ...f, diagnosis: e.target.value }))}
-                  placeholder="Diagnostico o impresion clinica..." data-testid="form-diagnosis" />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Plan / Tratamiento</Label>
-                  <Textarea value={form.treatment_plan} rows={2}
-                    onChange={(e) => setForm(f => ({ ...f, treatment_plan: e.target.value }))}
-                    placeholder="Plan de tratamiento, prescripcion optica..." data-testid="form-treatment-plan" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Recomendaciones</Label>
-                  <Textarea value={form.recommendations} rows={2}
-                    onChange={(e) => setForm(f => ({ ...f, recommendations: e.target.value }))}
-                    placeholder="Recomendaciones al paciente..." data-testid="form-recommendations" />
-                </div>
               </div>
               <div className="space-y-2">
                 <Label>Observaciones</Label>
@@ -1077,7 +1115,7 @@ export default function ConsultationsPage() {
         setForm={setEyeglassForm}
         onSubmit={handleCreateEyeglassRx}
         testIdPrefix=""
-        refractions={selectedConsultation?.refractions || []}
+        refractions={(view === 'detail' ? selectedConsultation?.refractions : form.refractions) || []}
       />
       <ContactRxDialog
         open={showContactRx}
@@ -1085,7 +1123,7 @@ export default function ConsultationsPage() {
         form={contactForm}
         setForm={setContactForm}
         onSubmit={handleCreateContactRx}
-        refractions={selectedConsultation?.refractions || []}
+        refractions={(view === 'detail' ? selectedConsultation?.refractions : form.refractions) || []}
       />
       <MedicalRxDialog
         open={showMedicalRx}

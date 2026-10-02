@@ -1,68 +1,61 @@
-# Autoservicio de registro — Plan Básico (Cortexia Optical)
+# Refracciones en la consulta: captura y receta imprimible
 
-Permite que un interesado se inscriba solo desde la web, verifique su correo y entre de inmediato a usar el Plan Básico, sin esperar aprobación manual. La meta es eliminar la fricción inicial: de "solicitar y esperar" a "crear cuenta y empezar hoy".
+En la pantalla de consulta, la persona registra una o varias refracciones justo después del plan de tratamiento y, con un clic, convierte cualquiera de ellas en una receta imprimible de anteojos o de lentes de contacto.
+La receta queda guardada en el historial del paciente y se descarga lista para entregar o imprimir, con el logo y la plantilla de la óptica.
 
 ## Para quién es
-- Dueños o administradores de ópticas en Latinoamérica que quieren probar Cortexia sin trámites ni contacto previo con ventas.
-- El Superadmin, que deja de crear cuentas Básicas a mano y solo atiende solicitudes de planes superiores.
+- Optómetras y profesionales de salud visual que atienden la consulta y entregan la graduación al paciente.
+- Staff de la óptica que imprime o comparte la receta al final de la atención.
 
 ## Funcionalidad principal y experiencia
-- **Registro público en una pantalla** (reemplaza el formulario actual de solicitud en `/registro`): la persona ingresa nombre del responsable, nombre de la óptica, correo, contraseña, WhatsApp, ciudad/país, código promocional (opcional) y acepta el consentimiento.
-- **Verificación de correo obligatoria**: al enviar el formulario se manda un correo con un enlace seguro. La cuenta se crea y se activa recién cuando la persona hace clic en ese enlace. Hasta entonces no puede entrar. Incluye botón para reenviar el correo.
-- **Provisión 100% automática**: al verificar, el sistema crea sola la óptica (empresa) y al usuario como Admin, le asigna el Plan Básico y lo deja listo para iniciar sesión. Sin intervención del Superadmin.
-- **Plan Básico gratuito hasta 50 pacientes**: la cuenta funciona sin costo mientras no supere los 50 pacientes activos.
-- **Al llegar al límite, "flujo normal"**: cuando la óptica alcanza su tope de pacientes, el sistema le impide agregar más y le muestra un aviso claro para actualizar de plan y pagar por Stripe (esto ya existe en la app y se reutiliza).
-- **Código promocional con beneficio (límite de pacientes ampliado)**: los códigos ya existen hoy en el área de Solicitudes de cuenta del Superadmin. El beneficio **no es monetario**: es un **límite de pacientes ampliado en el plan gratis**. Cada código tiene un límite de pacientes que el **Superadmin puede modificar en el área de códigos**. Si la persona ingresa un código válido durante el registro, su cuenta arranca con ese tope gratuito (por ejemplo 200 pacientes en lugar de 50). Un código sin límite configurado queda registrado para atribución de campaña y usa el tope por defecto (50), como hoy.
-- **Planes superiores siguen por solicitud**: quien necesite un plan mayor verá un enlace tipo "¿Necesitas un plan superior? Contáctanos" que abre el formulario de solicitud actual y sigue llegando al CRM del Superadmin.
+- **Área de refracción reubicada:** aparece después de "Plan / Tratamiento" dentro de la consulta (hoy está antes del diagnóstico).
+- **Varias refracciones:** se puede agregar y quitar más de una refracción (por ejemplo, la refracción final y una comparativa). Cada refracción tiene, por ojo (OD / OS): Esfera, Cilindro, Eje, Adición y una nota.
+- **Imprimir como receta, por refracción:** cada refracción muestra dos acciones claras: "Imprimir como anteojos" e "Imprimir como lentes de contacto".
+- **Paso rápido para completar:** al elegir una opción se abre una ventana con los valores ya precargados desde esa refracción. La persona completa solo lo que la refracción no incluye:
+  - Anteojos: D.P. (distancia pupilar) y, opcionalmente, tipo de lente y armazón.
+  - Lentes de contacto: curva base, diámetro, marca y tipo de reemplazo.
+  - En ambos casos, un campo de observaciones.
+- **Guardar + imprimir:** al confirmar, la receta se guarda en el historial de recetas del paciente y se genera el PDF (media carta, con logo y plantilla de la óptica) para descargar o imprimir. Puede reimprimirse después.
+- **Funciona desde el formulario**, aun sin haber guardado la consulta. Solo requiere que haya un paciente seleccionado.
 
 ## Flujo del usuario
-1. Desde tu sitio de marketing (`web.cortexiaoptical.com`) hace clic en "Crear cuenta gratis", que lo lleva a la página de registro de la app (`www.cortexiaoptical.com/registro`).
-2. Llena el formulario de registro (incluye contraseña propia y, si tiene, código promocional) y acepta el consentimiento.
-3. Recibe un correo de verificación y hace clic en el enlace.
-4. El sistema crea su óptica y su usuario Admin con Plan Básico y lo lleva a iniciar sesión.
-5. Entra y empieza a cargar pacientes, inventario y ventas de inmediato.
-6. Al acercarse/llegar a 50 pacientes (o al tope ampliado por su código), ve el aviso para actualizar de plan y pagar por Stripe.
+1. En la consulta, después de llenar "Plan / Tratamiento", la persona registra una o más refracciones.
+2. Para una refracción, elige "Imprimir como anteojos" o "Imprimir como lentes de contacto".
+3. Se abre el paso rápido con los datos precargados; completa los campos específicos del tipo de receta y confirma.
+4. La receta se guarda en el historial del paciente y se abre el PDF listo para imprimir o compartir.
+5. Puede repetir con otra refracción, o imprimir la misma refracción también como el otro tipo de receta.
 
 ## Sensación UI/UX
-- Coherente con la identidad actual de Cortexia (azul profundo profesional, estética limpia y sobria de la app).
-- Registro de mínima fricción: una sola pantalla, campos claros, validación en vivo, mensajes de error entendibles y señales de confianza ("sin tarjeta", "empieza gratis hasta 50 pacientes").
-- Estados explícitos: "revisa tu correo para verificar", "correo verificado, ya puedes entrar", "límite alcanzado, actualiza tu plan".
-
-## Conexión con el sitio web
-- **Sitio de marketing:** `web.cortexiaoptical.com` (WordPress u otra plataforma), separado y sin cambios.
-- **App Cortexia (producción):** `www.cortexiaoptical.com`, con su propia dirección. No hay conflicto: marketing en `web.` y app en `www.`.
-- La conexión es por **enlace**: en tu sitio de marketing (`web.cortexiaoptical.com`) agregas un botón "Crear cuenta gratis" que apunta a `https://www.cortexiaoptical.com/registro`. Ese botón lo configuras tú con tus accesos a la web; del lado de la app yo construyo la página de registro.
-- Los enlaces del correo de verificación se arman desde la variable `APP_URL`, fijada a `https://www.cortexiaoptical.com`, para que apunten a la app y no al sitio de marketing.
+- Coherente con la consulta actual: estética sobria y profesional, OD en azul y OS en verde, rejilla clara por ojo.
+- Acciones de impresión evidentes en cada refracción; la ventana para completar datos es breve y enfocada.
+- El PDF conserva la identidad de la óptica (logo, encabezado, plantilla) ya existente.
 
 ## Fases de implementación
+
 **Fase 1 — MVP (se construye ahora)**
-- Nueva pantalla de autoservicio en `/registro` (reemplaza el formulario de solicitud para el Plan Básico).
-- Verificación de correo por enlace seguro con expiración y reenvío.
-- Provisión automática de óptica + Admin con Plan Básico al verificar.
-- Nuevo campo "límite de pacientes" en cada código promocional, editable por el Superadmin en el área de códigos existente (Solicitudes de cuenta).
-- Aplicación del límite ampliado del código al registrarse: la cuenta arranca con el tope del código en lugar de 50.
-- Aviso/upsell al alcanzar el límite gratuito, reutilizando el control de pacientes y el pago existente por Stripe.
-- Enlace "Contáctanos" hacia el formulario de solicitud actual para planes superiores.
+- Reubicar el área de refracción para que aparezca después de "Plan / Tratamiento".
+- Conservar el registro de varias refracciones (agregar/quitar).
+- En cada refracción, acciones "Imprimir como anteojos" e "Imprimir como lentes de contacto".
+- Paso rápido precargado para completar los datos específicos de cada tipo de receta.
+- Guardar la receta en el historial del paciente y generar el PDF para imprimir.
+- Que funcione desde el formulario, con solo tener un paciente seleccionado.
 
 **Fase 2 — Más adelante**
-- Tope gratuito configurable por plan (no fijo en 50).
-- Panel del Superadmin para ver registros por autoservicio, estados de verificación y expiraciones.
-- Onboarding de bienvenida más guiado tras el primer ingreso.
+- Elegir cualquiera de las refracciones desde la vista de la consulta ya guardada y reimprimir.
+- Mostrar, junto a cada receta ya generada dentro de la consulta, un botón visible para descargar/imprimir su PDF.
+- Enviar la receta al paciente por WhatsApp o correo.
 
 **Fase 3 — Futuro**
-- Página pública de marketing con tabla de precios y botón por plan.
-- Correos de seguimiento a registros abandonados (no verificados).
-- Analítica del embudo de registro (visitas → registros → verificados → activos).
+- Comparar refracciones lado a lado y marcar una como "final".
+- Copiar automáticamente la lensometría o la agudeza visual a una refracción nueva.
+- Plantillas de receta adicionales.
 
-## Suposiciones (decisiones tomadas sin preguntar)
-- El autoservicio **reemplaza** el formulario de solicitud en la ruta pública `/registro` para el Plan Básico; el formulario/CRM actual se conserva solo para planes superiores, accesible desde un enlace "Contáctanos".
-- La persona **define su propia contraseña** durante el registro (no se envía contraseña temporal). El correo de verificación solo confirma el correo y activa la cuenta.
-- La cuenta y la empresa se **crean al hacer clic en el enlace de verificación** (no antes); el enlace expira a las 48 horas y puede reenviarse.
-- El Plan Básico es el plan marcado como predeterminado de autoservicio; si no hay uno marcado, se usa el plan gratuito con tope de 50 pacientes; en su defecto, el plan más económico.
-- El tope gratuito por defecto es **50 pacientes activos** (coincide con el valor por defecto actual del sistema).
-- El beneficio del código promocional es **exclusivamente un límite de pacientes ampliado en el plan gratis** (no monetario). El número lo configura y edita el Superadmin en el área de códigos ya existente. Se aplica sobre la nueva cuenta como límite efectivo de pacientes al registrarse.
-- Se mantiene el consentimiento obligatorio y las protecciones anti-spam (honeypot + límite de intentos) del formulario actual.
-- La verificación de correo usa el servicio de correo ya integrado (Resend); no se requiere una integración nueva.
-- Las operaciones de la óptica siguen en GTQ; los cobros de membresía siguen en USD por Stripe, sin cambios.
-- La app vive en `www.cortexiaoptical.com` y el sitio de marketing en `web.cortexiaoptical.com`; son dominios distintos, sin conflicto. `APP_URL` se fija a `https://www.cortexiaoptical.com` para los enlaces de la app y del correo de verificación.
-- El botón "Crear cuenta gratis" en el sitio de marketing lo agregas tú (WordPress/plataforma actual); del lado de la app solo se entrega la ruta pública de registro (`/registro`) a la que enlazar.
+## Suposiciones (decisiones tomadas sin volver a preguntar)
+- La refracción mantiene sus campos actuales (OD/OS: Esfera, Cilindro, Eje, Adición + nota). Para lentes de contacto, el "poder" se toma de la esfera y el resto se completa en el paso rápido.
+- El área de refracción se coloca después del bloque "Plan / Tratamiento" y "Recomendaciones", antes de "Observaciones".
+- Al imprimir desde una consulta nueva aún sin guardar, la receta se guarda bajo el paciente y queda vinculada a la consulta cuando esta ya existe (consulta guardada o en edición).
+- Se requiere un paciente seleccionado para imprimir; si no hay, se muestra un aviso.
+- Se reutiliza el sistema actual de recetas de anteojos y de lentes de contacto y su PDF (plantilla, logo, tamaño media carta); no se crea un formato de receta nuevo.
+- Se mantienen también los botones actuales de la consulta para generar recetas; las nuevas acciones por refracción se suman a lo existente.
+- El PDF se descarga/abre para imprimir; no hay impresión automática silenciosa.
+- Idioma español. La receta médica no cambia.

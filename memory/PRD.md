@@ -9,6 +9,15 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 - Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
 
 
+### Refracciones en consulta → receta imprimible (Jun 2026)
+Fase 1 (MVP) del plan aprobado, 100% frontend (backend de recetas/PDF ya existía). En `ConsultationsPage.js`:
+- **Área "Refracción y receta" reubicada**: ahora aparece después de "Plan / Tratamiento" y "Recomendaciones", antes de "Observaciones" (antes estaba antes del diagnóstico). Se conserva agregar/quitar varias refracciones (OD/OS: Esfera, Cilindro, Eje, Adición + nota).
+- **Botones por refracción**: "Imprimir como anteojos" e "Imprimir como lentes de contacto". Cada uno precarga el diálogo existente (`EyeglassRxDialog`/`ContactRxDialog`) desde ESA refracción (`refractionToEyeglass`/`refractionToContact`). El usuario completa solo lo específico (anteojos: D.P., tipo de lente/armazón; contacto: curva base, diámetro, marca, reemplazo) + observaciones.
+- **Guardar + abrir PDF**: al confirmar se crea la receta (`POST /api/prescriptions/{eyeglass|contact}`) y se abre el PDF (`GET .../{id}/pdf`, blob → `window.open`) con logo/plantilla de la óptica. Reimprimible.
+- **Funciona desde el formulario** con solo un paciente seleccionado (aun sin guardar la consulta): nuevo `rxContext` resuelve `patient_id`=form y `consultation_id`=null en consulta nueva, o el id cuando se edita una existente (ambos `consultation_id` ya eran opcionales en los modelos). Si no hay paciente, muestra aviso. Los botones del detalle de consulta siguen igual.
+- **Verificado**: curl E2E (crear receta de anteojos y de contacto SIN `consultation_id` → 200; GET PDF → 200 `application/pdf`, PDF válido 1 pág) + screenshots (sección reubicada tras Plan/Tratamiento con los 2 botones; diálogo "Receta de Anteojos" precargado OD -1.25 / OS -1.00 con paciente seleccionado y consulta sin guardar). Datos de prueba limpiados. Fase 2 pendiente: reimprimir desde consulta guardada y envío por WhatsApp/correo.
+
+
 ### Ajustes al formulario de Consultas: tipos + Lensometría (Jun 2026)
 - **Tipo de Consulta**: se retiraron "Consulta General" y "Seguimiento" del menú (en `ConsultationsPage.js` y `PatientsPage.js`); opciones ahora: Control, Urgencia, Primera Vez. Default = **Primera Vez**. Se añadió `CONSULTATION_TYPE_LABELS` (incluye los tipos retirados) para seguir etiquetando correctamente consultas antiguas en listas/detalle.
 - **Nueva sección "IV. Lensometría"** (rejilla estructurada) justo después de "III. Agudeza Visual"; "Hallazgos y Plan" pasó a "V". Campos por ojo (OD/OS): Esfera, Cilindro, Eje, ADD → backend `lensometry_{od|oi}_{sphere|cyl|axis|add}` en `ConsultationCreate`/`ConsultationUpdate` (models.py), persistidos en create y editables vía PUT (`routes/consultations.py`). El campo simple "Lensometría actual" de Antecedentes se quitó del formulario (reemplazado por la nueva rejilla); los registros antiguos conservan y muestran su valor legacy en el detalle.
