@@ -227,18 +227,19 @@ def _toc(story, styles):
         ("3.5", "Reportes y auditoria", "10"),
         ("3.6", "Seguridad y sesiones activas", "11"),
         ("3.7", "Mi Plan, suscripcion y cobros", "12"),
-        ("4", "Guia para el Vendedor", "13"),
-        ("4.1", "Registro de pacientes", "13"),
-        ("4.2", "Cotizaciones y ventas", "14"),
-        ("4.3", "Manejo de caja diaria", "15"),
-        ("4.4", "Agenda y citas", "16"),
-        ("5", "Guia para el Doctor / Optometrista", "17"),
-        ("5.1", "Consultas oftalmologicas", "17"),
-        ("5.2", "Recetas de anteojos, contacto y medicas", "18"),
-        ("5.3", "Historial clinico del paciente", "19"),
-        ("6", "Modulo especial: Jornadas", "20"),
-        ("7", "Buenas practicas y consejos", "21"),
-        ("8", "Soporte y contacto", "22"),
+        ("3.8", "Ingreso masivo de pacientes", "13"),
+        ("4", "Guia para el Vendedor", "14"),
+        ("4.1", "Registro de pacientes", "14"),
+        ("4.2", "Cotizaciones y ventas", "15"),
+        ("4.3", "Manejo de caja diaria", "16"),
+        ("4.4", "Agenda y citas", "17"),
+        ("5", "Guia para el Doctor / Optometrista", "18"),
+        ("5.1", "Consultas oftalmologicas", "18"),
+        ("5.2", "Recetas de anteojos, contacto y medicas", "19"),
+        ("5.3", "Historial clinico del paciente", "20"),
+        ("6", "Modulo especial: Jornadas", "21"),
+        ("7", "Buenas practicas y consejos", "22"),
+        ("8", "Soporte y contacto", "23"),
     ]
     rows = []
     for num, title, page in items:
@@ -594,6 +595,53 @@ def _admin_section(story, styles):
         "Si esta por vencer, actualizala antes del proximo cobro. Las cuentas marcadas como "
         "<b>cortesia</b> estan exentas de cobro y de suspension.",
         styles, color=BRAND_AMBER, title="Evita suspensiones"
+    ))
+    story.append(PageBreak())
+
+    # 3.8 Ingreso masivo de pacientes
+    story.append(Paragraph("3.8 Ingreso masivo de pacientes", styles["H2"]))
+    story.append(Paragraph(
+        "Si estas empezando con Cortexia o migrando desde papel, Excel u otro sistema, puedes cargar "
+        "muchos pacientes de una sola vez desde una hoja de calculo, en lugar de registrarlos uno por uno. "
+        "Esta herramienta es <b>exclusiva del administrador</b> y esta en <b>Configuracion → Ingreso masivo de pacientes</b>.",
+        styles["Body"]))
+    story.append(Paragraph("<b>Como funciona, paso a paso</b>", styles["H3"]))
+    story.append(_bullets([
+        "<b>1. Descarga la plantilla</b> (Excel o CSV). Trae las columnas correctas, una fila de ejemplo "
+        "y una hoja de instrucciones.",
+        "<b>2. Llena tus pacientes</b>. Son obligatorios <b>Nombre completo</b> y <b>Telefono</b>. "
+        "Opcionales: WhatsApp, Correo, Fecha de nacimiento (AAAA-MM-DD), Sexo (M/F) y Direccion.",
+        "<b>3. Sube el archivo</b> (.xlsx o .csv) arrastrandolo o haciendo clic en el area de carga.",
+        "<b>4. Revisa la vista previa</b>: cuantas filas se detectaron, cuantos pacientes son <b>nuevos</b>, "
+        "cuantos se van a <b>actualizar</b>, cuantas recetas de historial trae y que filas tienen error.",
+        "<b>5. Confirma</b> y recibe el <b>reporte final</b>: creados, actualizados, fuera de tope y errores "
+        "(con el motivo de cada fila).",
+    ], styles))
+    story.append(Paragraph("<b>Historial de recetas (graduacion)</b>", styles["H3"]))
+    story.append(_bullets([
+        "Las columnas de graduacion (<b>OD/OS</b>: Esfera, Cilindro, Eje, Adicion) y las Observaciones son "
+        "opcionales. Si las llenas, se guarda una <b>receta de anteojos</b> ligada al paciente como su historial.",
+        "Para cargar <b>varias recetas a un mismo paciente</b>, repite su <b>correo o telefono</b> en varias filas "
+        "(una receta por fila). Los datos del paciente se toman de la <b>primera fila</b> y cada fila adicional "
+        "solo agrega una receta a su historial.",
+        "La columna <b>Fecha de receta</b> (AAAA-MM-DD) es opcional y fecha cada receta para ordenarla en el historial.",
+        "En graduacion puedes escribir <b>plano</b> o <b>pl</b> para 0.00.",
+    ], styles))
+    story.append(Paragraph("<b>Pacientes repetidos y tope del plan</b>", styles["H3"]))
+    story.append(_bullets([
+        "Si un paciente del archivo <b>ya existe</b> en tu optica (mismo correo o, en su defecto, mismo telefono), "
+        "se <b>actualizan sus datos</b> en vez de duplicarlo.",
+        "En cuentas con <b>limite de pacientes</b> (plan gratis o codigo promocional), se importan los pacientes "
+        "nuevos <b>hasta llenar el cupo disponible</b> y el reporte te dice cuantos quedaron fuera. Las "
+        "<b>actualizaciones</b> a pacientes existentes <b>no consumen cupo</b>.",
+        "Las filas con datos faltantes o mal formados <b>se omiten</b> y se listan con el motivo; corrigelas en tu "
+        "archivo y vuelve a subir solo esas.",
+    ], styles))
+    story.append(_tip_box(
+        "Primero descarga la plantilla y usa la vista previa para revisar los numeros ANTES de confirmar. "
+        "Si tienes historial, agrega la <b>Fecha de receta</b> a cada fila para que las recetas queden ordenadas "
+        "cronologicamente en la ficha del paciente.",
+        styles, color=BRAND_TEAL, title="Recomendacion"
     ))
     story.append(PageBreak())
 

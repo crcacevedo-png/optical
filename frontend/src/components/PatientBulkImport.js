@@ -103,7 +103,7 @@ export function PatientBulkImport() {
   };
 
   const willSkip = preview && !preview.limit.unlimited && preview.limit.available != null
-    ? Math.max(0, preview.valid_count - preview.limit.available)
+    ? Math.max(0, (preview.new_patients ?? 0) - preview.limit.available)
     : 0;
 
   return (
@@ -150,6 +150,9 @@ export function PatientBulkImport() {
               <div className="flex-1">
                 <p className="text-sm font-semibold text-slate-800">Sube tu archivo lleno</p>
                 <p className="text-xs text-slate-500 mt-0.5">Formatos: .xlsx o .csv. Maximo 2000 filas por carga.</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Para cargar <strong>varias recetas a un mismo paciente</strong>, repite su correo o telefono en varias filas (una receta por fila).
+                </p>
 
                 <div
                   role="button"
@@ -189,10 +192,17 @@ export function PatientBulkImport() {
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <PreviewStat label="Filas detectadas" value={preview.total_rows} tone="slate" icon={<Users className="w-4 h-4" />} testid="preview-total" />
-              <PreviewStat label="Listas para importar" value={preview.valid_count} tone="green" icon={<CheckCircle2 className="w-4 h-4" />} testid="preview-valid" />
-              <PreviewStat label="Con receta" value={preview.has_rx_count} tone="blue" icon={<Glasses className="w-4 h-4" />} testid="preview-rx" />
+              <PreviewStat label="Pacientes nuevos" value={preview.new_patients ?? 0} tone="green" icon={<CheckCircle2 className="w-4 h-4" />} testid="preview-new" />
+              <PreviewStat label="A actualizar" value={preview.update_patients ?? 0} tone="blue" icon={<RefreshCw className="w-4 h-4" />} testid="preview-update" />
               <PreviewStat label="Con error" value={preview.error_count} tone="red" icon={<AlertTriangle className="w-4 h-4" />} testid="preview-errors" />
             </div>
+
+            {preview.has_rx_count > 0 && (
+              <p className="text-xs text-blue-700 flex items-center gap-1.5" data-testid="preview-rx-note">
+                <Glasses className="w-3.5 h-3.5 shrink-0" />
+                Se guardaran {preview.has_rx_count} recetas de historial. Puedes repetir un paciente en varias filas para cargarle varias recetas.
+              </p>
+            )}
 
             {!preview.limit.unlimited && (
               <p className="text-xs text-slate-500">

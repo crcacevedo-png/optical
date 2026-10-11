@@ -38,6 +38,7 @@ TEMPLATE_HEADERS = [
     "Fecha de nacimiento (AAAA-MM-DD)",
     "Sexo (M/F)",
     "Direccion",
+    "Fecha de receta (AAAA-MM-DD)",
     "OD Esfera",
     "OD Cilindro",
     "OD Eje",
@@ -51,7 +52,7 @@ TEMPLATE_HEADERS = [
 
 TEMPLATE_EXAMPLE = [
     "Maria Lopez Garcia", "55551234", "55551234", "maria@ejemplo.com",
-    "1990-05-12", "F", "Zona 1, Ciudad de Guatemala",
+    "1990-05-12", "F", "Zona 1, Ciudad de Guatemala", "2024-02-10",
     "-1.25", "-0.50", "90", "+1.00",
     "-1.00", "-0.75", "85", "+1.00",
     "Lentes para lectura y distancia",
@@ -66,6 +67,8 @@ HEADER_MAP = {
     "fecha de nacimiento": "birth_date", "fecha nacimiento": "birth_date", "nacimiento": "birth_date",
     "sexo": "gender", "genero": "gender",
     "direccion": "address",
+    "fecha de receta": "rx_date", "fecha receta": "rx_date", "fecha de la receta": "rx_date",
+    "fecha de evaluacion": "rx_date", "fecha evaluacion": "rx_date",
     "od esfera": "od_sphere", "od cilindro": "od_cylinder", "od eje": "od_axis", "od adicion": "od_addition",
     "os esfera": "oi_sphere", "os cilindro": "oi_cylinder", "os eje": "oi_axis", "os adicion": "oi_addition",
     "oi esfera": "oi_sphere", "oi cilindro": "oi_cylinder", "oi eje": "oi_axis", "oi adicion": "oi_addition",
@@ -238,6 +241,10 @@ def _validate_row(excel_row: int, d: dict):
         if v is not None:
             rx_has = True
 
+    rx_date_iso, date_ok = _parse_date(d.get("rx_date"))
+    if rx_has and not date_ok:
+        return None, {"row": excel_row, "name": full, "reason": "Fecha de receta invalida (use AAAA-MM-DD)"}
+
     parts = full.split()
     first_name = parts[0]
     last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
@@ -258,6 +265,7 @@ def _validate_row(excel_row: int, d: dict):
         "address": _cell_str(d.get("address")) or None,
         "rx": rx_vals if rx_has else None,
         "rx_observations": _cell_str(d.get("rx_observations")) or None,
+        "rx_date": rx_date_iso if rx_has else None,
         "match_key": ("email:" + email) if email else ("phone:" + phone),
     }
     return clean, None
@@ -314,7 +322,12 @@ def _build_template_workbook() -> io.BytesIO:
         "   guarda una receta de anteojos como historial inicial del paciente.",
         "8. En graduacion puedes escribir 'plano' o 'pl' para 0.00.",
         "9. Si un paciente ya existe (mismo correo o telefono) se actualizan sus datos.",
-        "10. La fila de ejemplo de la hoja 'Pacientes' puedes borrarla antes de subir.",
+        "10. HISTORIAL: para agregar VARIAS recetas a un mismo paciente, repite su",
+        "    correo o telefono en varias filas (una receta por fila). Los datos del",
+        "    paciente se toman de la PRIMERA fila; cada fila adicional solo agrega una",
+        "    receta a su historial.",
+        "11. 'Fecha de receta' (AAAA-MM-DD) es opcional y fecha cada receta del historial.",
+        "12. La fila de ejemplo de la hoja 'Pacientes' puedes borrarla antes de subir.",
     ]
     for i, line in enumerate(notes, start=1):
         c = ws2.cell(row=i, column=1, value=line)
@@ -369,10 +382,40 @@ async def preview_import(file: UploadFile = File(...), user: dict = Depends(get_
             if clean["rx"]:
                 has_rx += 1
 
+    company_oid = ObjectId(user["company_id"])
     max_p = effective_max_patients(company, plan)
-    current = await db.patients.count_documents({"company_id": ObjectId(user["company_id"]), "is_deleted": {"$ne": True}})
+    current = await db.patients.count_documents({"company_id": company_oid, "is_deleted": {"$ne": True}})
     unlimited = max_p <= 0
     available = None if unlimited else max(0, max_p - current)
+
+    # Pacientes distintos (por correo/telefono) y estimado de nuevos vs a actualizar.
+    emails = [c["email"] for c in valid if c["email"]]
+    phones = [c["phone"] for c in valid]
+    existing_emails, existing_phones = set(), set()
+    if emails or phones:
+        cur = db.patients.find(
+            {"company_id": company_oid, "is_deleted": {"$ne": True},
+             "$or": [{"email": {"$in": emails}}, {"phone": {"$in": phones}}]},
+            {"email": 1, "phone": 1},
+        )
+        async for doc in cur:
+            if doc.get("email"):
+                existing_emails.add(doc["email"])
+            if doc.get("phone"):
+                existing_phones.add(doc["phone"])
+
+    seen_keys = set()
+    new_patients = update_patients = 0
+    for c in valid:
+        k = c["match_key"]
+        if k in seen_keys:
+            continue
+        seen_keys.add(k)
+        exists = (c["email"] in existing_emails) if c["email"] else (c["phone"] in existing_phones)
+        if exists:
+            update_patients += 1
+        else:
+            new_patients += 1
 
     def _display(c):
         return {
@@ -386,6 +429,9 @@ async def preview_import(file: UploadFile = File(...), user: dict = Depends(get_
         "valid_count": len(valid),
         "error_count": len(errors),
         "has_rx_count": has_rx,
+        "distinct_patients": len(seen_keys),
+        "new_patients": new_patients,
+        "update_patients": update_patients,
         "detected_columns": headers,
         "sample": [_display(c) for c in valid[:PREVIEW_SAMPLE]],
         "error_preview": errors[:PREVIEW_SAMPLE],
@@ -419,7 +465,8 @@ async def commit_import(request: Request, file: UploadFile = File(...), user: di
 
     created = updated = skipped = rx_created = 0
     skipped_rows = []
-    seen = {}  # match_key -> patient_id (dentro de esta carga)
+    seen = {}            # match_key -> patient_id (primera aparicion en esta carga)
+    skipped_keys = set() # pacientes nuevos no creados por tope
 
     async def _find_existing(clean):
         base = {"company_id": company_oid, "is_deleted": {"$ne": True}}
@@ -433,6 +480,9 @@ async def commit_import(request: Request, file: UploadFile = File(...), user: di
     async def _create_rx(patient_oid, clean):
         nonlocal rx_created
         rx = clean["rx"]
+        rx_at = now_iso
+        if clean.get("rx_date"):
+            rx_at = datetime.strptime(clean["rx_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc).isoformat()
         rx_doc = {
             "company_id": company_oid, "patient_id": patient_oid, "consultation_id": None,
             "professional_name": None,
@@ -442,7 +492,7 @@ async def commit_import(request: Request, file: UploadFile = File(...), user: di
             "oi_addition": rx["oi_addition"], "oi_dp": None,
             "observations": clean["rx_observations"], "lens_type": None, "frame_type": None,
             "source": "import",
-            "created_at": now_iso, "created_by": actor_oid,
+            "created_at": rx_at, "created_by": actor_oid,
         }
         await db.eyeglass_prescriptions.insert_one(rx_doc)
         rx_created += 1
@@ -464,10 +514,15 @@ async def commit_import(request: Request, file: UploadFile = File(...), user: di
 
     for clean in valid:
         key = clean["match_key"]
-        existing_id = seen.get(key)
-        is_new = False
-        if existing_id is None:
-            existing_id = await _find_existing(clean)
+        # Fila de historial adicional para un paciente ya procesado en esta carga:
+        # solo agrega receta, no vuelve a actualizar sus datos ni cuenta como paciente.
+        if key in seen:
+            if clean["rx"]:
+                await _create_rx(seen[key], clean)
+            continue
+        if key in skipped_keys:
+            continue  # paciente nuevo omitido por tope; sus filas extra tambien se omiten
+        existing_id = await _find_existing(clean)
         if existing_id is not None:
             await db.patients.update_one({"_id": existing_id}, {"$set": _update_set(clean)})
             updated += 1
@@ -475,6 +530,7 @@ async def commit_import(request: Request, file: UploadFile = File(...), user: di
         else:
             if not unlimited and available <= 0:
                 skipped += 1
+                skipped_keys.add(key)
                 skipped_rows.append({"row": clean["row"], "name": clean["full_name"], "reason": "Tope de pacientes alcanzado"})
                 continue
             doc = {
@@ -489,7 +545,6 @@ async def commit_import(request: Request, file: UploadFile = File(...), user: di
             res = await db.patients.insert_one(doc)
             patient_oid = res.inserted_id
             created += 1
-            is_new = True
             if not unlimited:
                 available -= 1
         seen[key] = patient_oid
