@@ -1,0 +1,4 @@
+Nombre completo,Telefono,WhatsApp,Correo electronico,Fecha de nacimiento (AAAA-MM-DD),Sexo (M/F),Direccion,Fecha de receta (AAAA-MM-DD),OD Esfera,OD Cilindro,OD Eje,OD Adicion,OS Esfera,OS Cilindro,OS Eje,OS Adicion,Observaciones receta,LC OD Poder,LC OD Curva Base,LC OD Diametro,LC OD Cilindro,LC OD Eje,LC OD Adicion,LC OS Poder,LC OS Curva Base,LC OS Diametro,LC OS Cilindro,LC OS Eje,LC OS Adicion,LC Marca,LC Tipo de lente,LC Reemplazo,LC Observaciones
+ZZLC Pedro Castro,50077001,,pedro.zzlc@ejemplo.com,1988-09-09,M,Zona 7,2024-05-01,-2.00,-0.50,90,,-2.25,-0.50,88,,Receta anteojos,-1.75,8.6,14.2,,,,-2.00,8.6,14.2,,,,Acuvue,Esfericos,Mensual,Uso diario
+ZZLC Sofia Mena,50077002,,,1992-12-12,F,Zona 8,2024-06-15,,,,,,,,,,-1.25,8.4,14.0,,,,-1.50,8.4,14.0,,,,Biofinity,Esfericos,Quincenal,Solo lentes de contacto
+ZZLC Pedro Castro,50077001,,pedro.zzlc@ejemplo.com,,,,2023-01-10,-1.75,-0.50,90,,-2.00,-0.50,88,,Historial anterior,,,,,,,,,,,,,,,,

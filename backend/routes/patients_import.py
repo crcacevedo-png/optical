@@ -48,6 +48,22 @@ TEMPLATE_HEADERS = [
     "OS Eje",
     "OS Adicion",
     "Observaciones receta",
+    "LC OD Poder",
+    "LC OD Curva Base",
+    "LC OD Diametro",
+    "LC OD Cilindro",
+    "LC OD Eje",
+    "LC OD Adicion",
+    "LC OS Poder",
+    "LC OS Curva Base",
+    "LC OS Diametro",
+    "LC OS Cilindro",
+    "LC OS Eje",
+    "LC OS Adicion",
+    "LC Marca",
+    "LC Tipo de lente",
+    "LC Reemplazo",
+    "LC Observaciones",
 ]
 
 TEMPLATE_EXAMPLE = [
@@ -56,6 +72,10 @@ TEMPLATE_EXAMPLE = [
     "-1.25", "-0.50", "90", "+1.00",
     "-1.00", "-0.75", "85", "+1.00",
     "Lentes para lectura y distancia",
+    "-1.00", "8.6", "14.2", "", "", "",
+    "-0.75", "8.6", "14.2", "", "", "",
+    "Acuvue", "Esfericos", "Mensual",
+    "Uso diario",
 ]
 
 # Normalizado -> campo canonico.
@@ -73,6 +93,14 @@ HEADER_MAP = {
     "os esfera": "oi_sphere", "os cilindro": "oi_cylinder", "os eje": "oi_axis", "os adicion": "oi_addition",
     "oi esfera": "oi_sphere", "oi cilindro": "oi_cylinder", "oi eje": "oi_axis", "oi adicion": "oi_addition",
     "observaciones receta": "rx_observations", "observaciones": "rx_observations", "observacion": "rx_observations",
+    "lc od poder": "cl_od_power", "lc od curva base": "cl_od_bc", "lc od diametro": "cl_od_dia",
+    "lc od cilindro": "cl_od_cylinder", "lc od eje": "cl_od_axis", "lc od adicion": "cl_od_addition",
+    "lc os poder": "cl_oi_power", "lc os curva base": "cl_oi_bc", "lc os diametro": "cl_oi_dia",
+    "lc os cilindro": "cl_oi_cylinder", "lc os eje": "cl_oi_axis", "lc os adicion": "cl_oi_addition",
+    "lc oi poder": "cl_oi_power", "lc oi curva base": "cl_oi_bc", "lc oi diametro": "cl_oi_dia",
+    "lc oi cilindro": "cl_oi_cylinder", "lc oi eje": "cl_oi_axis", "lc oi adicion": "cl_oi_addition",
+    "lc marca": "cl_brand", "lc tipo de lente": "cl_lens_type", "lc tipo": "cl_lens_type",
+    "lc reemplazo": "cl_replacement", "lc observaciones": "cl_observations", "lc observacion": "cl_observations",
 }
 
 RX_NUMERIC_FIELDS = ["od_sphere", "od_cylinder", "od_axis", "od_addition",
@@ -81,6 +109,17 @@ RX_AXIS_FIELDS = {"od_axis", "oi_axis"}
 RX_LABELS = {
     "od_sphere": "OD Esfera", "od_cylinder": "OD Cilindro", "od_axis": "OD Eje", "od_addition": "OD Adicion",
     "oi_sphere": "OS Esfera", "oi_cylinder": "OS Cilindro", "oi_axis": "OS Eje", "oi_addition": "OS Adicion",
+}
+
+CL_NUMERIC_FIELDS = ["cl_od_power", "cl_od_bc", "cl_od_dia", "cl_od_cylinder", "cl_od_axis", "cl_od_addition",
+                     "cl_oi_power", "cl_oi_bc", "cl_oi_dia", "cl_oi_cylinder", "cl_oi_axis", "cl_oi_addition"]
+CL_AXIS_FIELDS = {"cl_od_axis", "cl_oi_axis"}
+CL_TEXT_FIELDS = ["cl_brand", "cl_lens_type", "cl_replacement", "cl_observations"]
+CL_LABELS = {
+    "cl_od_power": "LC OD Poder", "cl_od_bc": "LC OD Curva Base", "cl_od_dia": "LC OD Diametro",
+    "cl_od_cylinder": "LC OD Cilindro", "cl_od_axis": "LC OD Eje", "cl_od_addition": "LC OD Adicion",
+    "cl_oi_power": "LC OS Poder", "cl_oi_bc": "LC OS Curva Base", "cl_oi_dia": "LC OS Diametro",
+    "cl_oi_cylinder": "LC OS Cilindro", "cl_oi_axis": "LC OS Eje", "cl_oi_addition": "LC OS Adicion",
 }
 _PLANO_ALIASES = ("plano", "pl", "piano", "neutro", "n", "0", "0.0", "0.00")
 
@@ -241,8 +280,18 @@ def _validate_row(excel_row: int, d: dict):
         if v is not None:
             rx_has = True
 
+    cl_vals = {}
+    cl_has = False
+    for f in CL_NUMERIC_FIELDS:
+        v, ok = _parse_optic(d.get(f), as_int=(f in CL_AXIS_FIELDS))
+        if not ok:
+            return None, {"row": excel_row, "name": full, "reason": f"Dato de lente de contacto invalido en columna '{CL_LABELS[f]}'"}
+        cl_vals[f] = v
+        if v is not None:
+            cl_has = True
+
     rx_date_iso, date_ok = _parse_date(d.get("rx_date"))
-    if rx_has and not date_ok:
+    if (rx_has or cl_has) and not date_ok:
         return None, {"row": excel_row, "name": full, "reason": "Fecha de receta invalida (use AAAA-MM-DD)"}
 
     parts = full.split()
@@ -265,7 +314,9 @@ def _validate_row(excel_row: int, d: dict):
         "address": _cell_str(d.get("address")) or None,
         "rx": rx_vals if rx_has else None,
         "rx_observations": _cell_str(d.get("rx_observations")) or None,
-        "rx_date": rx_date_iso if rx_has else None,
+        "cl": cl_vals if cl_has else None,
+        "cl_text": {f: (_cell_str(d.get(f)) or None) for f in CL_TEXT_FIELDS} if cl_has else None,
+        "rx_date": rx_date_iso if (rx_has or cl_has) else None,
         "match_key": ("email:" + email) if email else ("phone:" + phone),
     }
     return clean, None
@@ -327,7 +378,10 @@ def _build_template_workbook() -> io.BytesIO:
         "    paciente se toman de la PRIMERA fila; cada fila adicional solo agrega una",
         "    receta a su historial.",
         "11. 'Fecha de receta' (AAAA-MM-DD) es opcional y fecha cada receta del historial.",
-        "12. La fila de ejemplo de la hoja 'Pacientes' puedes borrarla antes de subir.",
+        "12. LENTES DE CONTACTO: las columnas que empiezan con 'LC' son opcionales; si las",
+        "    llenas se guarda tambien una receta de lentes de contacto. Una fila puede traer",
+        "    receta de anteojos, de lentes de contacto, o ambas.",
+        "13. La fila de ejemplo de la hoja 'Pacientes' puedes borrarla antes de subir.",
     ]
     for i, line in enumerate(notes, start=1):
         c = ws2.cell(row=i, column=1, value=line)
@@ -372,7 +426,7 @@ async def preview_import(file: UploadFile = File(...), user: dict = Depends(get_
     content = await _read_upload(file)
     headers, rows = await asyncio.to_thread(_read_rows, content, file.filename)
 
-    valid, errors, has_rx = [], [], 0
+    valid, errors, has_rx, has_cl = [], [], 0, 0
     for excel_row, d in rows:
         clean, err = _validate_row(excel_row, d)
         if err:
@@ -381,6 +435,8 @@ async def preview_import(file: UploadFile = File(...), user: dict = Depends(get_
             valid.append(clean)
             if clean["rx"]:
                 has_rx += 1
+            if clean["cl"]:
+                has_cl += 1
 
     company_oid = ObjectId(user["company_id"])
     max_p = effective_max_patients(company, plan)
@@ -421,7 +477,7 @@ async def preview_import(file: UploadFile = File(...), user: dict = Depends(get_
         return {
             "row": c["row"], "name": c["full_name"], "phone": c["phone"],
             "email": c["email"] or "", "birth_date": c["birth_date"] or "",
-            "gender": c["gender"] or "", "has_rx": bool(c["rx"]),
+            "gender": c["gender"] or "", "has_rx": bool(c["rx"]), "has_cl": bool(c["cl"]),
         }
 
     return {
@@ -429,6 +485,7 @@ async def preview_import(file: UploadFile = File(...), user: dict = Depends(get_
         "valid_count": len(valid),
         "error_count": len(errors),
         "has_rx_count": has_rx,
+        "has_contact_count": has_cl,
         "distinct_patients": len(seen_keys),
         "new_patients": new_patients,
         "update_patients": update_patients,
@@ -463,7 +520,7 @@ async def commit_import(request: Request, file: UploadFile = File(...), user: di
     current = await db.patients.count_documents({"company_id": company_oid, "is_deleted": {"$ne": True}})
     available = None if unlimited else max(0, max_p - current)
 
-    created = updated = skipped = rx_created = 0
+    created = updated = skipped = rx_created = cl_created = 0
     skipped_rows = []
     seen = {}            # match_key -> patient_id (primera aparicion en esta carga)
     skipped_keys = set() # pacientes nuevos no creados por tope
@@ -477,12 +534,14 @@ async def commit_import(request: Request, file: UploadFile = File(...), user: di
         doc = await db.patients.find_one({**base, "phone": clean["phone"]})
         return doc["_id"] if doc else None
 
+    def _rx_at(clean):
+        if clean.get("rx_date"):
+            return datetime.strptime(clean["rx_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc).isoformat()
+        return now_iso
+
     async def _create_rx(patient_oid, clean):
         nonlocal rx_created
         rx = clean["rx"]
-        rx_at = now_iso
-        if clean.get("rx_date"):
-            rx_at = datetime.strptime(clean["rx_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc).isoformat()
         rx_doc = {
             "company_id": company_oid, "patient_id": patient_oid, "consultation_id": None,
             "professional_name": None,
@@ -492,10 +551,35 @@ async def commit_import(request: Request, file: UploadFile = File(...), user: di
             "oi_addition": rx["oi_addition"], "oi_dp": None,
             "observations": clean["rx_observations"], "lens_type": None, "frame_type": None,
             "source": "import",
-            "created_at": rx_at, "created_by": actor_oid,
+            "created_at": _rx_at(clean), "created_by": actor_oid,
         }
         await db.eyeglass_prescriptions.insert_one(rx_doc)
         rx_created += 1
+
+    async def _create_contact_rx(patient_oid, clean):
+        nonlocal cl_created
+        cl = clean["cl"]
+        txt = clean["cl_text"] or {}
+        cl_doc = {
+            "company_id": company_oid, "patient_id": patient_oid, "consultation_id": None,
+            "professional_name": None,
+            "od_power": cl["cl_od_power"], "od_bc": cl["cl_od_bc"], "od_dia": cl["cl_od_dia"],
+            "od_cylinder": cl["cl_od_cylinder"], "od_axis": cl["cl_od_axis"], "od_addition": cl["cl_od_addition"],
+            "oi_power": cl["cl_oi_power"], "oi_bc": cl["cl_oi_bc"], "oi_dia": cl["cl_oi_dia"],
+            "oi_cylinder": cl["cl_oi_cylinder"], "oi_axis": cl["cl_oi_axis"], "oi_addition": cl["cl_oi_addition"],
+            "brand": txt.get("cl_brand"), "lens_type": txt.get("cl_lens_type"), "replacement": txt.get("cl_replacement"),
+            "observations": txt.get("cl_observations"),
+            "source": "import",
+            "created_at": _rx_at(clean), "created_by": actor_oid,
+        }
+        await db.contact_lens_prescriptions.insert_one(cl_doc)
+        cl_created += 1
+
+    async def _create_history(patient_oid, clean):
+        if clean["rx"]:
+            await _create_rx(patient_oid, clean)
+        if clean["cl"]:
+            await _create_contact_rx(patient_oid, clean)
 
     def _update_set(clean):
         s = {
@@ -517,8 +601,7 @@ async def commit_import(request: Request, file: UploadFile = File(...), user: di
         # Fila de historial adicional para un paciente ya procesado en esta carga:
         # solo agrega receta, no vuelve a actualizar sus datos ni cuenta como paciente.
         if key in seen:
-            if clean["rx"]:
-                await _create_rx(seen[key], clean)
+            await _create_history(seen[key], clean)
             continue
         if key in skipped_keys:
             continue  # paciente nuevo omitido por tope; sus filas extra tambien se omiten
@@ -548,8 +631,7 @@ async def commit_import(request: Request, file: UploadFile = File(...), user: di
             if not unlimited:
                 available -= 1
         seen[key] = patient_oid
-        if clean["rx"]:
-            await _create_rx(patient_oid, clean)
+        await _create_history(patient_oid, clean)
 
     if created:
         await _notify_patient_limit(company, plan, user["company_id"])
@@ -558,7 +640,8 @@ async def commit_import(request: Request, file: UploadFile = File(...), user: di
         "PATIENTS_IMPORTED", actor_id=user["_id"], actor_email=user.get("email"),
         actor_role=user["role"], company_id=user["company_id"],
         metadata={"created": created, "updated": updated, "skipped_limit": skipped,
-                  "errors": len(error_rows), "prescriptions": rx_created, "filename": file.filename},
+                  "errors": len(error_rows), "prescriptions": rx_created,
+                  "contact_prescriptions": cl_created, "filename": file.filename},
         request=request,
     )
 
@@ -569,6 +652,7 @@ async def commit_import(request: Request, file: UploadFile = File(...), user: di
         "skipped_limit": skipped,
         "errors": len(error_rows),
         "prescriptions_created": rx_created,
+        "contact_prescriptions_created": cl_created,
         "error_rows": error_rows,
         "skipped_rows": skipped_rows,
         "limit": {"unlimited": unlimited, "max": None if unlimited else max_p},

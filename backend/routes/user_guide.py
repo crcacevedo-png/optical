@@ -229,17 +229,17 @@ def _toc(story, styles):
         ("3.7", "Mi Plan, suscripcion y cobros", "12"),
         ("3.8", "Ingreso masivo de pacientes", "13"),
         ("4", "Guia para el Vendedor", "14"),
-        ("4.1", "Registro de pacientes", "14"),
-        ("4.2", "Cotizaciones y ventas", "15"),
-        ("4.3", "Manejo de caja diaria", "16"),
-        ("4.4", "Agenda y citas", "17"),
-        ("5", "Guia para el Doctor / Optometrista", "18"),
-        ("5.1", "Consultas oftalmologicas", "18"),
-        ("5.2", "Recetas de anteojos, contacto y medicas", "19"),
-        ("5.3", "Historial clinico del paciente", "20"),
-        ("6", "Modulo especial: Jornadas", "21"),
-        ("7", "Buenas practicas y consejos", "22"),
-        ("8", "Soporte y contacto", "23"),
+        ("4.1", "Registro de pacientes", "15"),
+        ("4.2", "Cotizaciones y ventas", "16"),
+        ("4.3", "Manejo de caja diaria", "17"),
+        ("4.4", "Agenda y citas", "18"),
+        ("5", "Guia para el Doctor / Optometrista", "19"),
+        ("5.1", "Consultas oftalmologicas", "19"),
+        ("5.2", "Recetas de anteojos, contacto y medicas", "20"),
+        ("5.3", "Historial clinico del paciente", "21"),
+        ("6", "Modulo especial: Jornadas", "22"),
+        ("7", "Buenas practicas y consejos", "23"),
+        ("8", "Soporte y contacto", "24"),
     ]
     rows = []
     for num, title, page in items:
@@ -621,6 +621,9 @@ def _admin_section(story, styles):
     story.append(_bullets([
         "Las columnas de graduacion (<b>OD/OS</b>: Esfera, Cilindro, Eje, Adicion) y las Observaciones son "
         "opcionales. Si las llenas, se guarda una <b>receta de anteojos</b> ligada al paciente como su historial.",
+        "Las columnas que empiezan con <b>LC</b> (Poder, Curva Base, Diametro, Cilindro, Eje, Adicion, Marca, "
+        "Tipo de lente, Reemplazo) son opcionales y guardan una <b>receta de lentes de contacto</b>. Una misma "
+        "fila puede traer receta de anteojos, de lentes de contacto, o ambas.",
         "Para cargar <b>varias recetas a un mismo paciente</b>, repite su <b>correo o telefono</b> en varias filas "
         "(una receta por fila). Los datos del paciente se toman de la <b>primera fila</b> y cada fila adicional "
         "solo agrega una receta a su historial.",

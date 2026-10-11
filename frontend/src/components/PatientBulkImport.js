@@ -126,7 +126,7 @@ export function PatientBulkImport() {
             <div className="flex-1">
               <p className="text-sm font-semibold text-slate-800">Descarga la plantilla y llenala con tus pacientes</p>
               <p className="text-xs text-slate-500 mt-0.5">
-                Incluye las columnas correctas, una fila de ejemplo e instrucciones. 'Nombre completo' y 'Telefono' son obligatorios.
+                Incluye las columnas correctas, una fila de ejemplo e instrucciones. 'Nombre completo' y 'Telefono' son obligatorios; las columnas de graduacion (anteojos y lentes de contacto "LC") son opcionales.
               </p>
               <div className="flex flex-wrap gap-2 mt-3">
                 <Button type="button" variant="outline" size="sm" disabled={downloading}
@@ -197,10 +197,10 @@ export function PatientBulkImport() {
               <PreviewStat label="Con error" value={preview.error_count} tone="red" icon={<AlertTriangle className="w-4 h-4" />} testid="preview-errors" />
             </div>
 
-            {preview.has_rx_count > 0 && (
+            {(preview.has_rx_count > 0 || preview.has_contact_count > 0) && (
               <p className="text-xs text-blue-700 flex items-center gap-1.5" data-testid="preview-rx-note">
                 <Glasses className="w-3.5 h-3.5 shrink-0" />
-                Se guardaran {preview.has_rx_count} recetas de historial. Puedes repetir un paciente en varias filas para cargarle varias recetas.
+                Se guardaran {preview.has_rx_count} recetas de anteojos y {preview.has_contact_count ?? 0} de lentes de contacto. Puedes repetir un paciente en varias filas para cargarle varias recetas.
               </p>
             )}
 
@@ -281,9 +281,9 @@ export function PatientBulkImport() {
               <PreviewStat label="Fuera de tope" value={report.skipped_limit} tone="amber" icon={<Users className="w-4 h-4" />} testid="import-count-skipped" />
               <PreviewStat label="Con error" value={report.errors} tone="red" icon={<AlertTriangle className="w-4 h-4" />} testid="import-count-errors" />
             </div>
-            {report.prescriptions_created > 0 && (
+            {(report.prescriptions_created > 0 || report.contact_prescriptions_created > 0) && (
               <p className="text-xs text-blue-700 flex items-center gap-1.5">
-                <Glasses className="w-3.5 h-3.5" /> Se guardaron {report.prescriptions_created} recetas de anteojos como historial inicial.
+                <Glasses className="w-3.5 h-3.5" /> Se guardaron {report.prescriptions_created} recetas de anteojos y {report.contact_prescriptions_created ?? 0} de lentes de contacto como historial.
               </p>
             )}
 
