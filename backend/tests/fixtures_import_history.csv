@@ -1,5 +1,0 @@
-Nombre completo,Telefono,WhatsApp,Correo electronico,Fecha de nacimiento (AAAA-MM-DD),Sexo (M/F),Direccion,Fecha de receta (AAAA-MM-DD),OD Esfera,OD Cilindro,OD Eje,OD Adicion,OS Esfera,OS Cilindro,OS Eje,OS Adicion,Observaciones receta
-ZZHist Carlos Ramirez,50033001,,carlos.zzhist@ejemplo.com,1980-02-02,M,Zona 10,2022-01-15,-1.00,-0.25,90,,-1.00,-0.25,88,,Primera receta 2022
-ZZHist Carlos Ramirez,50033001,,carlos.zzhist@ejemplo.com,,,,2023-03-20,-1.50,-0.50,90,,-1.25,-0.50,88,,Segunda receta 2023
-ZZHist Carlos Ramirez,50033001,,carlos.zzhist@ejemplo.com,,,,2024-06-10,-1.75,-0.50,92,+1.00,-1.50,-0.50,90,+1.00,Tercera receta 2024 con adicion
-ZZHist Ana Solis,50033002,,,1995-07-07,F,Zona 4,,,,,,,,,,
