@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Settings, Building2, Upload, FileText, Save, ImageIcon, Glasses, Pill, ShieldCheck, Lock, KeyRound, Server, Users as UsersIcon, Activity, Database, Download, BookOpen, MessageCircle, Copy, Link as LinkIcon } from 'lucide-react';
 import { RolePermissionsSection } from '../components/RolePermissionsSection';
 import SessionsPanel from '../components/security/SessionsPanel';
+import { PatientBulkImport } from '../components/PatientBulkImport';
 import { Monitor } from 'lucide-react';
 
 const PRESCRIPTION_FONTS = [
@@ -652,6 +653,9 @@ export default function SettingsPage() {
 
         {/* Permisos por Rol (admin only) */}
         {user?.role === 'admin' && <RolePermissionsSection />}
+
+        {/* Ingreso masivo de pacientes (admin only) */}
+        {user?.role === 'admin' && <PatientBulkImport />}
 
         {/* Documentacion (admin y superadmin) */}
         {(user?.role === 'admin' || user?.role === 'superadmin') && (

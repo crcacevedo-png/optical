@@ -20,7 +20,7 @@ from routes import (
     notifications, security, data_export, audit_log, onboarding, health_metrics,
     cash_register, support_tickets, billing, jornadas, jornada_ops, jornada_consignment,
     superadmin_retention, reactivation_feedback, sessions, security_reports, user_guide,
-    email_queue_admin, leads, registration,
+    email_queue_admin, leads, registration, patients_import,
 )
 
 app = FastAPI(title="Cortexia Optical API")
@@ -71,6 +71,7 @@ api_router.include_router(user_guide.router)
 api_router.include_router(email_queue_admin.router)
 api_router.include_router(leads.router)
 api_router.include_router(registration.router)
+api_router.include_router(patients_import.router)
 api_router.include_router(billing.cron_router)
 api_router.include_router(registration.cron_router)
 # Cron de la plataforma (Bearer WEBHOOK_CRON_SECRET) va bajo /api/cron/* via api_router.

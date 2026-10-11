@@ -1,0 +1,5 @@
+Nombre completo,Telefono,WhatsApp,Correo electronico,Fecha de nacimiento (AAAA-MM-DD),Sexo (M/F),Direccion,OD Esfera,OD Cilindro,OD Eje,OD Adicion,OS Esfera,OS Cilindro,OS Eje,OS Adicion,Observaciones receta
+QAImport Alpha Perez,50099001,,qa.alpha@ejemplo.com,1990-05-12,F,Zona 1,-1.25,-0.50,90,+1.00,-1.00,plano,85,+1.00,Historial inicial
+QAImport Beta Lopez,50099002,,,1985-03-01,M,Zona 2,,,,,,,,,
+,50099003,,qa.gamma@ejemplo.com,2000-01-01,M,Zona 3,,,,,,,,,
+QAImport Delta Mal,50099005,,,13/45/2020,M,Zona 5,,,,,,,,,
