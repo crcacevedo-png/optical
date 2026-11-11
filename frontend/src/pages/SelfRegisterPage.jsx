@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '../components/ui/select';
 import { CheckCircle2, Loader2, Sparkles, Eye, EyeOff, MailCheck, ShieldCheck, Glasses, Users, Lock } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -19,6 +20,31 @@ const OVERLAY_MOBILE =
   'linear-gradient(to top, rgba(8,14,26,0.94) 0%, rgba(12,22,40,0.70) 60%, rgba(16,28,52,0.45) 100%)';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Códigos de país (LatAm + principales) para el número de WhatsApp — plataforma internacional.
+const COUNTRIES = [
+  { iso: 'GT', name: 'Guatemala', dial: '502' },
+  { iso: 'MX', name: 'México', dial: '52' },
+  { iso: 'CO', name: 'Colombia', dial: '57' },
+  { iso: 'CL', name: 'Chile', dial: '56' },
+  { iso: 'AR', name: 'Argentina', dial: '54' },
+  { iso: 'PE', name: 'Perú', dial: '51' },
+  { iso: 'BO', name: 'Bolivia', dial: '591' },
+  { iso: 'PY', name: 'Paraguay', dial: '595' },
+  { iso: 'UY', name: 'Uruguay', dial: '598' },
+  { iso: 'EC', name: 'Ecuador', dial: '593' },
+  { iso: 'VE', name: 'Venezuela', dial: '58' },
+  { iso: 'HN', name: 'Honduras', dial: '504' },
+  { iso: 'SV', name: 'El Salvador', dial: '503' },
+  { iso: 'NI', name: 'Nicaragua', dial: '505' },
+  { iso: 'CR', name: 'Costa Rica', dial: '506' },
+  { iso: 'PA', name: 'Panamá', dial: '507' },
+  { iso: 'DO', name: 'República Dominicana', dial: '1' },
+  { iso: 'BR', name: 'Brasil', dial: '55' },
+  { iso: 'US', name: 'Estados Unidos', dial: '1' },
+  { iso: 'ES', name: 'España', dial: '34' },
+];
+const dialOf = (iso) => (COUNTRIES.find((c) => c.iso === iso) || COUNTRIES[0]).dial;
 
 const CONSENT_TEXT =
   'Acepto que Cortexia Optical utilice mis datos para crear y administrar mi cuenta, y para contactarme por WhatsApp y correo electrónico. Mis datos serán tratados de forma confidencial y puedo solicitar su eliminación cuando lo desee.';
@@ -48,7 +74,7 @@ export default function SelfRegisterPage() {
   const [searchParams] = useSearchParams();
   const [form, setForm] = useState({
     name: '', optica_name: '', email: '', password: '', confirm: '',
-    whatsapp: '', location: '', promo_code: '', consent: false, website: '',
+    country: 'GT', whatsapp: '', location: '', promo_code: '', consent: false, website: '',
   });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -88,7 +114,7 @@ export default function SelfRegisterPage() {
     if (f.confirm !== f.password) e.confirm = 'Las contraseñas no coinciden.';
     const digits = (f.whatsapp || '').replace(/[^0-9]/g, '');
     if (!f.whatsapp.trim()) e.whatsapp = 'El número de WhatsApp es obligatorio.';
-    else if (digits.length < 8) e.whatsapp = 'Ingresa un número de WhatsApp válido.';
+    else if (digits.length < 6 || digits.length > 15) e.whatsapp = 'Ingresa un número de WhatsApp válido.';
     if (!f.consent) e.consent = 'Debes aceptar el consentimiento para continuar.';
     return e;
   };
@@ -114,7 +140,7 @@ export default function SelfRegisterPage() {
         optica_name: form.optica_name.trim(),
         email: form.email.trim(),
         password: form.password,
-        whatsapp: form.whatsapp.trim(),
+        whatsapp: `+${dialOf(form.country)} ${form.whatsapp.trim()}`,
         location: form.location.trim(),
         promo_code: form.promo_code.trim(),
         consent: form.consent,
@@ -311,12 +337,27 @@ export default function SelfRegisterPage() {
 
                   <div>
                     <Label htmlFor="whatsapp" className="text-slate-700">Número de WhatsApp *</Label>
-                    <Input id="whatsapp" data-testid="register-whatsapp-input" value={form.whatsapp} inputMode="tel"
-                      onChange={(e) => setField('whatsapp', e.target.value)} onBlur={() => blur('whatsapp')}
-                      placeholder="Ej: 5555 5555 (Guatemala)" className="mt-1 h-11 rounded-xl focus-visible:ring-[#13B8B0]" />
+                    <div className="mt-1 flex items-start gap-2">
+                      <Select value={form.country} onValueChange={(v) => setField('country', v)}>
+                        <SelectTrigger data-testid="register-country-code-select"
+                          className="h-11 w-[116px] shrink-0 rounded-xl focus:ring-[#13B8B0]">
+                          <span className="font-medium text-slate-700">+{dialOf(form.country)}</span>
+                        </SelectTrigger>
+                        <SelectContent className="max-h-72">
+                          {COUNTRIES.map((c) => (
+                            <SelectItem key={c.iso} value={c.iso} data-testid={`register-country-opt-${c.iso}`}>
+                              {c.name} (+{c.dial})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input id="whatsapp" data-testid="register-whatsapp-input" value={form.whatsapp} inputMode="tel"
+                        onChange={(e) => setField('whatsapp', e.target.value)} onBlur={() => blur('whatsapp')}
+                        placeholder="Ej: 5555 5555" className="flex-1 h-11 rounded-xl focus-visible:ring-[#13B8B0]" />
+                    </div>
                     {errors.whatsapp
                       ? <p className="text-xs text-red-500 mt-1" data-testid="error-whatsapp">{errors.whatsapp}</p>
-                      : <p className="text-xs text-slate-400 mt-1">Si es de Guatemala, basta con los 8 dígitos.</p>}
+                      : <p className="text-xs text-slate-400 mt-1">Elige el código de tu país e ingresa tu número.</p>}
                   </div>
 
                   <div>

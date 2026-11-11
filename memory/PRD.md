@@ -1,5 +1,8 @@
 # PRD: Cortexia Optical - Plataforma SaaS para Opticas
 
+### Registro: código de país para WhatsApp (internacional) — Jun 2026
+`SelfRegisterPage.jsx` (`/registro`): el campo "Número de WhatsApp" ahora tiene un **selector de código de país** (Select shadcn) a la izquierda del número, con 20 países LatAm + USA/España (default Guatemala +502). Al enviar se compone `+{dial} {numero}` y el backend `_normalize_wa` lo guarda como `+{digitos}` (E.164). Validación: 6–15 dígitos locales. data-testids: `register-country-code-select`, `register-country-opt-{ISO}`. Verificado: UI (selector +502 inline) + normalización por código (GT/MX/CO/US/AR). NOTA: cambio en preview; requiere re-publicar para que llegue a producción (cortexiaoptical.com).
+
 ## Problema Original
 Plataforma web SaaS multi-tenant para administracion integral de opticas en Latinoamerica.
 
