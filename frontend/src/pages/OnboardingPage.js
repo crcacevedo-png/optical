@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../context/AuthContext';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, useCurrency } from '../context/AuthContext';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Progress } from '../components/ui/progress';
@@ -100,6 +100,7 @@ export const STEPS = [
 
 export default function OnboardingPage() {
   const { user } = useAuth();
+  const { currency, currencyInfo } = useCurrency();
   const navigate = useNavigate();
   const [progress, setProgress] = useState({});
   const [loading, setLoading] = useState(true);
@@ -296,6 +297,21 @@ export default function OnboardingPage() {
                       <p className="text-sm text-slate-500 leading-relaxed mb-3">
                         {step.description}
                       </p>
+                      {step.id === 'choose_currency' && (
+                        <div
+                          className="flex items-start gap-2.5 mb-3 rounded-xl border border-[#6D35D8]/20 bg-[#6D35D8]/[0.06] px-3.5 py-2.5"
+                          data-testid="onboarding-detected-currency"
+                        >
+                          <Coins className="w-4 h-4 text-[#6D35D8] shrink-0 mt-0.5" strokeWidth={2} />
+                          <p className="text-sm text-slate-700 leading-relaxed">
+                            Detectamos que tu óptica usa{' '}
+                            <strong className="text-[#6D35D8]">
+                              {currencyInfo.name} ({currencyInfo.symbol} · {currency})
+                            </strong>
+                            , según el país de tu registro. Ya quedó preseleccionada; puedes confirmarla o cambiarla al elegir moneda.
+                          </p>
+                        </div>
+                      )}
                       {!done && (
                         <Button
                           size="sm"
