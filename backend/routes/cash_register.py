@@ -21,7 +21,7 @@ from reportlab.platypus import (
 )
 
 from db import db, serialize_doc
-from currency_config import format_amount, company_currency
+from currency_config import format_amount, company_currency, excel_number_format
 from auth_utils import get_current_user
 from audit import log_audit
 
@@ -531,11 +531,7 @@ async def cash_register_report(
 
 
 def _fmt_q(v) -> str:
-    try:
-        n = float(v or 0)
-    except (TypeError, ValueError):
-        n = 0.0
-    return f"Q {n:,.2f}"
+    return format_amount(v, "GTQ")
 
 
 @router.get("/report/pdf")
@@ -893,12 +889,12 @@ async def cash_register_single_pdf(register_id: str, user: dict = Depends(get_cu
     )
 
 
-def _render_cierre_egresos_xlsx(reg: dict, egresos: list, company_name: str, branch_name: Optional[str]) -> bytes:
+def _render_cierre_egresos_xlsx(reg: dict, egresos: list, company_name: str, branch_name: Optional[str], currency_code: str = "GTQ") -> bytes:
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
     header_font = Font(bold=True, color="FFFFFF", size=11)
     header_fill = PatternFill(start_color="7F1D1D", end_color="7F1D1D", fill_type="solid")
-    money = 'Q #,##0.00'
+    money = excel_number_format(currency_code)
 
     wb = Workbook()
     ws = wb.active
@@ -968,14 +964,14 @@ async def cash_register_egresos_xlsx(register_id: str, user: dict = Depends(get_
         egresos = reg.get("egresos_detail") or []
 
     _serialize(reg)
-    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1})
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1, "currency": 1})
     company_name = (company or {}).get("name", "Optica")
     branch_name = None
     if branch_oid:
         b = await db.branches.find_one({"_id": branch_oid}, {"name": 1})
         branch_name = (b or {}).get("name")
 
-    xlsx_bytes = await asyncio.to_thread(_render_cierre_egresos_xlsx, reg, egresos, company_name, branch_name)
+    xlsx_bytes = await asyncio.to_thread(_render_cierre_egresos_xlsx, reg, egresos, company_name, branch_name, company_currency(company))
 
     await log_audit("CASH_REGISTER_EGRESOS_XLSX", actor_id=user["_id"], actor_email=user.get("email"),
                     metadata={"register_id": register_id, "count": len(egresos)})

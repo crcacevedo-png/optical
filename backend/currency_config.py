@@ -49,6 +49,13 @@ def format_amount(value, code="GTQ") -> str:
     return f"{c['symbol']} {num}"
 
 
+def excel_number_format(code="GTQ") -> str:
+    """Formato numerico de openpyxl con el simbolo de la moneda (0 decimales para CLP/PYG)."""
+    c = get_currency(code)
+    base = "#,##0.00" if c["decimals"] else "#,##0"
+    return f'"{c["symbol"]} "{base}'
+
+
 def company_currency(company) -> str:
     """Devuelve el codigo de moneda de la optica (default GTQ)."""
     code = (company or {}).get("currency")

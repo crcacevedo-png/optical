@@ -22,7 +22,7 @@ import re
 import asyncio
 
 from db import db, serialize_doc
-from currency_config import currency_symbol, company_currency
+from currency_config import currency_symbol, company_currency, format_amount
 from auth_utils import get_current_user
 from audit import log_audit
 
@@ -251,7 +251,8 @@ async def close_jornada_cash(
     totals = await _compute_jornada_cash_totals(j["_id"], reg)
     diff = round(float(data.counted_cash or 0) - float(totals["expected_cash"] or 0), 2)
     if abs(diff) > 0.01 and not (data.counted_notes or "").strip():
-        raise HTTPException(status_code=400, detail=f"Diferencia de Q{diff}. Ingresa un motivo/justificacion.")
+        _co = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"currency": 1}) or {}
+        raise HTTPException(status_code=400, detail=f"Diferencia de {format_amount(diff, company_currency(_co))}. Ingresa un motivo/justificacion.")
     now = datetime.now(timezone.utc).isoformat()
     set_fields = {
         "status": "closed",

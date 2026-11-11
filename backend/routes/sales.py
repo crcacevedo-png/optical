@@ -606,9 +606,9 @@ def _render_sale_receipt_pdf(sale: dict, company: dict, patient_name: str, selle
         py -= 0.22 * inch
         c.setFont("Helvetica", 8.5)
         for p in pays:
-            m = method_labels.get(p.get("method"), p.get("method", ""))
+            method_label = method_labels.get(p.get("method"), p.get("method", ""))
             c.setFillColor(colors.black)
-            c.drawString(0.42 * inch, py, m)
+            c.drawString(0.42 * inch, py, method_label)
             c.drawString(2.2 * inch, py, m(p.get('amount', 0)))
             py -= 0.2 * inch
             if py < 0.9 * inch:

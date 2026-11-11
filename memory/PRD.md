@@ -6,7 +6,7 @@ Plataforma web SaaS multi-tenant para administracion integral de opticas en Lati
 ## Arquitectura
 - Frontend: React 19 + Tailwind CSS + Shadcn UI + Recharts
 - Backend: FastAPI + Motor (MongoDB async) - Modular (22 archivos de rutas)
-- Auth: JWT con cookies httpOnly | Moneda: GTQ | Idioma: Espanol
+- Auth: JWT con cookies httpOnly | Moneda: multi-moneda LatAm+USD por optica (default GTQ) | Idioma: Espanol
 
 
 
@@ -27,6 +27,18 @@ Ampliacion de la importacion masiva para soportar **varias recetas por paciente 
 - **Frontend `components/PatientBulkImport.js`**: la vista previa ahora muestra 4 contadores **Filas detectadas / Pacientes nuevos (`preview-new`) / A actualizar (`preview-update`) / Con error (`preview-errors`)** + nota azul de recetas de historial (`preview-rx-note`); `willSkip` usa `new_patients`. Pista bajo el area de carga: repetir correo/telefono en varias filas para cargar varias recetas.
 - **Guia de usuario `routes/user_guide.py`**: nueva subseccion **"3.8 Ingreso masivo de pacientes"** (pasos, historial multiple, fecha de receta, duplicados y tope) + entradas en la Tabla de Contenidos (paginas re-numeradas; el PDF ahora tiene **23 paginas**). Verificado `_build_pdf()` 23 paginas con el texto nuevo presente.
 - **Verificado**: curl E2E (3 filas del mismo Juan por correo -> preview new=2/update=0/has_rx=3; commit created=2/updated=0/prescriptions=3; el paciente queda con 3 recetas fechadas 2022/2023/2024 ordenadas desc) + testing agent iteration_19 100% (UI admin: preview new/update/nota historial + reporte). Datos QA limpiados.
+
+### Seleccion de moneda para Latinoamerica — Fase 1 MVP (Jun 2026)
+Cada optica elige la moneda en la que opera (unica por empresa, compartida por todas las sucursales/usuarios). **Solo presentacion**: cambia simbolo y formato; NO convierte ni recalcula montos historicos. Default y retrocompatible: **GTQ (Q)**.
+- **Catalogo compartido**: `frontend/src/lib/currency.js` y `backend/currency_config.py` (en sincronia). 16 monedas: GTQ, USD, MXN, COP, CLP(0 dec), ARS, PEN(S/), BOB, PYG(₲,0 dec), UYU, HNL, NIO, CRC, DOP, BRL, VES. Helpers: `formatCurrency`/`format_amount` (agrupa con coma estilo LatAm, decimales por moneda), `currency_symbol`, `is_valid_currency`, `company_currency`, `excel_number_format` (formato openpyxl por moneda).
+- **Persistencia/sesion**: campo `currency` en el doc `companies`. `PUT /api/settings/company` acepta y valida `currency` (invalida -> 400; solo admin -> 403 para vendedor). `/api/auth/login` y `/api/auth/me` devuelven `currency` (default GTQ si falta).
+- **Frontend**: `AuthContext` fija la moneda activa (singleton `setActiveCurrency`) y expone `useCurrency`. Nueva tarjeta **`CurrencySettingsCard.js`** en `/settings` (solo admin): selector buscable (Popover+Command) con nombre/pais/simbolo, estado actual (`current-currency`), dialogo de **confirmacion** que aclara que no convierte montos. Tras guardar hace `checkAuth()` y auto-marca el paso de onboarding. 19 archivos operativos migrados a `formatCurrency` (dashboard, ventas/POS, inventario, finanzas, cuentas por cobrar/pagar, cotizaciones, caja, jornadas, reportes). `SuperAdminDashboard` queda en Q a proposito (metricas agregadas de plataforma).
+- **Documentos backend** reflejan la moneda de la optica: recibo de venta PDF + mensaje WhatsApp (`sales.py`), cotizacion PDF (`quotations.py`), cierre/arqueo de caja PDF + egresos.xlsx (`cash_register.py`), P&L PDF + xlsx, compras.xlsx, egresos.xlsx (`finance.py`), reportes.xlsx (`reports.py`), recibo + reporte de jornada PDF (`jornada_ops.py`, `jornada_consignment.py`). Excel usa `excel_number_format` (CLP/PYG sin decimales).
+- **Onboarding**: nuevo paso `choose_currency` ("Elige la moneda de tu optica", CTA a `/settings`) en `OnboardingPage.js` STEPS + `ALLOWED_STEP_IDS`; se marca completado automaticamente al guardar la moneda.
+- **Guia de usuario** `user_guide.py`: subseccion **3.1.1 "Moneda de tu optica"** dentro de configuracion inicial (admin, lista LatAm+USD, aviso de solo-presentacion) + entrada en el indice; paginacion re-ajustada (PDF ahora **25 paginas**).
+- **data-testids**: `currency-settings-card`, `current-currency`, `currency-select-trigger`, `currency-search-input`, `currency-option-{CODE}`, `currency-save-btn`, `currency-confirm-dialog`, `currency-confirm-btn`, `currency-cancel-btn`, `step-choose_currency`.
+- **Verificado**: testing agent iteration_21 (backend 14/14 tras corregir un shadow de variable `m` en el recibo; frontend 100%: tarjeta, selector buscable, confirmacion, propagacion del simbolo en todas las pantallas, vendedor sin tarjeta, onboarding auto-completado). Issues menores de Excel con "Q" fijo corregidos despues (finance x3, caja egresos, helper `_fmt_q` legacy, mensaje de diferencia de caja) y re-verificados: curl E2E en vivo (PEN -> recibo PDF 200, finanzas xlsx 200, P&L xlsx 200; reset a GTQ) + unit check de number_format (PEN `"S/ "#,##0.00`, CLP `"$ "#,##0`). Optica demo restaurada a GTQ.
+
 
 ### Importacion de pacientes — Fase 2: Recetas de lentes de contacto (Jun 2026)
 El MISMO archivo de importacion ahora tambien carga **recetas de lentes de contacto** (no solo anteojos), por pedido del usuario.

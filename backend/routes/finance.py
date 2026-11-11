@@ -7,7 +7,7 @@ import io
 import asyncio
 
 from db import db, serialize_doc
-from currency_config import format_amount, company_currency
+from currency_config import format_amount, company_currency, excel_number_format
 from auth_utils import get_current_user
 from models import FinanceEntryCreate
 from audit import log_audit
@@ -402,9 +402,9 @@ async def purchases_report_xlsx(
     entries = await db.finance_entries.find(query).sort("date", -1).to_list(5000)
     for e in entries:
         serialize_doc(e)
-    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1}) or {}
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1, "currency": 1}) or {}
 
-    xlsx_bytes = await asyncio.to_thread(_render_purchases_xlsx, entries, company.get("name", "Cortexia Optical"), d_from, d_to)
+    xlsx_bytes = await asyncio.to_thread(_render_purchases_xlsx, entries, company.get("name", "Cortexia Optical"), d_from, d_to, company_currency(company))
     filename = f"compras-proveedores-{d_from}-a-{d_to}.xlsx"
     return StreamingResponse(
         io.BytesIO(xlsx_bytes),
@@ -413,13 +413,13 @@ async def purchases_report_xlsx(
     )
 
 
-def _render_purchases_xlsx(entries: list, company_name: str, d_from: str, d_to: str) -> bytes:
+def _render_purchases_xlsx(entries: list, company_name: str, d_from: str, d_to: str, currency_code: str = "GTQ") -> bytes:
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
 
     header_font = Font(bold=True, color="FFFFFF", size=11)
     header_fill = PatternFill(start_color="1B2A49", end_color="1B2A49", fill_type="solid")
-    money = 'Q #,##0.00'
+    money = excel_number_format(currency_code)
 
     # Agrupar por proveedor
     by_supplier = {}
@@ -524,9 +524,9 @@ async def expenses_report_xlsx(
     entries = await db.finance_entries.find(query).sort("date", -1).to_list(10000)
     for e in entries:
         serialize_doc(e)
-    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1}) or {}
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1, "currency": 1}) or {}
 
-    xlsx_bytes = await asyncio.to_thread(_render_expenses_xlsx, entries, company.get("name", "Cortexia Optical"), d_from, d_to)
+    xlsx_bytes = await asyncio.to_thread(_render_expenses_xlsx, entries, company.get("name", "Cortexia Optical"), d_from, d_to, company_currency(company))
 
     await log_audit("FINANCE_EXPENSES_REPORT", actor_id=user["_id"], actor_email=user.get("email"),
                     metadata={"date_from": d_from, "date_to": d_to, "count": len(entries)})
@@ -539,12 +539,12 @@ async def expenses_report_xlsx(
     )
 
 
-def _render_expenses_xlsx(entries: list, company_name: str, d_from: str, d_to: str) -> bytes:
+def _render_expenses_xlsx(entries: list, company_name: str, d_from: str, d_to: str, currency_code: str = "GTQ") -> bytes:
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
     header_font = Font(bold=True, color="FFFFFF", size=11)
     header_fill = PatternFill(start_color="7F1D1D", end_color="7F1D1D", fill_type="solid")
-    money = 'Q #,##0.00'
+    money = excel_number_format(currency_code)
 
     by_cat, by_method, total = {}, {}, 0.0
     for e in entries:
@@ -773,8 +773,8 @@ async def income_statement_xlsx(
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
     data = await _compute_income_statement(user, date_from, date_to, branch_id)
-    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1}) or {}
-    xlsx_bytes = await asyncio.to_thread(_render_pl_xlsx, data, company.get("name", "Cortexia Optical"))
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1, "currency": 1}) or {}
+    xlsx_bytes = await asyncio.to_thread(_render_pl_xlsx, data, company.get("name", "Cortexia Optical"), company_currency(company))
     await log_audit("FINANCE_INCOME_STATEMENT", actor_id=user["_id"], actor_email=user.get("email"),
                     metadata={"format": "xlsx", **data["period"]})
     p = data["period"]
@@ -808,10 +808,10 @@ async def income_statement_pdf(
     )
 
 
-def _render_pl_xlsx(data: dict, company_name: str) -> bytes:
+def _render_pl_xlsx(data: dict, company_name: str, currency_code: str = "GTQ") -> bytes:
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
-    money = 'Q #,##0.00'
+    money = excel_number_format(currency_code)
     green_fill = PatternFill(start_color="ECFDF5", end_color="ECFDF5", fill_type="solid")
     red_fill = PatternFill(start_color="FEF2F2", end_color="FEF2F2", fill_type="solid")
 
