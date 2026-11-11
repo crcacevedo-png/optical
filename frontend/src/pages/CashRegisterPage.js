@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 import React, { useState, useEffect, useCallback } from 'react';
 import { api, formatApiErrorDetail, useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -34,8 +35,7 @@ const PAY_METHODS = [
   { value: 'other', label: 'Otro' },
 ];
 
-const fmt = (n) =>
-  `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmt = (n) => formatMoney(n);
 
 const METHOD_META = {
   cash: { label: 'Efectivo', icon: Banknote, color: 'emerald' },

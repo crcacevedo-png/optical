@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 import React, { useState, useEffect } from 'react';
 import { api, formatApiErrorDetail } from '../context/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
@@ -9,8 +10,7 @@ import { PAYMENT_METHODS, referenceLabelFor, referencePlaceholderFor } from './P
 import { HandCoins } from 'lucide-react';
 import { toast } from 'sonner';
 
-const fmt = (n) =>
-  `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmt = (n) => formatMoney(n);
 
 /**
  * Dialogo para registrar un abono sobre una venta pendiente.

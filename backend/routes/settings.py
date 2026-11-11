@@ -7,6 +7,7 @@ from typing import List, Dict
 from db import db, serialize_doc, UPLOADS_DIR
 from auth_utils import get_current_user
 from models import CompanyUpdate
+from currency_config import is_valid_currency
 import object_storage as objstore
 
 router = APIRouter(prefix="/settings", tags=["Configuracion"])
@@ -46,8 +47,7 @@ async def get_my_company(user: dict = Depends(get_current_user)):
     company = await db.companies.find_one({"_id": ObjectId(user["company_id"])})
     if not company:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
-    serialize_doc(company)
-    return company
+    return serialize_doc(company)
 
 @router.put("/company")
 async def update_my_company(data: CompanyUpdate, user: dict = Depends(get_current_user)):
@@ -61,6 +61,8 @@ async def update_my_company(data: CompanyUpdate, user: dict = Depends(get_curren
         k: v for k, v in data.model_dump().items()
         if v is not None and k not in BLOCKED_FIELDS
     }
+    if "currency" in update_data and not is_valid_currency(update_data["currency"]):
+        raise HTTPException(status_code=400, detail="Moneda no valida")
     if not update_data:
         raise HTTPException(status_code=400, detail="Sin datos para actualizar")
     await db.companies.update_one({"_id": ObjectId(user["company_id"])}, {"$set": update_data})

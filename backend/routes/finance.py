@@ -7,6 +7,7 @@ import io
 import asyncio
 
 from db import db, serialize_doc
+from currency_config import format_amount, company_currency
 from auth_utils import get_current_user
 from models import FinanceEntryCreate
 from audit import log_audit
@@ -795,8 +796,8 @@ async def income_statement_pdf(
     if user["role"] == "superadmin":
         raise HTTPException(status_code=403, detail="Acceso denegado")
     data = await _compute_income_statement(user, date_from, date_to, branch_id)
-    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1}) or {}
-    pdf_bytes = await asyncio.to_thread(_render_pl_pdf, data, company.get("name", "Cortexia Optical"))
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1, "currency": 1}) or {}
+    pdf_bytes = await asyncio.to_thread(_render_pl_pdf, data, company.get("name", "Cortexia Optical"), company_currency(company))
     await log_audit("FINANCE_INCOME_STATEMENT", actor_id=user["_id"], actor_email=user.get("email"),
                     metadata={"format": "pdf", **data["period"]})
     p = data["period"]
@@ -845,7 +846,7 @@ def _render_pl_xlsx(data: dict, company_name: str) -> bytes:
     buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
 
 
-def _render_pl_pdf(data: dict, company_name: str) -> bytes:
+def _render_pl_pdf(data: dict, company_name: str, currency_code: str = "GTQ") -> bytes:
     from reportlab.lib.pagesizes import letter
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -853,10 +854,7 @@ def _render_pl_pdf(data: dict, company_name: str) -> bytes:
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 
     def _q(v):
-        try:
-            return f"Q {float(v or 0):,.2f}"
-        except (TypeError, ValueError):
-            return "Q 0.00"
+        return format_amount(v, currency_code)
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=letter, leftMargin=0.7 * inch, rightMargin=0.7 * inch,

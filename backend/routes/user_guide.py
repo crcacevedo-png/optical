@@ -221,25 +221,26 @@ def _toc(story, styles):
         ("2", "Antes de empezar: Primer ingreso", "5"),
         ("3", "Guia para el Administrador", "6"),
         ("3.1", "Configuracion inicial de la optica", "6"),
+        ("3.1.1", "Moneda de tu optica", "6"),
         ("3.2", "Gestion de sucursales y equipo", "6"),
-        ("3.3", "Inventario y proveedores", "7"),
-        ("3.4", "Caja y finanzas", "8"),
-        ("3.5", "Reportes y auditoria", "10"),
-        ("3.6", "Seguridad y sesiones activas", "11"),
-        ("3.7", "Mi Plan, suscripcion y cobros", "12"),
-        ("3.8", "Ingreso masivo de pacientes", "13"),
-        ("4", "Guia para el Vendedor", "14"),
-        ("4.1", "Registro de pacientes", "15"),
-        ("4.2", "Cotizaciones y ventas", "16"),
-        ("4.3", "Manejo de caja diaria", "17"),
-        ("4.4", "Agenda y citas", "18"),
-        ("5", "Guia para el Doctor / Optometrista", "19"),
-        ("5.1", "Consultas oftalmologicas", "19"),
-        ("5.2", "Recetas de anteojos, contacto y medicas", "20"),
-        ("5.3", "Historial clinico del paciente", "21"),
-        ("6", "Modulo especial: Jornadas", "22"),
-        ("7", "Buenas practicas y consejos", "23"),
-        ("8", "Soporte y contacto", "24"),
+        ("3.3", "Inventario y proveedores", "8"),
+        ("3.4", "Caja y finanzas", "9"),
+        ("3.5", "Reportes y auditoria", "11"),
+        ("3.6", "Seguridad y sesiones activas", "12"),
+        ("3.7", "Mi Plan, suscripcion y cobros", "13"),
+        ("3.8", "Ingreso masivo de pacientes", "14"),
+        ("4", "Guia para el Vendedor", "15"),
+        ("4.1", "Registro de pacientes", "16"),
+        ("4.2", "Cotizaciones y ventas", "17"),
+        ("4.3", "Manejo de caja diaria", "18"),
+        ("4.4", "Agenda y citas", "19"),
+        ("5", "Guia para el Doctor / Optometrista", "20"),
+        ("5.1", "Consultas oftalmologicas", "20"),
+        ("5.2", "Recetas de anteojos, contacto y medicas", "21"),
+        ("5.3", "Historial clinico del paciente", "22"),
+        ("6", "Modulo especial: Jornadas", "23"),
+        ("7", "Buenas practicas y consejos", "24"),
+        ("8", "Soporte y contacto", "25"),
     ]
     rows = []
     for num, title, page in items:
@@ -390,9 +391,26 @@ def _admin_section(story, styles):
     story.append(_bullets([
         "<b>Datos de la empresa</b>: nombre comercial, NIT, direccion, telefono, correo.",
         "<b>Logo</b>: sube tu logo (PNG/JPG max 5MB). Aparecera en PDFs, tickets, recetas y cotizaciones.",
-        "<b>Moneda</b>: por defecto Q (quetzales). Cambiala segun tu pais.",
+        "<b>Moneda</b>: elige la moneda en la que opera tu optica desde el selector (ver 3.1.1).",
         "<b>IVA</b>: default 12% (Guatemala). Editable segun regimen fiscal.",
     ], styles))
+
+    story.append(Paragraph("3.1.1 Moneda de tu optica", styles["H3"]))
+    story.append(Paragraph(
+        "En <b>Configuracion → Moneda</b> el administrador elige la moneda en la que opera la optica. "
+        "Esta configuracion es <b>unica por optica</b> y se aplica a todas las sucursales y usuarios.",
+        styles["Body"]))
+    story.append(_bullets([
+        "Incluye las principales monedas de Latinoamerica y el dolar (USD), con nombre, pais y simbolo.",
+        "Por defecto es el <b>Quetzal de Guatemala (Q)</b>.",
+        "Se aplica en ventas, POS, cotizaciones, caja, finanzas, reportes y en los comprobantes/PDF.",
+        "Antes de guardar se pide una <b>confirmacion</b>.",
+    ], styles))
+    story.append(_tip_box(
+        "Cambiar la moneda <b>solo cambia el simbolo y el formato</b> que se muestra. "
+        "No convierte ni recalcula los montos ya registrados: conservan su valor numerico.",
+        styles, color=BRAND_AMBER, title="Importante"
+    ))
 
     story.append(Paragraph("3.2 Gestion de sucursales y equipo", styles["H2"]))
     story.append(Paragraph(

@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 // Tab de Caja de la Jornada
 import React, { useState, useEffect, useCallback } from 'react';
 import { api, formatApiErrorDetail } from '../context/AuthContext';
@@ -16,7 +17,7 @@ import {
 import { toast } from 'sonner';
 import { Wallet, Plus, Minus, ArrowDownCircle, ArrowUpCircle, Lock, Play, CheckCircle2, AlertTriangle } from 'lucide-react';
 
-const fmtQ = (n) => `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtQ = (n) => formatMoney(n);
 
 const CATEGORIES = [
   { key: 'transporte', label: 'Transporte' },

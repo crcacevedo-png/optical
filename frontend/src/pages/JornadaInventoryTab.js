@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 // Tab de Inventario de la Jornada
 import React, { useState, useEffect, useCallback } from 'react';
 import { api, formatApiErrorDetail } from '../context/AuthContext';
@@ -16,7 +17,7 @@ import { toast } from 'sonner';
 import { Package, Truck, Search, Plus, Minus, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import JornadaExcelImport from './JornadaExcelImport';
 
-const fmtQ = (n) => `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtQ = (n) => formatMoney(n);
 
 export default function JornadaInventoryTab({ jornada, reload }) {
   const jid = jornada._id;

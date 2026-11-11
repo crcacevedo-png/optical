@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, formatApiErrorDetail } from '../context/AuthContext';
@@ -20,7 +21,7 @@ const STATUS_META = {
   cancelada: { label: 'Cancelada', cls: 'bg-rose-100 text-rose-700 border-rose-200' },
 };
 
-const fmtQ = (n) => `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtQ = (n) => formatMoney(n);
 const fmtDate = (iso) => (iso ? new Date(iso + 'T00:00:00').toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }) : '');
 
 export default function JornadasPage() {

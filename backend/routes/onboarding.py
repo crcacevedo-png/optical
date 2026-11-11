@@ -14,6 +14,7 @@ router = APIRouter(prefix="/onboarding", tags=["Onboarding"])
 ALLOWED_STEP_IDS = {
     "download_guide",
     "company_data",
+    "choose_currency",
     "branches",
     "users",
     "inventory",

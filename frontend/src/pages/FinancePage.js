@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api, formatApiErrorDetail, useAuth } from '../context/AuthContext';
@@ -132,9 +133,7 @@ export default function FinancePage() {
     }
   };
 
-  const formatCurrency = (amount) => {
-    return `Q ${(amount || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`;
-  };
+  const formatCurrency = (amount) => formatMoney(amount);
 
   const canVoid = (entry) =>
     user && user.role !== 'superadmin' && !entry.is_voided &&

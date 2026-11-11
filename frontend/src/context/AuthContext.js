@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { enqueue as enqueueRequest } from '../lib/offlineQueue';
+import { setActiveCurrency, formatCurrency as fmtCurrency, getCurrency, DEFAULT_CURRENCY } from '../lib/currency';
 
 // In production (custom domain), use relative URL (same-origin).
 // In preview/dev, use the env variable.
@@ -165,6 +166,10 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null); // null = checking, false = not authenticated
   const [loading, setLoading] = useState(true);
 
+  // Fija la moneda activa (singleton) de forma sincrona antes de renderizar los hijos,
+  // para que todos los formateadores de dinero usen el simbolo de la optica.
+  setActiveCurrency(user && user.currency);
+
   const checkAuth = useCallback(async () => {
     try {
       const { data } = await api.get('/api/auth/me');
@@ -221,6 +226,19 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+}
+
+// Hook de moneda: devuelve el codigo activo, su info y un formateador ligado a la optica.
+export function useCurrency() {
+  const { user } = useAuth();
+  const code = (user && user.currency) || DEFAULT_CURRENCY;
+  const info = getCurrency(code);
+  return {
+    currency: code,
+    currencyInfo: info,
+    symbol: info.symbol,
+    formatCurrency: (amount) => fmtCurrency(amount, code),
+  };
 }
 
 export { api };

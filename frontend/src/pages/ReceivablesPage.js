@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -9,8 +10,7 @@ import { BranchFilter } from '../components/BranchFilter';
 import { AddPaymentDialog } from '../components/AddPaymentDialog';
 import { HandCoins, AlertTriangle, Search, TrendingDown, Users, Receipt } from 'lucide-react';
 
-const fmt = (n) =>
-  `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmt = (n) => formatMoney(n);
 
 const agingBadge = (days) => {
   if (days <= 7) return { label: `${days} d`, cls: 'bg-emerald-100 text-emerald-700' };

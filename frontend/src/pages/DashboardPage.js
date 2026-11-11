@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api, useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -70,9 +71,7 @@ export default function DashboardPage() {
     }
   };
 
-  const formatCurrency = (amount) => {
-    return `Q ${(amount || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
+  const formatCurrency = (amount) => formatMoney(amount);
 
   if (loading) {
     return (

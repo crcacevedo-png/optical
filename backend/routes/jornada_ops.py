@@ -22,6 +22,7 @@ import re
 import asyncio
 
 from db import db, serialize_doc
+from currency_config import currency_symbol, company_currency
 from auth_utils import get_current_user
 from audit import log_audit
 
@@ -1020,6 +1021,7 @@ def _render_receipt_pdf(sale: dict, company: dict, j: dict, patient_name: str) -
     from reportlab.pdfgen import canvas
     import io as _io
 
+    cs = currency_symbol(company_currency(company))
     width = 80 * mm
     lines_items = len(sale.get("items") or [])
     lines_pay = len(sale.get("payments") or [])
@@ -1071,37 +1073,37 @@ def _render_receipt_pdf(sale: dict, company: dict, j: dict, patient_name: str) -
         price = float(it.get("price", 0))
         line_total = float(it.get("total", qty * price))
         c.drawString(4 * mm, y, f"{name}")
-        c.drawRightString(width - 4 * mm, y, f"Q {line_total:.2f}")
+        c.drawRightString(width - 4 * mm, y, f"{cs} {line_total:.2f}")
         y -= 3 * mm
-        c.drawString(6 * mm, y, f"  {qty} x Q {price:.2f}")
+        c.drawString(6 * mm, y, f"  {qty} x {cs} {price:.2f}")
         y -= 3.5 * mm
     y -= 1 * mm
     c.line(4 * mm, y, width - 4 * mm, y)
     y -= 3 * mm
     c.setFont("Helvetica", 7)
     c.drawString(4 * mm, y, "Subtotal")
-    c.drawRightString(width - 4 * mm, y, f"Q {float(sale.get('subtotal', 0)):.2f}")
+    c.drawRightString(width - 4 * mm, y, f"{cs} {float(sale.get('subtotal', 0)):.2f}")
     y -= 3 * mm
     if float(sale.get("discount", 0)) > 0:
         c.drawString(4 * mm, y, "Descuento")
-        c.drawRightString(width - 4 * mm, y, f"-Q {float(sale.get('discount', 0)):.2f}")
+        c.drawRightString(width - 4 * mm, y, f"-{cs} {float(sale.get('discount', 0)):.2f}")
         y -= 3 * mm
     c.setFont("Helvetica-Bold", 9)
     c.drawString(4 * mm, y, "TOTAL")
-    c.drawRightString(width - 4 * mm, y, f"Q {float(sale.get('total', 0)):.2f}")
+    c.drawRightString(width - 4 * mm, y, f"{cs} {float(sale.get('total', 0)):.2f}")
     y -= 4 * mm
     c.setFont("Helvetica", 7)
     method_labels = {"cash": "Efectivo", "card": "Tarjeta", "transfer": "Transf.", "check": "Cheque", "other": "Otro"}
     for p in (sale.get("payments") or []):
         m = method_labels.get(p.get("method"), p.get("method", ""))
         c.drawString(4 * mm, y, f"Pago {m}")
-        c.drawRightString(width - 4 * mm, y, f"Q {float(p.get('amount', 0)):.2f}")
+        c.drawRightString(width - 4 * mm, y, f"{cs} {float(p.get('amount', 0)):.2f}")
         y -= 3 * mm
     if float(sale.get("balance", 0)) > 0.01:
         c.setFont("Helvetica-Bold", 8)
         c.setFillColor(colors.HexColor("#d97706"))
         c.drawString(4 * mm, y, "SALDO PENDIENTE")
-        c.drawRightString(width - 4 * mm, y, f"Q {float(sale.get('balance', 0)):.2f}")
+        c.drawRightString(width - 4 * mm, y, f"{cs} {float(sale.get('balance', 0)):.2f}")
         c.setFillColor(colors.black)
         y -= 3.5 * mm
     y -= 2 * mm

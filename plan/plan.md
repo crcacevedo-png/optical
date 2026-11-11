@@ -1,62 +1,60 @@
-# Ingreso Masivo de Pacientes (Importación desde Excel/CSV)
+# Selección de moneda para Latinoamérica
 
-Una herramienta para que el administrador de la óptica cargue muchos pacientes de una sola vez desde una hoja de cálculo, en lugar de registrarlos uno por uno.
-Incluye descargar una plantilla, subir el archivo, ver una vista previa y recibir un reporte claro de qué se creó, qué se actualizó y qué falló.
+Permite que cada óptica elija la moneda en la que trabaja (por nombre y país) y que esa moneda se muestre en todo el sistema.
+Hoy la moneda está fija como Quetzal de Guatemala; esta función la vuelve configurable sin tocar las cifras ya registradas.
 
 ## Para quién es
-Administradores de óptica que están empezando con Cortexia o que migran desde papel, Excel propio u otro sistema, y necesitan cargar su base de pacientes (y su historial básico de recetas) rápidamente.
+Administradores de ópticas de distintos países de Latinoamérica que usan Cortexia y necesitan que ventas, precios, caja, cotizaciones, finanzas y reportes se muestren en su propia moneda local, no en Quetzales.
 
 ## Funcionalidad y experiencia principal
-- **Plantilla descargable** (Excel y CSV) con las columnas correctas y una fila de ejemplo, para que el administrador sepa exactamente cómo llenar sus datos.
-- **Carga de archivo** en formato Excel (.xlsx) o CSV, desde el menú de Configuración.
-- **Vista previa** antes de confirmar: cuántas filas se detectaron y una muestra de los primeros registros.
-- **Columnas de paciente**: Nombre completo (obligatorio), Teléfono (obligatorio), WhatsApp, Correo electrónico, Fecha de nacimiento, Sexo y Dirección.
-- **Historial de receta de anteojos / evaluación** (opcional, por fila): graduación OD y OS (Esfera, Cilindro, Eje, Adición) y una nota de observaciones. Si estas columnas vienen llenas, se guarda una receta de anteojos ligada a ese paciente como su historial inicial.
-- **Pacientes repetidos**: si un paciente del archivo ya existe en la óptica (mismo correo o, en su defecto, mismo teléfono), se **actualizan sus datos** con la información del archivo en lugar de duplicarlo.
-- **Tope de pacientes**: en cuentas con límite (plan gratis o código promocional), se importan pacientes nuevos **hasta llenar el tope disponible** y se informa cuántos quedaron fuera. Las actualizaciones a pacientes existentes no consumen cupo.
-- **Manejo de errores por fila**: las filas válidas se importan igual; las que tienen datos faltantes o mal formados se omiten y se listan con el motivo, para corregirlas y volver a subir solo esas.
-- **Reporte final**: resumen con cantidades de creados, actualizados, omitidos por tope y con error (incluyendo el detalle fila por fila).
+- **Selector de moneda** en Configuración (visible solo para el administrador), con una lista amplia de monedas latinoamericanas más el dólar estadounidense. Cada opción se muestra con su **nombre, país y símbolo** (por ejemplo: "Peso mexicano (México) — $", "Sol (Perú) — S/", "Quetzal (Guatemala) — Q", "Dólar (Ecuador/El Salvador/Panamá) — $").
+- **Aplica a toda la óptica**: una sola moneda para todas las sucursales y usuarios del negocio.
+- **Se refleja en todo el sistema**: cualquier lugar donde se muestre dinero adopta el símbolo y el formato de la moneda elegida — ventas y punto de venta, cotizaciones, caja (apertura/cierre, pagos, cuentas por cobrar), finanzas, cuentas por pagar y cobrar, inventario y precios, tablero/indicadores, reportes, jornadas, y los importes en comprobantes/PDF que incluyan montos.
+- **Paso en el Inicio rápido**: la elección de moneda se agrega como uno de los primeros pasos del asistente de Inicio rápido (onboarding), para que cada óptica la defina al configurar su cuenta. El paso lleva directo a la configuración de moneda, se marca como completado y se puede editar después desde Configuración.
+- **En el manual de usuario**: la función queda documentada en el manual (PDF), dentro de la sección de configuración inicial, explicando cómo elegir la moneda y que solo cambia la presentación (sin convertir cifras).
+- **Sin conversión de cifras**: cambiar la moneda solo cambia el **símbolo y el formato** mostrado; los montos ya registrados (ventas pasadas, precios, saldos, reportes) conservan su número tal cual. Está pensado para fijar la moneda una vez, de preferencia al inicio.
+- **Formato por país**: la separación de miles/decimales y la cantidad de decimales siguen la convención de cada moneda (por ejemplo, el peso chileno y el guaraní se muestran sin decimales; otras con dos decimales).
+- **Valor inicial**: las ópticas actuales siguen viendo Quetzal hasta que el administrador decida cambiarlo, de modo que nada se altera para quienes ya usan el sistema.
+- **Aviso al cambiar**: antes de guardar, se muestra una confirmación que aclara que solo cambia la presentación y que los montos históricos no se convierten.
 
 ## Flujo del usuario
-1. El administrador entra a **Configuración** y abre la tarjeta **Ingreso masivo de pacientes**.
-2. Descarga la **plantilla** (Excel o CSV) y la llena con sus pacientes.
-3. Sube el archivo; el sistema muestra una **vista previa** con el total de filas detectadas y una muestra.
-4. Confirma la importación.
-5. Ve el **reporte**: creados, actualizados, omitidos por tope y filas con error (con el motivo de cada una).
-6. Si hubo errores o pacientes fuera de tope, corrige su archivo y repite el proceso solo con esos.
+1. El administrador entra a **Configuración** (o toca el paso **"Elige la moneda de tu óptica"** del Inicio rápido, que lleva al mismo lugar).
+2. Abre la tarjeta **Moneda** y ve la moneda actual del negocio.
+3. Elige en la lista la moneda deseada (identificada por nombre, país y símbolo).
+4. Confirma el aviso de que solo cambia la presentación (sin convertir cifras).
+5. Guarda; de inmediato, todas las pantallas que muestran dinero pasan a usar el símbolo y el formato de la nueva moneda, y el paso del Inicio rápido queda marcado como completado.
 
 ## Estética y sensación (UI/UX)
-Consistente con la pantalla de Configuración actual de Cortexia: tarjeta limpia con acento verde (pine), íconos de hoja de cálculo/subida, zona de "arrastrar o hacer clic" para el archivo, tabla de vista previa compacta y un resumen final con contadores de colores (verde = creados, azul = actualizados, ámbar = fuera de tope, rojo = errores). Visible únicamente para el rol administrador.
+Consistente con la pantalla de Configuración actual de Cortexia: tarjeta limpia con acento verde (pine), un menú de selección con buscador para encontrar la moneda rápidamente, y cada opción mostrando nombre + país + símbolo. El paso del Inicio rápido mantiene el mismo estilo de tarjeta de los demás pasos. La función es exclusiva del rol administrador.
 
 ## Fases de implementación
 
 **Fase 1 — MVP (se construye ahora)**
-- Tarjeta "Ingreso masivo de pacientes" en el menú de Configuración (solo administrador).
-- Plantilla descargable en Excel y CSV con columnas de paciente + columnas opcionales de receta de anteojos/evaluación.
-- Carga de archivo Excel/CSV con vista previa y confirmación.
-- Validación por fila (nombre y teléfono obligatorios; formatos de fecha/graduación).
-- Crear pacientes nuevos y actualizar los existentes por coincidencia (correo, luego teléfono).
-- Respetar el tope de pacientes: importar hasta el cupo disponible y avisar del resto.
-- Crear una receta de anteojos por fila cuando vengan las columnas de graduación.
-- Reporte final: creados, actualizados, omitidos por tope, y errores con motivo por fila.
+- Selector de moneda en Configuración (solo administrador) con lista amplia de Latinoamérica + dólar.
+- Moneda única por óptica (todas las sucursales y usuarios).
+- Aplicación del símbolo y formato de la moneda elegida en todas las pantallas y documentos donde se muestra dinero.
+- Formato y decimales según la convención de cada moneda.
+- Sin conversión de montos; Quetzal como valor inicial para las cuentas existentes.
+- Aviso de confirmación al cambiar la moneda.
+- **Nuevo paso "Elige la moneda de tu óptica" en el Inicio rápido**, que enlaza a la configuración de moneda y se puede marcar como completado.
+- **Documentación de la moneda en el manual de usuario (PDF)**, dentro de la sección de configuración inicial, con el índice actualizado.
 
-**Fase 2 — Historial ampliado y flexibilidad**
-- Varias recetas/evaluaciones por paciente (más de una fila de historial por persona).
-- Importación de recetas de lentes de contacto y de evaluaciones de consulta completas.
-- Mapeo manual de columnas para archivos que no usen la plantilla.
-- Bitácora de importaciones (historial de cargas realizadas).
+**Fase 2 — Claridad y documentos**
+- Mostrar el código internacional de la moneda (p. ej. MXN, PEN, GTQ) junto a los montos en reportes y comprobantes, para evitar ambigüedad entre monedas que comparten el símbolo "$".
+- Incluir la moneda en las exportaciones (Excel/PDF) y en los correos con importes.
+- Opción de ajustar manualmente el símbolo o los decimales si una óptica lo necesita.
 
-**Fase 3 — Automatización y control**
-- Revisión de duplicados antes de confirmar (elegir fila por fila qué actualizar).
-- Deshacer la última importación.
-- Importaciones programadas/recurrentes desde un archivo recurrente.
+**Fase 3 — Casos avanzados**
+- Herramienta opcional de conversión por tipo de cambio para reexpresar cifras históricas cuando un negocio realmente cambia de moneda.
+- Moneda distinta por sucursal y reportes consolidados multimoneda.
 
 ## Supuestos
-- **Nombre completo**: se usa una sola columna "Nombre completo"; el sistema separa el primer término como nombre y el resto como apellidos (el modelo de paciente guarda nombre y apellidos por separado).
-- **Teléfono obligatorio**: por consistencia con el registro manual actual, cada fila debe tener teléfono; WhatsApp es opcional y, si se omite, se usa el teléfono.
-- **Detección de repetidos**: se hace dentro de la misma óptica, por correo electrónico y, si no hay correo, por teléfono (no se incluye columna de documento/DPI porque no fue seleccionada).
-- **Historial en el MVP**: cada fila puede traer **una** receta de anteojos (graduación OD/OS + observaciones). El historial con múltiples recetas por paciente y las recetas de lentes de contacto/medicamentos quedan para la Fase 2.
-- **Formato de datos**: fechas en formato AAAA-MM-DD, sexo como M/F, y graduaciones numéricas (se acepta "plano"/"pl" como 0.00).
-- **Límite de tamaño**: el archivo tendrá un tope razonable de filas/peso por carga (similar a la importación de inventario existente) para proteger el rendimiento.
-- **Permisos**: la función es exclusiva del rol administrador de cada óptica.
-- **Aislamiento multiempresa**: todos los pacientes importados quedan ligados a la óptica y sucursal del administrador que realiza la carga.
+- **Alcance**: la moneda es única para toda la óptica (todas las sucursales y usuarios); la define el administrador.
+- **Solo presentación**: cambiar la moneda no convierte ni recalcula montos; únicamente cambia símbolo y formato.
+- **Valor inicial**: las ópticas actuales continúan en Quetzal (Guatemala) hasta que el administrador elija otra moneda.
+- **Lista de monedas**: se incluye un conjunto amplio de Latinoamérica más el dólar estadounidense (p. ej. Quetzal–Guatemala, Peso–México, Dólar–EE. UU./Ecuador/El Salvador/Panamá, Sol–Perú, Peso–Colombia, Peso–Chile, Peso–Argentina, Boliviano–Bolivia, Guaraní–Paraguay, Peso–Uruguay, Lempira–Honduras, Córdoba–Nicaragua, Colón–Costa Rica, Real–Brasil, Bolívar–Venezuela). El conjunto final puede ajustarse sin cambiar la experiencia.
+- **Formato por moneda**: el separador de miles/decimales y la cantidad de decimales siguen la convención de cada país.
+- **Inicio rápido**: el paso de moneda se suma a los pasos existentes (el total de pasos del asistente aumenta) y se puede completar/editar; elegir la moneda también queda disponible siempre desde Configuración.
+- **Manual de usuario**: la moneda se documenta dentro de la configuración inicial del manual (no es un capítulo nuevo); se actualiza el índice y la numeración de páginas.
+- **Impuestos no incluidos**: elegir la moneda no cambia el régimen fiscal ni la facturación específica de Guatemala (IVA/FEL/SAT); eso es independiente y queda fuera de esta función.
+- **Permiso**: la configuración de moneda es exclusiva del rol administrador de cada óptica.

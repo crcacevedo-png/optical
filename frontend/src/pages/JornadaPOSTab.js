@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 // Tab de Punto de Venta de la Jornada
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { api, formatApiErrorDetail } from '../context/AuthContext';
@@ -16,7 +17,7 @@ import {
 } from '../components/ui/dialog';
 import { Textarea } from '../components/ui/textarea';
 
-const fmtQ = (n) => `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtQ = (n) => formatMoney(n);
 
 const METHODS = [
   { key: 'cash', label: 'Efectivo' },

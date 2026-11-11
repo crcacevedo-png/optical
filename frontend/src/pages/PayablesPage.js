@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 import React, { useState, useEffect, useCallback } from 'react';
 import { api, formatApiErrorDetail } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -13,8 +14,7 @@ import { PAYMENT_METHODS } from '../components/PaymentLinesEditor';
 import { HandCoins, AlertTriangle, Search, TrendingDown, Truck, Receipt, CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
 
-const fmt = (n) =>
-  `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmt = (n) => formatMoney(n);
 
 const agingBadge = (days) => {
   if (days <= 7) return { label: `${days} d`, cls: 'bg-emerald-100 text-emerald-700' };

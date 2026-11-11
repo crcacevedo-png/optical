@@ -12,6 +12,7 @@ import { Settings, Building2, Upload, FileText, Save, ImageIcon, Glasses, Pill, 
 import { RolePermissionsSection } from '../components/RolePermissionsSection';
 import SessionsPanel from '../components/security/SessionsPanel';
 import { PatientBulkImport } from '../components/PatientBulkImport';
+import { CurrencySettingsCard } from '../components/CurrencySettingsCard';
 import { Monitor } from 'lucide-react';
 
 const PRESCRIPTION_FONTS = [
@@ -344,6 +345,9 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-6">
+        {/* MONEDA (admin only) */}
+        {user?.role === 'admin' && <CurrencySettingsCard />}
+
         {/* DATOS DE EMPRESA */}
         <Card data-testid="settings-company-card">
           <CardHeader className="pb-4">

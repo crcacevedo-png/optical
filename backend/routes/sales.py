@@ -14,6 +14,7 @@ from db import db, serialize_doc, UPLOADS_DIR
 from auth_utils import get_current_user, get_jwt_secret, JWT_ALGORITHM
 from models import SaleCreate
 from audit import log_audit
+from currency_config import format_amount, company_currency
 from cache import invalidate_inventory
 from rate_limiter import limiter
 import object_storage as objstore
@@ -385,7 +386,7 @@ async def sale_receipt_share_link(sale_id: str, user: dict = Depends(get_current
     if not sale or str(sale["company_id"]) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
 
-    company = await db.companies.find_one({"_id": sale["company_id"]}, {"name": 1}) or {}
+    company = await db.companies.find_one({"_id": sale["company_id"]}, {"name": 1, "currency": 1}) or {}
     patient_name = sale.get("patient_name_override") or "Consumidor final"
     phone = ""
     if sale.get("patient_id"):
@@ -409,7 +410,7 @@ async def sale_receipt_share_link(sale_id: str, user: dict = Depends(get_current
     greeting = f"Hola {first_name}, " if first_name else "Hola, "
     message = (
         f"{greeting}aqui esta tu recibo de compra en {company.get('name') or 'Cortexia Optical'} "
-        f"por un total de Q{float(sale.get('total', 0) or 0):.2f}. Puedes verlo aqui: "
+        f"por un total de {format_amount(sale.get('total', 0), company_currency(company))}. Puedes verlo aqui: "
     )
     return {
         "path": f"/api/sales/public/receipt?token={token}",
@@ -456,6 +457,10 @@ def _render_sale_receipt_pdf(sale: dict, company: dict, patient_name: str, selle
     from reportlab.lib.units import inch
     from reportlab.lib.utils import ImageReader
     from reportlab.pdfgen import canvas
+
+    _code = company_currency(company)
+    def m(v):
+        return format_amount(v, _code)
 
     NAVY = colors.HexColor("#1B2A49")
     GRAY = colors.HexColor("#64748b")
@@ -558,8 +563,8 @@ def _render_sale_receipt_pdf(sale: dict, company: dict, patient_name: str, selle
         line_total = float(it.get("total", it.get("subtotal", qty * price)) or 0)
         c.drawString(x_prod, y, name)
         c.drawRightString(x_qty, y, str(qty))
-        c.drawRightString(x_price, y, f"Q {price:.2f}")
-        c.drawRightString(x_total, y, f"Q {line_total:.2f}")
+        c.drawRightString(x_price, y, m(price))
+        c.drawRightString(x_total, y, m(line_total))
         y -= 0.2 * inch
         if y < 1.2 * inch:  # evitar invadir el pie
             break
@@ -578,17 +583,17 @@ def _render_sale_receipt_pdf(sale: dict, company: dict, patient_name: str, selle
         c.setFillColor(color if bold else colors.black)
         c.drawRightString(x_total, ty, value)
 
-    _tot("Subtotal", f"Q {float(sale.get('subtotal', 0) or 0):.2f}")
+    _tot("Subtotal", m(sale.get('subtotal', 0)))
     ty -= 0.2 * inch
     if float(sale.get("discount", 0) or 0) > 0:
-        _tot("Descuento", f"-Q {float(sale.get('discount', 0)):.2f}")
+        _tot("Descuento", f"-{m(sale.get('discount', 0))}")
         ty -= 0.2 * inch
-    _tot("TOTAL", f"Q {float(sale.get('total', 0) or 0):.2f}", bold=True, color=NAVY)
+    _tot("TOTAL", m(sale.get('total', 0)), bold=True, color=NAVY)
     ty -= 0.28 * inch
-    _tot("Pagado", f"Q {float(sale.get('amount_paid', 0) or 0):.2f}")
+    _tot("Pagado", m(sale.get('amount_paid', 0)))
     ty -= 0.2 * inch
     if float(sale.get("balance", 0) or 0) > 0.01:
-        _tot("SALDO PENDIENTE", f"Q {float(sale.get('balance', 0)):.2f}", bold=True, color=AMBER)
+        _tot("SALDO PENDIENTE", m(sale.get('balance', 0)), bold=True, color=AMBER)
 
     # ── Pagos (bloque izquierdo) ──
     py = block_top - 0.18 * inch
@@ -604,7 +609,7 @@ def _render_sale_receipt_pdf(sale: dict, company: dict, patient_name: str, selle
             m = method_labels.get(p.get("method"), p.get("method", ""))
             c.setFillColor(colors.black)
             c.drawString(0.42 * inch, py, m)
-            c.drawString(2.2 * inch, py, f"Q {float(p.get('amount', 0) or 0):.2f}")
+            c.drawString(2.2 * inch, py, m(p.get('amount', 0)))
             py -= 0.2 * inch
             if py < 0.9 * inch:
                 break

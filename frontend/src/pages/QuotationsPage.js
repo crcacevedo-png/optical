@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 import React, { useState, useEffect, useCallback } from 'react';
 import { api, formatApiErrorDetail } from '../context/AuthContext';
 import { Card, CardContent } from '../components/ui/card';
@@ -20,7 +21,7 @@ import { CreateQuotationDialog } from '../components/quotations/CreateQuotationD
 
 import { BranchFilter } from '../components/BranchFilter';
 
-const formatCurrency = (amount) => `Q${(amount || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`;
+const formatCurrency = (amount) => formatMoney(amount);
 
 const statusConfig = {
   pendiente: { label: 'Pendiente', color: 'bg-amber-100 text-amber-800', icon: Clock },

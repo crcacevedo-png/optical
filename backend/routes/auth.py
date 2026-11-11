@@ -204,13 +204,14 @@ async def login(data: UserLogin, response: Response, request: Request):
                 {"plan_id": 1, "needs_reactivation_feedback": 1, "billing_state": 1,
                  "grace_until": 1, "suspended_at": 1, "suspended_reason": 1,
                  "subscription_status": 1, "stripe_customer_id": 1, "is_courtesy": 1,
-                 "amount_mismatch": 1}
+                 "amount_mismatch": 1, "currency": 1}
             )
             if company:
                 # Flag para dialogo de feedback post-reactivacion (solo admins)
                 if user["role"] == "admin" and company.get("needs_reactivation_feedback"):
                     result["needs_reactivation_feedback"] = True
                 result["billing"] = build_billing_snapshot(company)
+                result["currency"] = company.get("currency") or "GTQ"
                 if company.get("plan_id"):
                     plan = await db.plans.find_one({"_id": company["plan_id"]})
                     if plan:
@@ -303,13 +304,14 @@ async def get_me(user: dict = Depends(get_current_user)):
                 {"plan_id": 1, "needs_reactivation_feedback": 1, "billing_state": 1,
                  "grace_until": 1, "suspended_at": 1, "suspended_reason": 1,
                  "subscription_status": 1, "stripe_customer_id": 1, "is_courtesy": 1,
-                 "amount_mismatch": 1}
+                 "amount_mismatch": 1, "currency": 1}
             )
             if company:
                 # Flag para dialogo de feedback post-reactivacion (solo admins)
                 if user["role"] == "admin" and company.get("needs_reactivation_feedback"):
                     user["needs_reactivation_feedback"] = True
                 user["billing"] = build_billing_snapshot(company)
+                user["currency"] = company.get("currency") or "GTQ"
                 if company.get("plan_id"):
                     plan = await db.plans.find_one({"_id": company["plan_id"]})
                     if plan:

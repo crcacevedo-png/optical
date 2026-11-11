@@ -12,6 +12,7 @@ from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
 
 from db import db, serialize_doc, UPLOADS_DIR
+from currency_config import format_amount, company_currency
 from auth_utils import get_current_user
 from models import QuotationCreate, QuotationStatusUpdate
 
@@ -262,6 +263,9 @@ async def _build_quotation_pdf_bytes(q: dict, patient: Optional[dict], company: 
 
 
 def _render_quotation_pdf(q: dict, patient: Optional[dict], company: Optional[dict]) -> bytes:
+    _code = company_currency(company)
+    def m(v):
+        return format_amount(v, _code)
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
@@ -300,8 +304,8 @@ def _render_quotation_pdf(q: dict, patient: Optional[dict], company: Optional[di
         c.drawString(col_x[0], y, str(i))
         c.drawString(col_x[1], y, item.get("name", "Producto")[:35])
         c.drawString(col_x[2], y, str(item.get("quantity", 1)))
-        c.drawRightString(6.2*inch, y, f"Q{item.get('unit_price', 0):,.2f}")
-        c.drawRightString(7.1*inch, y, f"Q{item.get('subtotal', 0):,.2f}")
+        c.drawRightString(6.2*inch, y, m(item.get('unit_price', 0)))
+        c.drawRightString(7.1*inch, y, m(item.get('subtotal', 0)))
         y -= 0.3*inch
         c.setStrokeColor(colors.HexColor("#E2E8F0"))
         c.line(0.8*inch, y + 0.15*inch, 7.2*inch, y + 0.15*inch)
@@ -309,19 +313,19 @@ def _render_quotation_pdf(q: dict, patient: Optional[dict], company: Optional[di
     y -= 0.2*inch
     c.setFont("Helvetica", 11)
     c.drawRightString(6.2*inch, y, "Subtotal:")
-    c.drawRightString(7.1*inch, y, f"Q{q.get('subtotal', 0):,.2f}")
+    c.drawRightString(7.1*inch, y, m(q.get('subtotal', 0)))
 
     if q.get("discount", 0) > 0:
         y -= 0.3*inch
         c.drawRightString(6.2*inch, y, "Descuento:")
         c.setFillColor(colors.HexColor("#DC2626"))
-        c.drawRightString(7.1*inch, y, f"-Q{q.get('discount', 0):,.2f}")
+        c.drawRightString(7.1*inch, y, f"-{m(q.get('discount', 0))}")
         c.setFillColor(colors.black)
 
     y -= 0.35*inch
     c.setFont("Helvetica-Bold", 13)
     c.drawRightString(6.2*inch, y, "TOTAL:")
-    c.drawRightString(7.1*inch, y, f"Q{q.get('total', 0):,.2f}")
+    c.drawRightString(7.1*inch, y, m(q.get('total', 0)))
 
     y -= 0.6*inch
     if q.get("notes"):
@@ -388,7 +392,7 @@ async def send_quotation_email(quotation_id: str, user: dict = Depends(get_curre
     pdf_bytes = await _build_quotation_pdf_bytes(q, patient, company)
 
     quotation_number = q.get("quotation_number", str(q["_id"])[-6:])
-    total_str = f"Q{q.get('total', 0):,.2f}"
+    total_str = format_amount(q.get('total', 0), company_currency(company))
     company_name = company.get("name", "Cortexia Optical") if company else "Cortexia Optical"
 
     html = render_quotation_email(

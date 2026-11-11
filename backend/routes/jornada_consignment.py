@@ -27,6 +27,7 @@ import asyncio
 import openpyxl
 
 from db import db, serialize_doc
+from currency_config import currency_symbol, company_currency
 from auth_utils import get_current_user
 from audit import log_audit
 
@@ -680,6 +681,8 @@ async def _build_report_data(company_id: ObjectId, j: dict) -> dict:
 async def get_report_pdf(jid: str, user: dict = Depends(get_current_user)):
     j = await _get_jornada_or_404(jid, user["company_id"])
     data = await _build_report_data(ObjectId(user["company_id"]), j)
+    _company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"currency": 1})
+    data["currency_code"] = company_currency(_company)
     pdf_bytes = await asyncio.to_thread(_render_jornada_report_pdf, data)
     return StreamingResponse(
         io.BytesIO(pdf_bytes), media_type="application/pdf",
@@ -702,6 +705,8 @@ def _render_jornada_report_pdf(data: dict) -> bytes:
     small = ParagraphStyle("small", parent=styles["Normal"], fontSize=9)
     elems: list = []
 
+    cs = currency_symbol(data.get("currency_code", "GTQ"))
+
     jm = data["jornada"]
     elems.append(Paragraph(f"Reporte de Cierre - {jm['name']}", h1))
     elems.append(Paragraph(f"Periodo: {jm['start_date']} a {jm['end_date']} | Sucursal: {jm.get('branch') or '-'} | Lugar: {jm.get('location') or '-'}", small))
@@ -712,21 +717,21 @@ def _render_jornada_report_pdf(data: dict) -> bytes:
     # Ventas
     s = data["sales"]
     elems.append(Paragraph("Ventas", h2))
-    sales_table = [["Total vendido", f"Q {s['total']:,.2f}"], ["Numero de ventas", s["count"]], ["Unidades", s["units_sold"]], ["Ticket promedio", f"Q {s['ticket_avg']:,.2f}"], ["Cuentas por cobrar", f"Q {s['receivables_total']:,.2f} ({s['receivables_count']})"]]
+    sales_table = [["Total vendido", f"{cs} {s['total']:,.2f}"], ["Numero de ventas", s["count"]], ["Unidades", s["units_sold"]], ["Ticket promedio", f"{cs} {s['ticket_avg']:,.2f}"], ["Cuentas por cobrar", f"{cs} {s['receivables_total']:,.2f} ({s['receivables_count']})"]]
     elems.append(_fmt_table(sales_table))
     if s["by_method"]:
         elems.append(Spacer(1, 6))
         elems.append(Paragraph("Por metodo de pago", h2))
-        elems.append(_fmt_table([[k.title(), f"Q {v:,.2f}"] for k, v in s["by_method"].items()]))
+        elems.append(_fmt_table([[k.title(), f"{cs} {v:,.2f}"] for k, v in s["by_method"].items()]))
     elems.append(Spacer(1, 12))
 
     # Inventario
     inv = data["inventory"]
     elems.append(Paragraph("Inventario", h2))
     elems.append(_fmt_table([
-        ["Enviado", f"{inv['sent_units']} un. / Q {inv['sent_value']:,.2f}"],
-        ["Vendido", f"{inv['sold_units']} un. / Q {inv['sold_value']:,.2f}"],
-        ["Devuelto", f"{inv['returned_units']} un. / Q {inv['returned_value']:,.2f}"],
+        ["Enviado", f"{inv['sent_units']} un. / {cs} {inv['sent_value']:,.2f}"],
+        ["Vendido", f"{inv['sold_units']} un. / {cs} {inv['sold_value']:,.2f}"],
+        ["Devuelto", f"{inv['returned_units']} un. / {cs} {inv['returned_value']:,.2f}"],
         ["Faltante", f"{inv['missing_units']} un."],
     ]))
     elems.append(Spacer(1, 12))
@@ -748,14 +753,14 @@ def _render_jornada_report_pdf(data: dict) -> bytes:
     c = data["cash"]
     elems.append(Paragraph("Caja", h2))
     elems.append(_fmt_table([
-        ["Fondo inicial", f"Q {c['opening']:,.2f}"],
-        ["Efectivo neto", f"Q {c['net_cash']:,.2f}"],
-        ["Egresos totales", f"Q {c['egresos_total']:,.2f}"],
-        ["Diferencia arqueo", f"Q {c['diff']:,.2f}"],
+        ["Fondo inicial", f"{cs} {c['opening']:,.2f}"],
+        ["Efectivo neto", f"{cs} {c['net_cash']:,.2f}"],
+        ["Egresos totales", f"{cs} {c['egresos_total']:,.2f}"],
+        ["Diferencia arqueo", f"{cs} {c['diff']:,.2f}"],
     ]))
     if c["egresos_by_category"]:
         elems.append(Paragraph("Egresos por categoria", h2))
-        elems.append(_fmt_table([[k.title(), f"Q {v:,.2f}"] for k, v in c["egresos_by_category"].items()]))
+        elems.append(_fmt_table([[k.title(), f"{cs} {v:,.2f}"] for k, v in c["egresos_by_category"].items()]))
     elems.append(Spacer(1, 12))
 
     # Liquidacion
@@ -770,17 +775,17 @@ def _render_jornada_report_pdf(data: dict) -> bytes:
                 ["Vendido", sup["sold_units"]],
                 ["Devuelto (remanente)", sup["returned_units"]],
                 ["Faltante", sup["missing_units"]],
-                ["A pagar al consignatario", f"Q {sup['to_pay']:,.2f}"],
-                ["Ingreso", f"Q {sup['revenue']:,.2f}"],
-                ["Utilidad", f"Q {sup['margin']:,.2f}"],
+                ["A pagar al consignatario", f"{cs} {sup['to_pay']:,.2f}"],
+                ["Ingreso", f"{cs} {sup['revenue']:,.2f}"],
+                ["Utilidad", f"{cs} {sup['margin']:,.2f}"],
             ]))
             elems.append(Spacer(1, 6))
         t = liq["totals"]
         elems.append(Paragraph("<b>Totales</b>", small))
         elems.append(_fmt_table([
-            ["Total a pagar", f"Q {t['to_pay']:,.2f}"],
-            ["Ingreso consignacion", f"Q {t['revenue']:,.2f}"],
-            ["Utilidad consignacion", f"Q {t['margin']:,.2f}"],
+            ["Total a pagar", f"{cs} {t['to_pay']:,.2f}"],
+            ["Ingreso consignacion", f"{cs} {t['revenue']:,.2f}"],
+            ["Utilidad consignacion", f"{cs} {t['margin']:,.2f}"],
         ]))
     elems.append(Spacer(1, 12))
 
@@ -788,8 +793,8 @@ def _render_jornada_report_pdf(data: dict) -> bytes:
     prof = data["profit"]
     elems.append(Paragraph("Resultado", h2))
     elems.append(_fmt_table([
-        ["Utilidad bruta (ventas)", f"Q {prof['gross']:,.2f}"],
-        ["Utilidad neta (ventas − consignacion − egresos)", f"Q {prof['net']:,.2f}"],
+        ["Utilidad bruta (ventas)", f"{cs} {prof['gross']:,.2f}"],
+        ["Utilidad neta (ventas − consignacion − egresos)", f"{cs} {prof['net']:,.2f}"],
     ]))
     g = data["goals"]
     if g["amount"] or g["patients"]:
@@ -797,7 +802,7 @@ def _render_jornada_report_pdf(data: dict) -> bytes:
         elems.append(Paragraph("Meta comercial", h2))
         rows = []
         if g["amount"]:
-            rows.append(["Meta venta", f"Q {g['amount']:,.2f} ({g['amount_pct']}% alcanzado)"])
+            rows.append(["Meta venta", f"{cs} {g['amount']:,.2f} ({g['amount_pct']}% alcanzado)"])
         if g["patients"]:
             rows.append(["Meta pacientes", f"{g['patients']} ({g['patients_pct']}% alcanzado)"])
         elems.append(_fmt_table(rows))

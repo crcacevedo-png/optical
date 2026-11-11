@@ -63,6 +63,7 @@ class CompanyUpdate(BaseModel):
     contact_email: Optional[str] = None
     is_active: Optional[bool] = None
     prescription_style: Optional[dict] = None
+    currency: Optional[str] = None
 
 class BranchCreate(BaseModel):
     name: str

@@ -21,6 +21,7 @@ from reportlab.platypus import (
 )
 
 from db import db, serialize_doc
+from currency_config import format_amount, company_currency
 from auth_utils import get_current_user
 from audit import log_audit
 
@@ -551,7 +552,7 @@ async def cash_register_report_pdf(
 
     # Company name
     company = await db.companies.find_one(
-        {"_id": ObjectId(user["company_id"])}, {"name": 1}
+        {"_id": ObjectId(user["company_id"])}, {"name": 1, "currency": 1}
     )
     company_name = (company or {}).get("name", "Optica")
 
@@ -561,7 +562,7 @@ async def cash_register_report_pdf(
         branch_name = (b or {}).get("name")
 
     pdf_bytes = await asyncio.to_thread(
-        _render_cash_report_pdf, data, company_name, branch_name, date_from, date_to
+        _render_cash_report_pdf, data, company_name, branch_name, date_from, date_to, company_currency(company)
     )
 
     await log_audit("CASH_REGISTER_REPORT_PDF", actor_id=user["_id"], actor_email=user.get("email"),
@@ -575,7 +576,9 @@ async def cash_register_report_pdf(
 
 
 def _render_cash_report_pdf(data: dict, company_name: str, branch_name: Optional[str],
-                            date_from: Optional[str], date_to: Optional[str]) -> bytes:
+                            date_from: Optional[str], date_to: Optional[str], currency_code: str = "GTQ") -> bytes:
+    def _fmt_q(v):
+        return format_amount(v, currency_code)
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=letter,
@@ -708,7 +711,9 @@ def _render_cash_report_pdf(data: dict, company_name: str, branch_name: Optional
     return buf.getvalue()
 
 
-def _render_single_cierre_pdf(reg: dict, company_name: str, branch_name: Optional[str]) -> bytes:
+def _render_single_cierre_pdf(reg: dict, company_name: str, branch_name: Optional[str], currency_code: str = "GTQ") -> bytes:
+    def _fmt_q(v):
+        return format_amount(v, currency_code)
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=letter,
@@ -869,14 +874,14 @@ async def cash_register_single_pdf(register_id: str, user: dict = Depends(get_cu
         for s in reg["sales_in_window"]:
             s["patient_name"] = pmap.get(s.get("patient_id"), "Consumidor final")
 
-    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1})
+    company = await db.companies.find_one({"_id": ObjectId(user["company_id"])}, {"name": 1, "currency": 1})
     company_name = (company or {}).get("name", "Optica")
     branch_name = None
     if branch_oid:
         b = await db.branches.find_one({"_id": branch_oid}, {"name": 1})
         branch_name = (b or {}).get("name")
 
-    pdf_bytes = await asyncio.to_thread(_render_single_cierre_pdf, reg, company_name, branch_name)
+    pdf_bytes = await asyncio.to_thread(_render_single_cierre_pdf, reg, company_name, branch_name, company_currency(company))
 
     await log_audit("CASH_REGISTER_CIERRE_PDF", actor_id=user["_id"], actor_email=user.get("email"),
                     metadata={"register_id": register_id})

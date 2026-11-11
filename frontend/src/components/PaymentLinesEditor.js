@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 import React from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -33,8 +34,7 @@ export const referencePlaceholderFor = (method) => {
   return '';
 };
 
-const fmt = (n) =>
-  `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmt = (n) => formatMoney(n);
 
 /**
  * Editor dinamico de pagos: cada fila = metodo + monto.

@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 import React, { useState, useEffect } from 'react';
 import { api, formatApiErrorDetail, useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -184,7 +185,7 @@ export default function SalesPage() {
       });
       const paidSum = validPayments.reduce((s, p) => s + p.amount, 0);
       if (paidSum < total) {
-        toast.success(`Venta registrada. Saldo pendiente Q${(total - paidSum).toFixed(2)} agregado a Cuentas por Cobrar.`);
+        toast.success(`Venta registrada. Saldo pendiente ${formatMoney(total - paidSum)} agregado a Cuentas por Cobrar.`);
       } else {
         toast.success('Venta registrada exitosamente');
       }
@@ -199,9 +200,7 @@ export default function SalesPage() {
     }
   };
 
-  const formatCurrency = (amount) => {
-    return `Q ${(amount || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`;
-  };
+  const formatCurrency = (amount) => formatMoney(amount);
 
   const handleDelete = async () => {
     if (!saleToDelete) return;

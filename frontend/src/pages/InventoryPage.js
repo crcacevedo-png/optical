@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 import React, { useState, useEffect } from 'react';
 import { api, formatApiErrorDetail } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -132,9 +133,7 @@ export default function InventoryPage() {
     }
   };
 
-  const formatCurrency = (amount) => {
-    return `Q ${(amount || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`;
-  };
+  const formatCurrency = (amount) => formatMoney(amount);
 
   const handleSaveMinStock = async (productId) => {
     const val = parseInt(minStockValue);

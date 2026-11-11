@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 /**
  * Barra de estado de caja para el modulo Ventas.
  * Muestra si hay caja abierta y permite abrir/cerrar sin salir de /sales.
@@ -19,7 +20,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const fmt = (n) => `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmt = (n) => formatMoney(n);
 
 const METHOD_META = {
   cash: { label: 'Efectivo', icon: Banknote, color: 'emerald' },

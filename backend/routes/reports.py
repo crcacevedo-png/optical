@@ -8,6 +8,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 from db import db, serialize_doc
+from currency_config import format_amount, company_currency
 from auth_utils import get_current_user
 from cache import TTLCache
 
@@ -218,8 +219,11 @@ async def export_reports_excel(
         branch_map = {b["_id"]: b["name"] for b in branches}
     
     # Company name
-    company = await db.companies.find_one({"_id": company_id}, {"name": 1})
+    company = await db.companies.find_one({"_id": company_id}, {"name": 1, "currency": 1})
     company_name = company["name"] if company else "Cortexia Optical"
+    _ccode = company_currency(company)
+    def _m(v):
+        return format_amount(v, _ccode)
     
     # Build Excel
     wb = Workbook()
@@ -248,12 +252,12 @@ async def export_reports_excel(
     for cell in ws1[4]:
         cell.font = header_font
         cell.fill = header_fill
-    ws1.append(["Total Ventas (devengado)", f"Q {total_sales:,.2f}"])
+    ws1.append(["Total Ventas (devengado)", _m(total_sales)])
     ws1.append(["No. Transacciones", len(sales)])
-    ws1.append(["Promedio por Venta", f"Q {(total_sales / len(sales) if sales else 0):,.2f}"])
-    ws1.append(["Ingresos cobrados (base caja)", f"Q {income:,.2f}"])
-    ws1.append(["Egresos pagados (base caja)", f"Q {expense:,.2f}"])
-    ws1.append(["Flujo de caja neto (base caja)", f"Q {income - expense:,.2f}"])
+    ws1.append(["Promedio por Venta", _m(total_sales / len(sales) if sales else 0)])
+    ws1.append(["Ingresos cobrados (base caja)", _m(income)])
+    ws1.append(["Egresos pagados (base caja)", _m(expense)])
+    ws1.append(["Flujo de caja neto (base caja)", _m(income - expense)])
     ws1.append([])
     
     # Payment methods breakdown
@@ -269,7 +273,7 @@ async def export_reports_excel(
         cell.font = header_font
         cell.fill = header_fill
     for method, amount in by_payment.items():
-        ws1.append([method, f"Q {amount:,.2f}"])
+        ws1.append([method, _m(amount)])
     
     ws1.column_dimensions['A'].width = 30
     ws1.column_dimensions['B'].width = 20

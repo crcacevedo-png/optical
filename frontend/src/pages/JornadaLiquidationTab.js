@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 // Tab de Liquidacion de Consignacion + descarga de reportes
 import React, { useState, useEffect, useCallback } from 'react';
 import { api, formatApiErrorDetail } from '../context/AuthContext';
@@ -7,7 +8,7 @@ import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
 import { Receipt, FileDown, FileSpreadsheet, TrendingUp, TrendingDown, RefreshCcw } from 'lucide-react';
 
-const fmtQ = (n) => `Q ${(Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtQ = (n) => formatMoney(n);
 
 export default function JornadaLiquidationTab({ jornada }) {
   const jid = jornada._id;

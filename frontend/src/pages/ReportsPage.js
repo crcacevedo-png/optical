@@ -1,3 +1,4 @@
+import { formatCurrency as formatMoney } from '../lib/currency';
 import React, { useState, useEffect } from 'react';
 import { api, useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -60,9 +61,7 @@ export default function ReportsPage() {
     }
   };
 
-  const formatCurrency = (amount) => {
-    return `Q ${(amount || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`;
-  };
+  const formatCurrency = (amount) => formatMoney(amount);
 
   const handleExportExcel = async () => {
     setExporting(true);

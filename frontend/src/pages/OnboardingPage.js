@@ -8,7 +8,7 @@ import { Progress } from '../components/ui/progress';
 import {
   Rocket, CheckCircle2, Circle, ArrowRight, Lock, Building2,
   Store, Users, Package, UserPlus, ShoppingCart, Sparkles, Download,
-  ShieldCheck, Mail, BookOpen
+  ShieldCheck, Mail, BookOpen, Coins
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -41,6 +41,15 @@ export const STEPS = [
     cta: 'Ir a Configuración',
     href: '/settings',
     color: '#13B8B0',
+  },
+  {
+    id: 'choose_currency',
+    icon: Coins,
+    title: 'Elige la moneda de tu óptica',
+    description: 'Selecciona la moneda en la que opera tu óptica (por defecto Quetzal de Guatemala). Se aplicará a ventas, cotizaciones, caja, reportes y comprobantes. Solo cambia la presentación; no convierte montos.',
+    cta: 'Elegir moneda',
+    href: '/settings',
+    color: '#6D35D8',
   },
   {
     id: 'branches',
