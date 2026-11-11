@@ -45,6 +45,20 @@ const COUNTRIES = [
   { iso: 'ES', name: 'España', dial: '34' },
 ];
 const dialOf = (iso) => (COUNTRIES.find((c) => c.iso === iso) || COUNTRIES[0]).dial;
+const flagUrl = (iso) => `https://flagcdn.com/w40/${(iso || 'gt').toLowerCase()}.png`;
+
+const Flag = ({ iso }) => (
+  <img
+    src={flagUrl(iso)}
+    srcSet={`${flagUrl(iso)} 1x, https://flagcdn.com/w80/${(iso || 'gt').toLowerCase()}.png 2x`}
+    alt=""
+    width={22}
+    height={16}
+    loading="lazy"
+    className="w-[22px] h-4 rounded-[2px] object-cover ring-1 ring-black/10 shrink-0"
+    draggable="false"
+  />
+);
 
 const CONSENT_TEXT =
   'Acepto que Cortexia Optical utilice mis datos para crear y administrar mi cuenta, y para contactarme por WhatsApp y correo electrónico. Mis datos serán tratados de forma confidencial y puedo solicitar su eliminación cuando lo desee.';
@@ -141,6 +155,7 @@ export default function SelfRegisterPage() {
         email: form.email.trim(),
         password: form.password,
         whatsapp: `+${dialOf(form.country)} ${form.whatsapp.trim()}`,
+        country: form.country,
         location: form.location.trim(),
         promo_code: form.promo_code.trim(),
         consent: form.consent,
@@ -340,13 +355,20 @@ export default function SelfRegisterPage() {
                     <div className="mt-1 flex items-start gap-2">
                       <Select value={form.country} onValueChange={(v) => setField('country', v)}>
                         <SelectTrigger data-testid="register-country-code-select"
-                          className="h-11 w-[116px] shrink-0 rounded-xl focus:ring-[#13B8B0]">
-                          <span className="font-medium text-slate-700">+{dialOf(form.country)}</span>
+                          className="h-11 w-[132px] shrink-0 rounded-xl focus:ring-[#13B8B0]">
+                          <span className="flex items-center gap-2">
+                            <Flag iso={form.country} />
+                            <span className="font-medium text-slate-700">+{dialOf(form.country)}</span>
+                          </span>
                         </SelectTrigger>
                         <SelectContent className="max-h-72">
                           {COUNTRIES.map((c) => (
                             <SelectItem key={c.iso} value={c.iso} data-testid={`register-country-opt-${c.iso}`}>
-                              {c.name} (+{c.dial})
+                              <span className="flex items-center gap-2">
+                                <Flag iso={c.iso} />
+                                <span>{c.name}</span>
+                                <span className="text-slate-400">(+{c.dial})</span>
+                              </span>
                             </SelectItem>
                           ))}
                         </SelectContent>

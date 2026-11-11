@@ -60,3 +60,18 @@ def company_currency(company) -> str:
     """Devuelve el codigo de moneda de la optica (default GTQ)."""
     code = (company or {}).get("currency")
     return code if code in _BY_CODE else DEFAULT_CURRENCY
+
+
+# Moneda sugerida por pais (ISO 3166-1 alpha-2) para preseleccion en el registro.
+CURRENCY_BY_COUNTRY = {
+    "GT": "GTQ", "MX": "MXN", "CO": "COP", "CL": "CLP", "AR": "ARS",
+    "PE": "PEN", "BO": "BOB", "PY": "PYG", "UY": "UYU", "EC": "USD",
+    "VE": "VES", "HN": "HNL", "SV": "USD", "NI": "NIO", "CR": "CRC",
+    "PA": "USD", "DO": "DOP", "BR": "BRL", "US": "USD", "ES": "USD",
+}
+
+
+def currency_for_country(iso) -> str:
+    """Moneda sugerida para un pais (ISO alpha-2). Default GTQ si no se reconoce."""
+    code = CURRENCY_BY_COUNTRY.get((iso or "").strip().upper())
+    return code if code in _BY_CODE else DEFAULT_CURRENCY

@@ -1049,3 +1049,8 @@ Auditoria de seguridad completa (read-only) con 2 findings CRITICOS (P0) y vario
 ### P1: Facturacion formal IVA Guatemala
 ### P2: Portal del paciente
 ### P3: Recordatorios WhatsApp/SMS, Marketing
+
+### Internacionalización del registro (Jun 2026)
+- **Selector de código de país con banderas** en `/registro` (`SelfRegisterPage.jsx`): 20 países (LatAm + USA/España), Guatemala +502 por defecto. Banderas vía flagcdn.com (trigger + lista). data-testids: `register-country-code-select`, `register-country-opt-{ISO}`.
+- El WhatsApp se envía como `+{código} {número}` y el backend (`registration.py`) lo normaliza a formato internacional.
+- **País guardado + moneda preseleccionada**: el ISO del país se persiste en el pending registration y en la empresa (`companies.country`). Al activar la cuenta, la moneda de la óptica se preselecciona según el país vía `currency_for_country()` en `currency_config.py` (mapa `CURRENCY_BY_COUNTRY`; default GTQ). El admin puede cambiarla luego en Configuración.

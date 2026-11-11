@@ -29,6 +29,7 @@ from auth_utils import get_real_ip, hash_password, validate_password_strength, g
 from audit import log_audit
 from rate_limiter import limiter
 from routes.notifications import create_notification
+from currency_config import currency_for_country
 from email_service import (
     queue_email, render_verify_registration, render_welcome_self_service,
     render_registration_reminder,
@@ -105,6 +106,7 @@ class RegistrationSubmit(BaseModel):
     email: EmailStr
     password: str
     whatsapp: str
+    country: Optional[str] = ""
     location: Optional[str] = ""
     promo_code: Optional[str] = ""
     consent: bool = False
@@ -165,6 +167,7 @@ async def submit_registration(request: Request, data: RegistrationSubmit):
         "password_hash": hash_password(data.password),
         "whatsapp": whatsapp,
         "whatsapp_raw": (data.whatsapp or "").strip(),
+        "country": (data.country or "").strip().upper()[:2],
         "location": (data.location or "").strip(),
         "promo_code": matched_code,
         "promo_code_input": (data.promo_code or "").strip().upper() or None,
@@ -304,11 +307,14 @@ async def verify_registration(request: Request, data: VerifyRequest):
         company_name = (reg.get("optica_name") or reg.get("name") or "Optica").strip()
         admin_name = (reg.get("name") or "Administrador").strip()
         whatsapp = reg.get("whatsapp") or ""
+        country = (reg.get("country") or "").strip().upper()
 
         company_doc = {
             "name": company_name, "legal_name": "", "tax_id": "",
             "address": reg.get("location") or "", "phone": whatsapp, "email": email,
             "contact_name": admin_name, "contact_phone": whatsapp, "contact_email": email,
+            "country": country,
+            "currency": currency_for_country(country),
             "is_active": True, "billing_state": "active",
             "signup_source": "self_service",
             "promo_code": reg.get("promo_code"),
