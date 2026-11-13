@@ -8,6 +8,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Eye, Glasses, Pill, Download } from 'lucide-react';
 
+const TYPE_LABELS = { general: 'Consulta General', control: 'Control', urgencia: 'Urgencia', primera_vez: 'Primera Vez', seguimiento: 'Seguimiento' };
+const EyeRows = ({ rows }) => (
+  <table className="w-full text-sm">
+    <thead><tr className="border-b text-xs text-slate-500 uppercase"><th className="text-left py-1">Ojo</th><th className="py-1">Esfera</th><th className="py-1">Cilindro</th><th className="py-1">Eje</th><th className="py-1">ADD</th></tr></thead>
+    <tbody>
+      {rows.map((r) => (
+        <tr key={r.eye} className="border-b last:border-0 text-center font-mono">
+          <td className={`py-1 text-left font-sans font-bold ${r.eye === 'OD' ? 'text-blue-700' : 'text-green-700'}`}>{r.eye}</td>
+          <td className="py-1">{r.s || '-'}</td><td className="py-1">{r.c || '-'}</td><td className="py-1">{r.a || '-'}</td><td className="py-1">{r.d || '-'}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
+
 export function ConsultationViewDialog({
   open, onOpenChange, loading, consultation, downloadPdf,
 }) {
@@ -25,8 +40,9 @@ export function ConsultationViewDialog({
                 <Eye className="w-5 h-5 text-pine-700" />
                 Consulta del {consultation.consultation_date?.slice(0, 10)}
                 <span className="px-2 py-0.5 bg-pine-50 text-pine-700 text-xs rounded-full font-medium ml-1">
-                  {consultation.consultation_type}
+                  {TYPE_LABELS[consultation.consultation_type] || consultation.consultation_type}
                 </span>
+                <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] rounded-full font-medium" data-testid="legacy-readonly-badge">Histórica · solo lectura</span>
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
@@ -115,6 +131,26 @@ export function ConsultationViewDialog({
                 </div>
               )}
 
+              {[consultation.lensometry_od_sphere, consultation.lensometry_od_cyl, consultation.lensometry_oi_sphere, consultation.lensometry_oi_cyl].some(Boolean) && (
+                <div className="border rounded-lg p-3" data-testid="legacy-lensometry">
+                  <p className="text-xs font-semibold text-pine-700 uppercase mb-2">IV. Lensometria</p>
+                  <EyeRows rows={[
+                    { eye: 'OD', s: consultation.lensometry_od_sphere, c: consultation.lensometry_od_cyl, a: consultation.lensometry_od_axis, d: consultation.lensometry_od_add },
+                    { eye: 'OS', s: consultation.lensometry_oi_sphere, c: consultation.lensometry_oi_cyl, a: consultation.lensometry_oi_axis, d: consultation.lensometry_oi_add },
+                  ]} />
+                </div>
+              )}
+              {(consultation.refractions || []).map((r, i) => (
+                <div key={i} className="border rounded-lg p-3" data-testid={`legacy-refraction-${i}`}>
+                  <p className="text-xs font-semibold text-pine-700 uppercase mb-2">Refraccion {i + 1}{r.is_final ? ' · FINAL' : ''}</p>
+                  <EyeRows rows={[
+                    { eye: 'OD', s: r.od_sphere, c: r.od_cylinder, a: r.od_axis, d: r.od_addition },
+                    { eye: 'OS', s: r.os_sphere, c: r.os_cylinder, a: r.os_axis, d: r.os_addition },
+                  ]} />
+                  {r.observations && <p className="text-xs text-slate-500 mt-1">Obs: {r.observations}</p>}
+                </div>
+              ))}
+
               {consultation.anamnesis && (
                 <div>
                   <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Historia / Anamnesis</p>
@@ -174,7 +210,7 @@ export function ConsultationViewDialog({
                         <span>Lentes de Contacto ({rx.created_at?.slice(0, 10)})</span>
                       </div>
                       <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:text-teal-800"
-                        onClick={() => downloadPdf('contact-lens', rx._id)}>
+                        onClick={() => downloadPdf('contact', rx._id)}>
                         <Download className="w-3 h-3 mr-1" /> PDF
                       </Button>
                     </div>

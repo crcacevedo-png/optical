@@ -328,6 +328,7 @@ class ConsultationCreate(BaseModel):
     lensometry_oi_axis: Optional[str] = None
     lensometry_oi_add: Optional[str] = None
     refractions: Optional[List[Refraction]] = None
+    evaluation: Optional[dict] = None
 
 class ConsultationUpdate(BaseModel):
     consultation_type: Optional[str] = None
@@ -379,6 +380,7 @@ class ConsultationUpdate(BaseModel):
     lensometry_oi_axis: Optional[str] = None
     lensometry_oi_add: Optional[str] = None
     refractions: Optional[List[Refraction]] = None
+    evaluation: Optional[dict] = None
 
 class SupplierCreate(BaseModel):
     name: str

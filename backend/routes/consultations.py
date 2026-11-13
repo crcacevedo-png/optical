@@ -6,6 +6,7 @@ from typing import Optional
 from db import db, serialize_doc
 from auth_utils import get_current_user
 from models import ConsultationCreate, ConsultationUpdate
+from clinical_rules import next_code, sanitize_evaluation
 
 router = APIRouter(prefix="/consultations", tags=["Consultas"])
 
@@ -118,12 +119,15 @@ async def create_consultation(data: ConsultationCreate, user: dict = Depends(get
         "lensometry_oi_axis": data.lensometry_oi_axis or "",
         "lensometry_oi_add": data.lensometry_oi_add or "",
         "refractions": [r.model_dump() for r in (data.refractions or [])],
+        "evaluation": sanitize_evaluation(data.evaluation),
+        "exam_code": await next_code(user["company_id"], "EX"),
+        "exam_status": "en_curso",
         "created_by": ObjectId(user["_id"]),
         "created_at": now.isoformat(),
         "updated_at": now.isoformat()
     }
     result = await db.optical_consultations.insert_one(doc)
-    return {"_id": str(result.inserted_id), "message": "Consulta registrada"}
+    return {"_id": str(result.inserted_id), "exam_code": doc["exam_code"], "patient_id": data.patient_id, "message": "Consulta registrada"}
 
 @router.get("/{consultation_id}")
 async def get_consultation(consultation_id: str, user: dict = Depends(get_current_user)):
@@ -167,6 +171,8 @@ async def update_consultation(consultation_id: str, data: ConsultationUpdate, us
     c = await db.optical_consultations.find_one({"_id": ObjectId(consultation_id)})
     if not c or str(c["company_id"]) != user["company_id"]:
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
+    if c.get("exam_status") == "firmado":
+        raise HTTPException(status_code=409, detail="El examen esta firmado. Reabrelo para modificarlo.")
     
     update_data = {}
     all_fields = [
@@ -189,6 +195,8 @@ async def update_consultation(consultation_id: str, data: ConsultationUpdate, us
     
     if data.refractions is not None:
         update_data["refractions"] = [r.model_dump() for r in data.refractions]
+    if data.evaluation is not None:
+        update_data["evaluation"] = sanitize_evaluation(data.evaluation)
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.optical_consultations.update_one({"_id": ObjectId(consultation_id)}, {"$set": update_data})
     return {"message": "Consulta actualizada"}

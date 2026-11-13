@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { BranchFilter } from '../components/BranchFilter';
 import {
   Plus, CalendarIcon, ChevronLeft, ChevronRight,
-  Check, X, MoreHorizontal, Clock, MessageCircle, Phone, CircleDot, AlertTriangle
+  Check, X, MoreHorizontal, Clock, MessageCircle, Phone, CircleDot, AlertTriangle, Stethoscope
 } from 'lucide-react';
 import {
   format, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths,
@@ -21,7 +21,8 @@ import {
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
+import { NewExamDialog } from '../components/exam/NewExamDialog';
 
 const HOURS = [
   '08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30',
@@ -45,6 +46,7 @@ export default function AgendaPage() {
   const [branchId, setBranchId] = useState('');
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [examFor, setExamFor] = useState(null);
   const [formData, setFormData] = useState({
     patient_id: '', date: '', time: '', duration: 30, type: 'consulta', notes: ''
   });
@@ -200,11 +202,15 @@ export default function AgendaPage() {
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" data-testid={`appointment-menu-${apt._id}`}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setExamFor(apt)} data-testid={`start-exam-${apt._id}`}>
+              <Stethoscope className="w-4 h-4 mr-2" /> Iniciar examen
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => updateStatus(apt._id, 'confirmada')}>
               <Check className="w-4 h-4 mr-2" /> Confirmar
             </DropdownMenuItem>
@@ -658,6 +664,8 @@ export default function AgendaPage() {
           </div>
         </CardContent>
       </Card>
+      <NewExamDialog open={!!examFor} onOpenChange={(o) => !o && setExamFor(null)} appointmentId={examFor?._id}
+        patient={examFor?.patient_id ? { _id: examFor.patient_id, name: examFor.patient_name || 'Paciente' } : null} />
     </div>
   );
 }

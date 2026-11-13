@@ -21,6 +21,7 @@ from routes import (
     cash_register, support_tickets, billing, jornadas, jornada_ops, jornada_consignment,
     superadmin_retention, reactivation_feedback, sessions, security_reports, user_guide,
     email_queue_admin, leads, registration, patients_import,
+    clinical_exams, clinical_adaptations, clinical_rx,
 )
 
 app = FastAPI(title="Cortexia Optical API")
@@ -72,6 +73,9 @@ api_router.include_router(email_queue_admin.router)
 api_router.include_router(leads.router)
 api_router.include_router(registration.router)
 api_router.include_router(patients_import.router)
+api_router.include_router(clinical_exams.router)
+api_router.include_router(clinical_adaptations.router)
+api_router.include_router(clinical_rx.router)
 api_router.include_router(billing.cron_router)
 api_router.include_router(registration.cron_router)
 # Cron de la plataforma (Bearer WEBHOOK_CRON_SECRET) va bajo /api/cron/* via api_router.
@@ -434,6 +438,12 @@ async def startup():
     await db.optical_consultations.create_index([("company_id", 1), ("created_at", -1)])
     await db.eyeglass_prescriptions.create_index([("company_id", 1), ("patient_id", 1), ("created_at", -1)])
     await db.contact_lens_prescriptions.create_index([("company_id", 1), ("patient_id", 1), ("created_at", -1)])
+    await db.scleral_prescriptions.create_index([("company_id", 1), ("patient_id", 1), ("created_at", -1)])
+    await db.lens_adaptations.create_index([("company_id", 1), ("patient_id", 1), ("created_at", -1)])
+    await db.clinical_counters.create_index([("company_id", 1), ("prefix", 1), ("year", 1)], unique=True)
+    for _coll in (db.eyeglass_prescriptions, db.contact_lens_prescriptions, db.scleral_prescriptions):
+        await _coll.create_index([("consultation_id", 1)])
+        await _coll.create_index([("series_id", 1), ("version", -1)])
     await db.medical_prescriptions.create_index([("company_id", 1), ("patient_id", 1), ("created_at", -1)])
 
     # --- Branches ---

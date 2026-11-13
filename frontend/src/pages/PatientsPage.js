@@ -14,41 +14,15 @@ import { Checkbox } from '../components/ui/checkbox';
 import { 
   Search, Plus, User, Phone, Mail, Calendar, 
   FileText, Eye, ShoppingBag, ChevronRight,
-  ChevronLeft, Save, Pill, Glasses, Pencil, Download, Trash2
+  ChevronLeft, Pencil, Trash2, Stethoscope
 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  EyeglassRxDialog, ContactRxDialog, MedicalRxDialog,
-  PatientAddDialog, PatientEditDialog, PatientDeleteDialog
-} from '../components/patients/PatientDialogs';
+import { useNavigate } from 'react-router-dom';
+import { PatientAddDialog, PatientEditDialog, PatientDeleteDialog } from '../components/patients/PatientDialogs';
 import { ConsultationViewDialog } from '../components/patients/ConsultationViewDialog';
-import { ConsultationFormDialog } from '../components/patients/ConsultationFormDialog';
-import { NextAppointmentDialog } from '../components/appointments/NextAppointmentDialog';
+import { NewExamDialog } from '../components/exam/NewExamDialog';
+import { PatientRxPanel } from '../components/exam/PatientRxPanel';
 
-const VA_METHODS = ['Snellen', 'logMAR', 'ETDRS'];
-
-const defaultClinicalFields = {
-  wears_glasses: false, glasses_since: '', glasses_type: '',
-  ocular_surgeries: '', ocular_trauma: '', ocular_diseases: '',
-  diabetes: false, hypertension: false, autoimmune_disease: false, autoimmune_details: '',
-  current_medications: '', allergies: '',
-  family_glaucoma: false, family_glaucoma_relationship: '',
-  family_macular_degeneration: false, family_macular_relationship: '',
-  family_high_myopia: false, family_high_myopia_relationship: '',
-  family_other_history: '',
-  va_distance_without_rx_od: '', va_distance_without_rx_oi: '',
-  va_distance_with_rx_od: '', va_distance_with_rx_oi: '',
-  va_near_without_rx_od: '', va_near_without_rx_oi: '',
-  va_near_with_rx_od: '', va_near_with_rx_oi: '',
-  va_pinhole_od: '', va_pinhole_oi: '',
-  visual_acuity_method: 'Snellen'
-};
-
-const CONSULTATION_TYPES = [
-  { value: 'control', label: 'Control' },
-  { value: 'urgencia', label: 'Urgencia' },
-  { value: 'primera_vez', label: 'Primera Vez' },
-];
 const CONSULTATION_TYPE_LABELS = {
   general: 'Consulta General', control: 'Control', urgencia: 'Urgencia',
   primera_vez: 'Primera Vez', seguimiento: 'Seguimiento',
@@ -56,6 +30,7 @@ const CONSULTATION_TYPE_LABELS = {
 
 export default function PatientsPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [search, setSearch] = useState('');
@@ -78,50 +53,14 @@ export default function PatientsPage() {
     notes: ''
   });
 
-  // Consultation form state
-  const [showConsultationDialog, setShowConsultationDialog] = useState(false);
-  const [consultationForm, setConsultationForm] = useState({
-    consultation_date: new Date().toISOString().slice(0, 10),
-    consultation_time: new Date().toTimeString().slice(0, 5),
-    consultation_type: 'primera_vez',
-    chief_complaint: '',
-    anamnesis: '',
-    findings: '',
-    diagnosis: '',
-    treatment_plan: '',
-    recommendations: '',
-    notes: '',
-    ...defaultClinicalFields
-  });
-  const [savingConsultation, setSavingConsultation] = useState(false);
-  const [savedConsultationId, setSavedConsultationId] = useState(null);
+  const [showNewExam, setShowNewExam] = useState(false);
   const [viewConsultation, setViewConsultation] = useState(null);
   const [showViewConsultation, setShowViewConsultation] = useState(false);
   const [loadingConsultation, setLoadingConsultation] = useState(false);
 
-  // Prescription states
-  const [showEyeglassRx, setShowEyeglassRx] = useState(false);
-  const [eyeglassForm, setEyeglassForm] = useState({
-    od_sphere: '', od_cylinder: '', od_axis: '', od_addition: '', od_dp: '',
-    oi_sphere: '', oi_cylinder: '', oi_axis: '', oi_addition: '', oi_dp: '',
-    lens_type: '', frame_type: '', observations: ''
-  });
-  const [showContactRx, setShowContactRx] = useState(false);
-  const [contactForm, setContactForm] = useState({
-    od_power: '', od_bc: '', od_dia: '', od_cylinder: '', od_axis: '', od_addition: '',
-    oi_power: '', oi_bc: '', oi_dia: '', oi_cylinder: '', oi_axis: '', oi_addition: '',
-    brand: '', lens_type: '', replacement: '', observations: ''
-  });
-  const [showMedicalRx, setShowMedicalRx] = useState(false);
-  const [medicalForm, setMedicalForm] = useState({
-    diagnosis: '', medications: [{ _uid: crypto.randomUUID(), name: '', dosage: '', frequency: '', duration: '' }], instructions: ''
-  });
   const [showEditPatient, setShowEditPatient] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  // Modal para agendar proxima cita al terminar consulta
-  const [showNextAppt, setShowNextAppt] = useState(false);
-  const [nextApptCtx, setNextApptCtx] = useState({ patient_id: null, professional_id: null, professional_name: null });
 
   const fetchPatients = useCallback(async (searchTerm = '') => {
     try {
@@ -162,50 +101,6 @@ export default function PatientsPage() {
 
   const totalPages = Math.ceil(totalPatients / PAGE_SIZE);
 
-  const resetConsultationForm = () => {
-    setConsultationForm({
-      consultation_date: new Date().toISOString().slice(0, 10),
-      consultation_time: new Date().toTimeString().slice(0, 5),
-      consultation_type: 'primera_vez',
-      chief_complaint: '',
-      anamnesis: '',
-      findings: '',
-      diagnosis: '',
-      treatment_plan: '',
-      recommendations: '',
-      notes: '',
-      ...defaultClinicalFields
-    });
-  };
-
-  const handleCreateConsultation = async () => {
-    if (!consultationForm.chief_complaint) {
-      return toast.error('Ingrese el motivo de consulta');
-    }
-    setSavingConsultation(true);
-    try {
-      const { data } = await api.post('/api/consultations', {
-        patient_id: selectedPatient._id,
-        ...consultationForm
-      });
-      toast.success('Consulta registrada exitosamente');
-      const newId = data._id || data.id;
-      setSavedConsultationId(newId);
-      fetchPatientDetails(selectedPatient._id);
-      // Auto-abrir modal para agendar proxima cita
-      setNextApptCtx({
-        patient_id: selectedPatient._id,
-        professional_id: user?._id || null,
-        professional_name: user?.name || null,
-      });
-      setTimeout(() => setShowNextAppt(true), 300);
-    } catch (error) {
-      toast.error(formatApiErrorDetail(error.response?.data?.detail));
-    } finally {
-      setSavingConsultation(false);
-    }
-  };
-
   const openConsultationDetail = async (consultationId) => {
     setLoadingConsultation(true);
     setShowViewConsultation(true);
@@ -218,76 +113,6 @@ export default function PatientsPage() {
     } finally {
       setLoadingConsultation(false);
     }
-  };
-
-  // Prescription handlers
-  const rxConsultationId = savedConsultationId;
-  const rxPatientId = selectedPatient?._id;
-
-  const handleCreateEyeglassRx = async () => {
-    if (!rxConsultationId) return;
-    try {
-      await api.post('/api/prescriptions/eyeglass', {
-        patient_id: rxPatientId,
-        consultation_id: rxConsultationId,
-        professional_name: user?.name,
-        ...eyeglassForm
-      });
-      toast.success('Receta de anteojos creada');
-      setShowEyeglassRx(false);
-      setEyeglassForm({ od_sphere: '', od_cylinder: '', od_axis: '', od_addition: '', od_dp: '', oi_sphere: '', oi_cylinder: '', oi_axis: '', oi_addition: '', oi_dp: '', lens_type: '', frame_type: '', observations: '' });
-      fetchPatientDetails(selectedPatient._id);
-    } catch (err) {
-      toast.error(formatApiErrorDetail(err?.response?.data?.detail));
-    }
-  };
-
-  const handleCreateContactRx = async () => {
-    if (!rxConsultationId) return;
-    try {
-      await api.post('/api/prescriptions/contact-lens', {
-        patient_id: rxPatientId,
-        consultation_id: rxConsultationId,
-        professional_name: user?.name,
-        ...contactForm
-      });
-      toast.success('Receta de lentes de contacto creada');
-      setShowContactRx(false);
-      setContactForm({ od_power: '', od_bc: '', od_dia: '', od_cylinder: '', od_axis: '', od_addition: '', oi_power: '', oi_bc: '', oi_dia: '', oi_cylinder: '', oi_axis: '', oi_addition: '', brand: '', lens_type: '', replacement: '', observations: '' });
-      fetchPatientDetails(selectedPatient._id);
-    } catch (err) {
-      toast.error(formatApiErrorDetail(err?.response?.data?.detail));
-    }
-  };
-
-  const handleCreateMedicalRx = async () => {
-    if (!rxConsultationId) return;
-    try {
-      await api.post('/api/prescriptions/medical', {
-        patient_id: rxPatientId,
-        consultation_id: rxConsultationId,
-        professional_name: user?.name,
-        ...medicalForm
-      });
-      toast.success('Receta medica creada');
-      setShowMedicalRx(false);
-      setMedicalForm({ diagnosis: '', medications: [{ name: '', dosage: '', frequency: '', duration: '' }], instructions: '' });
-      fetchPatientDetails(selectedPatient._id);
-    } catch (err) {
-      toast.error(formatApiErrorDetail(err?.response?.data?.detail));
-    }
-  };
-
-  const addMedication = () => {
-    setMedicalForm(f => ({ ...f, medications: [...f.medications, { _uid: crypto.randomUUID(), name: '', dosage: '', frequency: '', duration: '' }] }));
-  };
-  const updateMedication = (idx, field, value) => {
-    const meds = [...medicalForm.medications];
-    meds[idx][field] = value;
-    setMedicalForm(f => ({ ...f, medications: meds }));
-  };
-  const removeMedication = (idx) => {
-    setMedicalForm(f => ({ ...f, medications: f.medications.filter((_, i) => i !== idx) }));
   };
 
   const downloadPdf = async (type, id) => {
@@ -468,9 +293,9 @@ export default function PatientsPage() {
                     <CardTitle className="font-heading text-xl">
                       {selectedPatient.first_name} {selectedPatient.last_name}
                     </CardTitle>
-                    <Button size="sm" className="bg-pine-700 hover:bg-pine-800" data-testid="header-new-consultation-btn"
-                      onClick={() => { resetConsultationForm(); setSavedConsultationId(null); setShowConsultationDialog(true); }}>
-                      <Eye className="w-4 h-4 mr-1" /> Nueva Consulta
+                    <Button size="sm" className="bg-pine-700 hover:bg-pine-800" data-testid="header-new-exam-btn"
+                      onClick={() => setShowNewExam(true)}>
+                      <Stethoscope className="w-4 h-4 mr-1" /> Nuevo examen
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-4 mt-2 text-sm text-slate-500">
@@ -525,11 +350,16 @@ export default function PatientsPage() {
                       <div className="space-y-3">
                         {selectedPatient.consultations.map((con) => (
                           <div key={con._id} className="p-3 bg-slate-50 rounded-lg border cursor-pointer hover:bg-slate-100 hover:border-pine-200 transition-colors"
-                            onClick={() => openConsultationDetail(con._id)} data-testid={`consultation-history-${con._id}`}>
+                            onClick={() => (con.exam_code ? navigate(`/exams/${con._id}`) : openConsultationDetail(con._id))} data-testid={`consultation-history-${con._id}`}>
                             <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-sm font-semibold text-pine-700">{con.consultation_date?.slice(0, 10)}</span>
                                 <span className="px-2 py-0.5 bg-pine-50 text-pine-600 text-[10px] rounded-full font-medium">{CONSULTATION_TYPE_LABELS[con.consultation_type] || con.consultation_type}</span>
+                                {con.exam_code ? (
+                                  <span className={`px-2 py-0.5 text-[10px] rounded-full font-semibold border ${con.exam_status === 'firmado' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>
+                                    {con.exam_code} · {con.exam_status === 'firmado' ? 'Firmado' : 'En curso'}
+                                  </span>
+                                ) : <span className="px-2 py-0.5 text-[10px] rounded-full font-medium bg-slate-100 text-slate-500">Histórica</span>}
                               </div>
                               <span className="text-xs text-slate-400">{con.professional_name || ''}</span>
                             </div>
@@ -544,51 +374,7 @@ export default function PatientsPage() {
                   </TabsContent>
 
                   <TabsContent value="prescriptions" className="p-4 m-0">
-                    <h3 className="font-medium text-slate-900 mb-3">Recetas de Anteojos</h3>
-                    {selectedPatient.eyeglass_prescriptions?.length > 0 ? (
-                      <div className="space-y-3">
-                        {selectedPatient.eyeglass_prescriptions.map((rx) => (
-                          <div key={rx._id} className="p-4 rounded-lg bg-slate-50 border border-slate-100">
-                            <div className="flex justify-between items-start mb-3">
-                              <span className="text-sm text-slate-500">{rx.created_at?.slice(0, 10)}</span>
-                              <Button size="sm" variant="outline" onClick={() => downloadPdf('eyeglass', rx._id)}>
-                                Imprimir PDF
-                              </Button>
-                            </div>
-                            <div className="grid grid-cols-6 gap-2 text-sm">
-                              <div className="font-medium text-slate-500"></div>
-                              <div className="font-medium text-slate-500 text-center">Esfera</div>
-                              <div className="font-medium text-slate-500 text-center">Cilindro</div>
-                              <div className="font-medium text-slate-500 text-center">Eje</div>
-                              <div className="font-medium text-slate-500 text-center">Adición</div>
-                              <div className="font-medium text-slate-500 text-center">D.P.</div>
-                              
-                              <div className="font-medium">OD</div>
-                              <div className="text-center">{rx.od_sphere || '-'}</div>
-                              <div className="text-center">{rx.od_cylinder || '-'}</div>
-                              <div className="text-center">{rx.od_axis || '-'}</div>
-                              <div className="text-center">{rx.od_addition || '-'}</div>
-                              <div className="text-center">{rx.od_dp || '-'}</div>
-                              
-                              <div className="font-medium">OS</div>
-                              <div className="text-center">{rx.oi_sphere || '-'}</div>
-                              <div className="text-center">{rx.oi_cylinder || '-'}</div>
-                              <div className="text-center">{rx.oi_axis || '-'}</div>
-                              <div className="text-center">{rx.oi_addition || '-'}</div>
-                              <div className="text-center">{rx.oi_dp || '-'}</div>
-                            </div>
-                            {rx.observations && (
-                              <p className="mt-3 text-sm text-slate-600 border-t pt-2">
-                                <span className="font-medium">Observaciones:</span> {rx.observations}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-slate-500 text-center py-4">Sin recetas de anteojos</p>
-                    )}
-
+                    <PatientRxPanel patient={selectedPatient} />
                     <h3 className="font-medium text-slate-900 mb-3 mt-6">Recetas Médicas</h3>
                     {selectedPatient.medical_prescriptions?.length > 0 ? (
                       <div className="space-y-3">
@@ -731,27 +517,8 @@ export default function PatientsPage() {
         )}
       </div>
 
-      {/* Nueva Consulta Dialog */}
-      <ConsultationFormDialog
-        open={showConsultationDialog}
-        onOpenChange={setShowConsultationDialog}
-        patient={selectedPatient}
-        form={consultationForm}
-        setForm={setConsultationForm}
-        onSubmit={handleCreateConsultation}
-        savedId={savedConsultationId}
-        setSavedId={setSavedConsultationId}
-        submitting={savingConsultation}
-        resetForm={resetConsultationForm}
-        CONSULTATION_TYPES={CONSULTATION_TYPES}
-        VA_METHODS={VA_METHODS}
-        setEyeglassForm={setEyeglassForm}
-        openEyeglassRx={() => setShowEyeglassRx(true)}
-        setContactForm={setContactForm}
-        openContactRx={() => setShowContactRx(true)}
-        setMedicalForm={setMedicalForm}
-        openMedicalRx={() => setShowMedicalRx(true)}
-      />
+      <NewExamDialog open={showNewExam} onOpenChange={setShowNewExam}
+        patient={selectedPatient ? { _id: selectedPatient._id, first_name: selectedPatient.first_name, last_name: selectedPatient.last_name } : null} />
 
       <ConsultationViewDialog
         open={showViewConsultation}
@@ -761,31 +528,6 @@ export default function PatientsPage() {
         downloadPdf={downloadPdf}
       />
 
-      {/* ===== Extracted dialogs (see components/patients/PatientDialogs.js) ===== */}
-      <EyeglassRxDialog
-        open={showEyeglassRx}
-        onOpenChange={setShowEyeglassRx}
-        form={eyeglassForm}
-        setForm={setEyeglassForm}
-        onSubmit={handleCreateEyeglassRx}
-      />
-      <ContactRxDialog
-        open={showContactRx}
-        onOpenChange={setShowContactRx}
-        form={contactForm}
-        setForm={setContactForm}
-        onSubmit={handleCreateContactRx}
-      />
-      <MedicalRxDialog
-        open={showMedicalRx}
-        onOpenChange={setShowMedicalRx}
-        form={medicalForm}
-        setForm={setMedicalForm}
-        onSubmit={handleCreateMedicalRx}
-        addMedication={addMedication}
-        updateMedication={updateMedication}
-        removeMedication={removeMedication}
-      />
       <PatientEditDialog
         open={showEditPatient}
         onOpenChange={setShowEditPatient}
@@ -798,13 +540,6 @@ export default function PatientsPage() {
         onOpenChange={setShowDeleteConfirm}
         patient={selectedPatient}
         onConfirm={handleDeletePatient}
-      />
-      <NextAppointmentDialog
-        open={showNextAppt}
-        onOpenChange={setShowNextAppt}
-        patientId={nextApptCtx.patient_id}
-        professionalId={nextApptCtx.professional_id}
-        professionalName={nextApptCtx.professional_name}
       />
     </div>
   );
