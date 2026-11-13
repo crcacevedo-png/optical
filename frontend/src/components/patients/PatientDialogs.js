@@ -256,11 +256,11 @@ export function MedicalRxDialog({ open, onOpenChange, form, setForm, onSubmit, a
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Pill className="w-5 h-5 text-purple-600" /> Receta Medica</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Pill className="w-5 h-5 text-purple-600" /> Receta médica</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1">
-            <Label>Diagnostico</Label>
+            <Label>Diagnóstico</Label>
             <Input value={form.diagnosis} onChange={(e) => setForm(f => ({ ...f, diagnosis: e.target.value }))} data-testid={`${testIdPrefix}med-rx-diagnosis`} />
           </div>
           <div>
@@ -271,22 +271,22 @@ export function MedicalRxDialog({ open, onOpenChange, form, setForm, onSubmit, a
               </Button>
             </div>
             {form.medications.map((med, idx) => (
-              <div key={med._uid || idx} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 mb-2 items-end">
-                <div className="space-y-1">
+              <div key={med._uid || idx} className="grid grid-cols-2 sm:grid-cols-[1fr_auto_auto_auto_auto] gap-2 mb-2 items-end min-w-0">
+                <div className="space-y-1 col-span-2 sm:col-span-1">
                   <Label className="text-[10px]">Medicamento</Label>
                   <Input className="h-8 text-sm" value={med.name} onChange={(e) => updateMedication(idx, 'name', e.target.value)} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[10px]">Dosis</Label>
-                  <Input className="h-8 text-sm w-20" value={med.dosage} onChange={(e) => updateMedication(idx, 'dosage', e.target.value)} />
+                  <Input className="h-8 text-sm sm:w-20" value={med.dosage} onChange={(e) => updateMedication(idx, 'dosage', e.target.value)} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[10px]">Frecuencia</Label>
-                  <Input className="h-8 text-sm w-24" value={med.frequency} onChange={(e) => updateMedication(idx, 'frequency', e.target.value)} />
+                  <Input className="h-8 text-sm sm:w-24" value={med.frequency} onChange={(e) => updateMedication(idx, 'frequency', e.target.value)} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px]">Duracion</Label>
-                  <Input className="h-8 text-sm w-20" value={med.duration} onChange={(e) => updateMedication(idx, 'duration', e.target.value)} />
+                  <Label className="text-[10px]">Duración</Label>
+                  <Input className="h-8 text-sm sm:w-20" value={med.duration} onChange={(e) => updateMedication(idx, 'duration', e.target.value)} />
                 </div>
                 {form.medications.length > 1 && (
                   <Button variant="ghost" size="sm" className="text-red-500 h-8 w-8 p-0" onClick={() => removeMedication(idx)}>X</Button>

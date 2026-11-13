@@ -284,7 +284,7 @@ export default function MainLayout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 lg:p-8 p-4 pt-[85px] lg:pt-8 min-h-screen">
+      <main className="flex-1 min-w-0 lg:p-8 p-4 pt-[85px] lg:pt-8 min-h-screen">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-end items-center gap-3 mb-4">
             <OfflineIndicator />

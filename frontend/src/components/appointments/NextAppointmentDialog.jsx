@@ -64,7 +64,7 @@ export function NextAppointmentDialog({
         professional_id: professionalId || null,
         professional_name: professionalName || null,
       });
-      toast.success(`Proxima cita agendada para ${form.date} ${form.time}`);
+      toast.success(`Próxima cita agendada para ${form.date} ${form.time}`);
       onOpenChange(false);
       if (onSaved) onSaved();
     } catch (err) {
@@ -78,9 +78,9 @@ export function NextAppointmentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md" data-testid="next-appt-dialog">
         <DialogHeader>
-          <DialogTitle>Agendar proxima cita</DialogTitle>
+          <DialogTitle>Agendar próxima cita</DialogTitle>
           <DialogDescription>
-            La consulta se guardo correctamente. Reserva la siguiente cita del paciente ahora - o saltalo si no aplica.
+            Reserva la siguiente cita del paciente (control, entrega de lentes o seguimiento). Puedes omitirlo si no aplica.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -96,7 +96,7 @@ export function NextAppointmentDialog({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
-              <Label>Duracion (min)</Label>
+              <Label>Duración (min)</Label>
               <Input type="number" min="15" step="15" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} />
             </div>
             <div className="space-y-1.5">
@@ -105,7 +105,7 @@ export function NextAppointmentDialog({
                 <SelectTrigger data-testid="next-appt-type"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="general">Control</SelectItem>
-                  <SelectItem value="revision">Revision</SelectItem>
+                  <SelectItem value="revision">Revisión</SelectItem>
                   <SelectItem value="postoperatorio">Postoperatorio</SelectItem>
                   <SelectItem value="entrega">Entrega de lentes</SelectItem>
                 </SelectContent>

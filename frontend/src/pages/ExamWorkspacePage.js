@@ -101,7 +101,7 @@ export default function ExamWorkspacePage() {
         <ExamRxSection exam={exam} items={rx.items} medical={rx.medical || []} adaptations={adaptations} reload={reloadRx} onMedical={medical.start} />
       </div>
       <div ref={refs[3]} className="scroll-mt-28">
-        <PrintPanel items={printable} title="Imprimir y entregar" testId="exam-print-panel" />
+        <PrintPanel items={printable} title="Imprimir y entregar" testId="exam-print-panel" onPrinted={loadRx} />
       </div>
 
       <ConfirmDialog open={dialog === 'sign'} onOpenChange={(o) => !o && setDialog(null)} title="Firmar examen" testId="sign-exam-dialog" confirmLabel="Firmar examen"

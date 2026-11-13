@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
-import { api } from '../../context/AuthContext';
+import { api, useAuth } from '../../context/AuthContext';
 import { RxCard } from './RxCard';
 import { RxEditorDialog } from './RxEditorDialog';
 import { PrintPanel } from './PrintPanel';
@@ -21,6 +21,8 @@ const Chip = ({ active, onClick, children, testId }) => (
 // Panel de recetas del paciente (solo flujo nuevo): estados, acciones e impresión múltiple.
 export function PatientRxPanel({ patient }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canIssue = ['admin', 'doctor'].includes(user?.role) || !user?.allowed_menu_items || user.allowed_menu_items.includes('prescriptions');
   const [items, setItems] = useState(null);
   const [adaptations, setAdaptations] = useState([]);
   const [status, setStatus] = useState('todas');
@@ -68,16 +70,16 @@ export function PatientRxPanel({ patient }) {
       ) : (
         <div className="space-y-2.5" data-testid="patient-rx-list">
           {shown.map((rx) => (
-            <RxCard key={`${rx.kind}-${rx._id}`} rx={rx} actions={actions} canIssue
+            <RxCard key={`${rx.kind}-${rx._id}`} rx={rx} actions={actions} canIssue={canIssue}
               onEdit={(r) => setEditor({ kind: r.kind, rx: r })} onView={(r) => setEditor({ kind: r.kind, rx: r })}
               onOpenExam={(r) => navigate(`/exams/${r.consultation_id}`)} />
           ))}
         </div>
       )}
       <PrintPanel items={printable} title="Impresión múltiple" testId="patient-print-panel"
-        subtitle="Selecciona varias recetas emitidas del paciente y genera un PDF conjunto o archivos separados." />
+        subtitle="Selecciona varias recetas emitidas del paciente y genera un PDF conjunto o archivos separados." onPrinted={load} />
       <RxEditorDialog open={!!editor} onOpenChange={(o) => !o && setEditor(null)} kind={editor?.kind} rx={editor?.rx || null}
-        ctx={{ patientId: patient._id, examId: editor?.rx?.consultation_id, adaptations, canIssue: true }} onSaved={async (rx, { issue }) => { await load(); if (issue) actions.issue(rx); }} />
+        ctx={{ patientId: patient._id, examId: editor?.rx?.consultation_id, adaptations, canIssue }} onSaved={async (rx, { issue }) => { await load(); if (issue) actions.issue(rx); }} />
       {dialogs}
     </div>
   );

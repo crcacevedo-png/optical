@@ -42,7 +42,7 @@ export function ConsultationViewDialog({
                 <span className="px-2 py-0.5 bg-pine-50 text-pine-700 text-xs rounded-full font-medium ml-1">
                   {TYPE_LABELS[consultation.consultation_type] || consultation.consultation_type}
                 </span>
-                <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] rounded-full font-medium" data-testid="legacy-readonly-badge">Histórica · solo lectura</span>
+                <span className="px-2.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 text-xs rounded-full font-semibold" data-testid="legacy-readonly-badge">Histórica · solo lectura</span>
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">

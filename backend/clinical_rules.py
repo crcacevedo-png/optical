@@ -160,10 +160,11 @@ async def require_issue(user, exam=None):
 
 async def load_exam(exam_id, user, projection=None):
     require_tenant(user)
-    e = await db.optical_consultations.find_one({"_id": oid(exam_id, "Examen")}, projection)
-    if not e or str(e.get("company_id")) != str(user["company_id"]):
+    # Uso interno: los handlers necesitan los ObjectId crudos; serializan antes de responder.
+    found = await db.optical_consultations.find({"_id": oid(exam_id, "Examen")}, projection).to_list(1)
+    if not found or str(found[0].get("company_id")) != str(user["company_id"]):
         raise HTTPException(status_code=404, detail="Examen no encontrado")
-    return e
+    return found[0]
 
 
 async def load_patient(patient_id, user):

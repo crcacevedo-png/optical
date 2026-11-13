@@ -104,7 +104,7 @@ export function RxEditorDialog({ open, onOpenChange, kind, rx, initial, ctx, onS
             {readOnly ? 'Receta emitida: se muestran los valores congelados al momento de la emisión.' : 'Los cambios se guardan como borrador. La receta solo tiene validez al emitirla.'}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-5">
+        <div className="space-y-5 min-w-0">
           <SourceBanner kind={kind} rx={rx} fr={fr} adaptations={ctx?.adaptations} adaptationId={adaptationId} setAdaptationId={setAdaptationId} onReload={reload} readOnly={readOnly} />
           <KindFields v={v} set={set} readOnly={readOnly} />
           <CommonFields kind={kind} v={v} set={set} readOnly={readOnly} />

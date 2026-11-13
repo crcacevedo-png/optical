@@ -12,7 +12,7 @@ const keyOf = (rx) => `${rx.kind}-${rx._id}`;
 const codeOf = (rx) => rx.code_display || `RM-${String(rx._id).slice(-6).toUpperCase()}`;
 
 // Impresión múltiple: solo recetas entregables (emitidas, históricas o médicas).
-export function PrintPanel({ items, title = 'Imprimir recetas', subtitle, testId = 'print-panel' }) {
+export function PrintPanel({ items, title = 'Imprimir recetas', subtitle, onPrinted, testId = 'print-panel' }) {
   const [sel, setSel] = useState({});
   const [busy, setBusy] = useState(null);
   const ids = useMemo(() => items.map(keyOf).join('|'), [items]);
@@ -29,6 +29,7 @@ export function PrintPanel({ items, title = 'Imprimir recetas', subtitle, testId
       const res = await api.post('/api/clinical/prescriptions/print', { items: chosen.map((rx) => ({ kind: rx.kind, id: rx._id, copies: sel[keyOf(rx)] })) }, { responseType: 'blob' });
       openPdfBlob(res.data);
       toast.success(`PDF conjunto con ${chosen.length} receta(s)`);
+      onPrinted?.();
     } catch (err) {
       let msg = 'No se pudo generar el PDF';
       try { msg = JSON.parse(await err.response.data.text()).detail || msg; } catch (e) { /* respuesta no JSON */ }
@@ -43,6 +44,7 @@ export function PrintPanel({ items, title = 'Imprimir recetas', subtitle, testId
         openPdfBlob(res.data, `${codeOf(rx)}.pdf`);
       }
       toast.success(`${chosen.length} PDF descargado(s)`);
+      onPrinted?.();
     } catch (err) { toast.error(apiError(err, 'No se pudo generar alguno de los PDF')); }
     finally { setBusy(null); }
   };

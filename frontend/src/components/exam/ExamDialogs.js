@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
 import { Loader2 } from 'lucide-react';
 
-export function ConfirmDialog({ open, onOpenChange, title, description, children, confirmLabel = 'Confirmar', onConfirm, danger = false, testId = 'confirm-dialog' }) {
+export function ConfirmDialog({ open, onOpenChange, title, description, children, confirmLabel = 'Confirmar', onConfirm, danger = false, disabled = false, testId = 'confirm-dialog' }) {
   const [busy, setBusy] = useState(false);
   const run = async () => { setBusy(true); try { await onConfirm(); } finally { setBusy(false); } };
   return (
@@ -19,7 +19,7 @@ export function ConfirmDialog({ open, onOpenChange, title, description, children
         {children}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} data-testid={`${testId}-cancel`}>Cancelar</Button>
-          <Button onClick={run} disabled={busy} className={danger ? 'bg-red-600 hover:bg-red-700' : 'bg-pine-700 hover:bg-pine-800'} data-testid={`${testId}-confirm`}>
+          <Button onClick={run} disabled={busy || disabled} className={danger ? 'bg-red-600 hover:bg-red-700' : 'bg-pine-700 hover:bg-pine-800'} data-testid={`${testId}-confirm`}>
             {busy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}{confirmLabel}
           </Button>
         </DialogFooter>
@@ -32,7 +32,7 @@ export function ReasonDialog({ open, onOpenChange, title, description, confirmLa
   const [reason, setReason] = useState('');
   useEffect(() => { if (open) setReason(''); }, [open]);
   return (
-    <ConfirmDialog open={open} onOpenChange={onOpenChange} title={title} description={description} danger={danger}
+    <ConfirmDialog open={open} onOpenChange={onOpenChange} title={title} description={description} danger={danger} disabled={reason.trim().length < 5}
       confirmLabel={confirmLabel} testId={testId} onConfirm={() => onConfirm(reason.trim())}>
       <div className="space-y-1">
         <Label className="text-xs">Motivo (obligatorio)</Label>
